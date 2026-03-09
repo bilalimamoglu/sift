@@ -42,13 +42,6 @@ Requires Node.js 20 or later.
 npm install -g @bilalimamoglu/sift
 ```
 
-## `0.2.0` migration
-
-If you are upgrading from `0.1.0`:
-
-- replace `SIFT_API_KEY` with `SIFT_PROVIDER_API_KEY`
-- replace `sift exec preset <name> -- ...` with `sift exec --preset <name> -- ...`
-
 ## One-time setup
 
 Set credentials once in your shell:
@@ -238,6 +231,34 @@ sift doctor
 sift presets list
 sift presets show <name>
 ```
+
+## Releasing
+
+`sift` uses a manual GitHub Actions release workflow with npm trusted publishing.
+
+Before the first release:
+
+1. configure npm trusted publishing for `@bilalimamoglu/sift`
+2. point it at `bilalimamoglu/sift`
+3. use the workflow filename `release.yml`
+4. set the GitHub Actions environment name to `release`
+
+For each release:
+
+1. update `package.json` to the target version
+2. merge the final release commit to `main`
+3. open GitHub Actions and run the `release` workflow manually
+
+The workflow will:
+
+1. install dependencies
+2. typecheck, test, and build
+3. pack and smoke-test the tarball
+4. publish to npm
+5. create and push the `vX.Y.Z` tag
+6. create a GitHub Release
+
+`release.yml` uses OIDC trusted publishing, so it does not require an `NPM_TOKEN`.
 
 ## Using it with Codex
 

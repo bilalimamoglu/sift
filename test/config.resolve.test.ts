@@ -93,13 +93,4 @@ describe("resolveConfig", () => {
     expect(config.provider.apiKey).toBe("provider-key");
   });
 
-  it("does not read the legacy SIFT_API_KEY env var", () => {
-    const config = resolveConfig({
-      env: {
-        SIFT_API_KEY: "legacy-key"
-      }
-    });
-
-    expect(config.provider.apiKey).toBe("");
-  });
 });

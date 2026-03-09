@@ -1,0 +1,89 @@
+name: release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+          cache: npm
+
+      - name: Read package metadata
+        id: pkg
+        run: |
+          echo "name=$(node -p \"require('./package.json').name\")" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+          echo "tag=v$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+
+      - name: Fail if release tag already exists
+        run: |
+          git fetch --tags --force
+          if git rev-parse "${{ steps.pkg.outputs.tag }}" >/dev/null 2>&1; then
+            echo "Tag already exists: ${{ steps.pkg.outputs.tag }}" >&2
+            exit 1
+          fi
+
+      - name: Fail if npm version already exists
+        run: |
+          if npm view "${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }}" version >/dev/null 2>&1; then
+            echo "npm version already exists: ${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }}" >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Pack
+        id: pack
+        run: |
+          echo "tarball=$(npm pack | tail -n 1)" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke install tarball
+        run: |
+          TMP_DIR="$(mktemp -d)"
+          cp "${{ steps.pack.outputs.tarball }}" "$TMP_DIR/"
+          cd "$TMP_DIR"
+          npm init -y >/dev/null 2>&1
+          npm install "./${{ steps.pack.outputs.tarball }}" >/dev/null 2>&1
+          npx --no-install sift --help >/dev/null
+          npx --no-install sift exec --dry-run "did tests pass?" -- node -e "console.log('12 passed')" >/dev/null
+
+      - name: Publish to npm
+        run: npm publish --access public
+
+      - name: Create and push git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.pkg.outputs.tag }}" -m "sift ${{ steps.pkg.outputs.tag }}"
+          git push origin "${{ steps.pkg.outputs.tag }}"
+
+      - name: Create GitHub release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.pkg.outputs.tag }}" \
+            --title "${{ steps.pkg.outputs.tag }}" \
+            --generate-notes

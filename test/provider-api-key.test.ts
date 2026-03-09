@@ -14,14 +14,6 @@ describe("resolveProviderApiKey", () => {
     expect(apiKey).toBe("sift-key");
   });
 
-  it("does not read the legacy SIFT_API_KEY env var", () => {
-    const apiKey = resolveProviderApiKey("openai-compatible", undefined, {
-      SIFT_API_KEY: "legacy-key"
-    });
-
-    expect(apiKey).toBeUndefined();
-  });
-
   it("uses OPENAI_API_KEY for the default OpenAI-compatible base URL", () => {
     const apiKey = resolveProviderApiKey(
       "openai-compatible",

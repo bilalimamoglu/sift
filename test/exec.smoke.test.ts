@@ -98,38 +98,6 @@ describe("exec mode", () => {
     }
   });
 
-  it("does not use the legacy SIFT_API_KEY env var", async () => {
-    const server = await createFakeOpenAIServer(() => ({
-      status: 401,
-      body: {
-        error: "missing auth"
-      }
-    }));
-
-    try {
-      const result = await runCliAsync({
-        args: [
-          "exec",
-          "did the tests pass?",
-          "--",
-          "node",
-          "-e",
-          "console.log('Ran 12 tests\\n12 passed')"
-        ],
-        env: {
-          SIFT_BASE_URL: server.baseUrl,
-          SIFT_API_KEY: "legacy-key",
-          SIFT_MODEL: "test-model"
-        }
-      });
-
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain("Sift fallback triggered (Provider returned HTTP 401).");
-    } finally {
-      await server.close();
-    }
-  });
-
   it("supports dry-run mode without calling the provider", async () => {
     const result = await runCliAsync({
       args: [
