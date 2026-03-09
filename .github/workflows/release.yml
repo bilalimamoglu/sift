@@ -70,7 +70,7 @@ jobs:
           npm init -y >/dev/null 2>&1
           npm install "./${{ steps.pack.outputs.tarball }}" >/dev/null 2>&1
           npx --no-install sift --help >/dev/null
-          npx --no-install sift exec --dry-run "did tests pass?" -- node -e "console.log('12 passed')" >/dev/null
+          npx --no-install sift exec "did tests pass?" --dry-run -- node -e "console.log('12 passed')" >/dev/null
 
       - name: Publish to npm
         run: npm publish --access public

@@ -41,6 +41,7 @@ describe("release workflow", () => {
     expect(workflow).toContain("fetch-depth: 0");
     expect(workflow).toContain("contents: write");
     expect(workflow).toContain("id-token: write");
+    expect(workflow).toContain('sift exec "did tests pass?" --dry-run -- node -e "console.log(\'12 passed\')"');
     expect(workflow).not.toContain("NODE_AUTH_TOKEN");
     expect(workflow).not.toContain("NPM_TOKEN");
   });
