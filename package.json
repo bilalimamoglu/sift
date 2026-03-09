@@ -1,0 +1,57 @@
+{
+  "name": "@bilalimamoglu/sift",
+  "version": "0.1.0",
+  "description": "Agent-first command-output reduction layer for agents, CI, and automation.",
+  "type": "module",
+  "bin": {
+    "sift": "dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
+  },
+  "keywords": [
+    "cli",
+    "llm",
+    "agents",
+    "automation",
+    "terminal",
+    "logs",
+    "ci",
+    "json"
+  ],
+  "author": "Bilal Imamoglu",
+  "license": "MIT",
+  "dependencies": {
+    "cac": "^6.7.14",
+    "picocolors": "^1.1.1",
+    "strip-ansi": "^7.1.0",
+    "yaml": "^2.8.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
