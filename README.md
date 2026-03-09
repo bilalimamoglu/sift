@@ -36,6 +36,8 @@ then sending the full raw output to a large model is wasteful.
 
 ## Installation
 
+Requires Node.js 20 or later.
+
 ```bash
 npm install -g @bilalimamoglu/sift
 ```
