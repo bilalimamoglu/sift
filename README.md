@@ -83,6 +83,7 @@ sift exec --preset infra-risk -- terraform plan
 sift exec "did tests pass?" -- pytest
 sift exec "what changed?" -- git diff
 sift exec --preset infra-risk -- terraform plan
+sift exec --dry-run "what changed?" -- git diff
 ```
 
 What happens:
@@ -93,6 +94,8 @@ What happens:
 4. It sends the reduced input to a smaller model.
 5. It prints a short answer or JSON.
 6. It preserves the wrapped command's exit code.
+
+Use `--dry-run` to inspect the reduced input and prompt without calling the provider.
 
 ## Pipe mode
 
@@ -130,6 +133,20 @@ sift presets show audit-critical
 - `verdict`: `{ verdict, reason, evidence }`
 
 Some built-in presets also use local heuristics before calling a model. For example, `infra-risk` can mark obvious destructive plans as `fail` without sending the whole decision to the model.
+
+## JSON response format
+
+When `format` resolves to JSON, `sift` can ask the provider for native JSON output.
+
+- `auto`: enable native JSON mode only for known-safe endpoints such as `https://api.openai.com/v1`
+- `on`: always send the native JSON response format request
+- `off`: never send it
+
+Example:
+
+```bash
+sift exec --format json --json-response-format on "summarize this" -- some-command
+```
 
 ## Config
 
@@ -236,6 +253,7 @@ That gives the agent a simple habit:
 - Redaction is optional and regex-based.
 - Redaction is off by default. If command output may contain secrets, enable `--redact` or set it in config before sending output to a provider.
 - Built-in JSON and verdict flows return strict error objects on provider/model failure.
+- Retriable provider failures such as `429`, timeouts, and `5xx` responses are retried once before falling back.
 - `sift exec` detects simple prompt-like output such as `[y/N]` or `password:` and skips reduction instead of guessing.
 - Pipe mode does not preserve upstream shell pipeline failures; use `set -o pipefail` if you need that behavior.
 - `sift exec` mirrors the wrapped command's exit code.

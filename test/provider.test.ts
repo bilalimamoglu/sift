@@ -32,7 +32,8 @@ describe("OpenAICompatibleProvider", () => {
       temperature: 0.1,
       maxOutputTokens: 50,
       timeoutMs: 1000,
-      responseMode: "text"
+      responseMode: "text",
+      jsonResponseFormat: "auto"
     });
 
     expect(result.text).toBe("All tests passed.");
@@ -59,7 +60,8 @@ describe("OpenAICompatibleProvider", () => {
         temperature: 0.1,
         maxOutputTokens: 50,
         timeoutMs: 1000,
-        responseMode: "text"
+        responseMode: "text",
+        jsonResponseFormat: "auto"
       })
     ).rejects.toThrow("HTTP 500");
   });
@@ -83,7 +85,8 @@ describe("OpenAICompatibleProvider", () => {
         temperature: 0.1,
         maxOutputTokens: 50,
         timeoutMs: 20,
-        responseMode: "text"
+        responseMode: "text",
+        jsonResponseFormat: "auto"
       })
     ).rejects.toThrow("timed out");
   });
@@ -105,9 +108,76 @@ describe("OpenAICompatibleProvider", () => {
       temperature: 0.1,
       maxOutputTokens: 50,
       timeoutMs: 1000,
-      responseMode: "text"
+      responseMode: "text",
+      jsonResponseFormat: "auto"
     });
 
     expect(result.text).toBe("All tests passed.");
+  });
+
+  it("uses native JSON response_format for the default OpenAI endpoint in auto mode", async () => {
+    const originalFetch = globalThis.fetch;
+    let requestBody: any;
+
+    globalThis.fetch = (async (_input: unknown, init?: RequestInit) => {
+      requestBody = JSON.parse(String(init?.body ?? "{}"));
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "{\"status\":\"ok\"}" } }]
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }
+      );
+    }) as typeof fetch;
+
+    try {
+      const provider = new OpenAICompatibleProvider({
+        baseUrl: "https://api.openai.com/v1",
+        apiKey: "test-key"
+      });
+
+      await provider.generate({
+        model: "test-model",
+        prompt: "hello",
+        temperature: 0.1,
+        maxOutputTokens: 50,
+        timeoutMs: 1000,
+        responseMode: "json",
+        jsonResponseFormat: "auto"
+      });
+
+      expect(requestBody.response_format).toEqual({ type: "json_object" });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("does not use native JSON response_format for non-OpenAI endpoints in auto mode", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [{ message: { content: "{\"status\":\"ok\"}" } }]
+      }
+    }));
+
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key"
+    });
+
+    await provider.generate({
+      model: "test-model",
+      prompt: "hello",
+      temperature: 0.1,
+      maxOutputTokens: 50,
+      timeoutMs: 1000,
+      responseMode: "json",
+      jsonResponseFormat: "auto"
+    });
+
+    expect(server.requests[0].response_format).toBeUndefined();
   });
 });
