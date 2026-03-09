@@ -35,7 +35,7 @@ describe("README quick start acceptance", () => {
       const env = {
         ...process.env,
         SIFT_BASE_URL: server.baseUrl,
-        SIFT_API_KEY: "test-key",
+        SIFT_PROVIDER_API_KEY: "test-key",
         SIFT_MODEL: "test-model"
       };
 

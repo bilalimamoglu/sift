@@ -159,6 +159,8 @@ export async function runExec(request: ExecRequest): Promise<number> {
       process.stderr.write(`${pc.dim("sift")} bypass=interactive-prompt\n`);
     }
 
+    // Interactive prompts need the raw terminal text, not a distilled answer.
+    // Once we detect one, we switch to passthrough on stderr and skip reduction.
     process.stderr.write(capture.render());
   };
 

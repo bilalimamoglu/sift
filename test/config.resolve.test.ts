@@ -60,4 +60,46 @@ describe("resolveConfig", () => {
     expect(config.input.maxInputChars).toBe(3333);
     expect(config.runtime.rawFallback).toBe(false);
   });
+
+  it("uses OPENAI_API_KEY for the default OpenAI-compatible base URL", () => {
+    const config = resolveConfig({
+      env: {
+        OPENAI_API_KEY: "openai-fallback-key"
+      }
+    });
+
+    expect(config.provider.baseUrl).toBe("https://api.openai.com/v1");
+    expect(config.provider.apiKey).toBe("openai-fallback-key");
+  });
+
+  it("does not use OPENAI_API_KEY for unknown openai-compatible endpoints", () => {
+    const config = resolveConfig({
+      env: {
+        SIFT_BASE_URL: "https://proxy.example.test/v1",
+        OPENAI_API_KEY: "openai-fallback-key"
+      }
+    });
+
+    expect(config.provider.apiKey).toBe("");
+  });
+
+  it("reads SIFT_PROVIDER_API_KEY for the openai-compatible provider", () => {
+    const config = resolveConfig({
+      env: {
+        SIFT_PROVIDER_API_KEY: "provider-key"
+      }
+    });
+
+    expect(config.provider.apiKey).toBe("provider-key");
+  });
+
+  it("does not read the legacy SIFT_API_KEY env var", () => {
+    const config = resolveConfig({
+      env: {
+        SIFT_API_KEY: "legacy-key"
+      }
+    });
+
+    expect(config.provider.apiKey).toBe("");
+  });
 });

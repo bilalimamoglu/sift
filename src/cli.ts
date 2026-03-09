@@ -81,7 +81,10 @@ function applySharedOptions(command: ReturnType<typeof cli.command>) {
     .option("--provider <provider>", "Provider: openai-compatible")
     .option("--model <model>", "Model name")
     .option("--base-url <url>", "Provider base URL")
-    .option("--api-key <key>", "Provider API key")
+    .option(
+      "--api-key <key>",
+      "Provider API key (or set SIFT_PROVIDER_API_KEY)"
+    )
     .option("--timeout-ms <ms>", "Request timeout in milliseconds")
     .option("--format <format>", "brief | bullets | json | verdict")
     .option("--max-capture-chars <n>", "Maximum raw child output chars kept in memory")
@@ -176,7 +179,10 @@ async function executeExec(args: {
 
 applySharedOptions(
   cli.command("preset <name>", "Run a named preset against piped CLI output")
-).action(async (name: string, options: Record<string, unknown>) => {
+)
+  .usage("preset <name> [options]")
+  .example("preset test-status < test-output.txt")
+  .action(async (name: string, options: Record<string, unknown>) => {
   const config = resolveConfig({
     configPath: options.config as string | undefined,
     env: process.env,
@@ -203,6 +209,10 @@ applySharedOptions(
     .command("exec [question]", "Run a command and reduce its output")
     .allowUnknownOptions()
 )
+  .usage("exec [question] [options] -- <program> [args...]")
+  .example('exec "what changed?" -- git diff')
+  .example("exec --preset test-status -- pytest")
+  .example('exec --preset infra-risk --shell "terraform plan"')
   .option("--shell <command>", "Execute a shell command string instead of argv mode")
   .option("--preset <name>", "Run a named preset in exec mode")
   .action(async (question: string | undefined, options: Record<string, unknown>) => {
@@ -257,7 +267,14 @@ applySharedOptions(
   });
 
 cli
-  .command("config <action>", "Config commands: init | show | validate")
+  .command(
+    "config <action>",
+    "Config commands: init | show | validate (show/validate use resolved runtime config)"
+  )
+  .usage("config <init|show|validate> [options]")
+  .example("config init")
+  .example("config show")
+  .example("config validate --config ./sift.config.yaml")
   .option("--path <path>", "Target config path for init")
   .option("--config <path>", "Path to config file")
   .option("--show-secrets", "Show secret values in config show")
@@ -284,7 +301,8 @@ cli
   });
 
 cli
-  .command("doctor", "Validate runtime configuration")
+  .command("doctor", "Check local runtime config completeness")
+  .usage("doctor [options]")
   .option("--config <path>", "Path to config file")
   .action((options: Record<string, unknown>) => {
     const config = resolveConfig({
@@ -297,6 +315,9 @@ cli
 
 cli
   .command("presets <action> [name]", "Preset commands: list | show")
+  .usage("presets <list|show> [name] [options]")
+  .example("presets list")
+  .example("presets show infra-risk")
   .option("--config <path>", "Path to config file")
   .option("--internal", "Show internal preset fields in presets show")
   .action((action: string, name: string | undefined, options: Record<string, unknown>) => {
