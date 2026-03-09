@@ -42,6 +42,13 @@ Requires Node.js 20 or later.
 npm install -g @bilalimamoglu/sift
 ```
 
+## `0.2.0` migration
+
+If you are upgrading from `0.1.0`:
+
+- replace `SIFT_API_KEY` with `SIFT_PROVIDER_API_KEY`
+- replace `sift exec preset <name> -- ...` with `sift exec --preset <name> -- ...`
+
 ## One-time setup
 
 Set credentials once in your shell:
@@ -65,6 +72,13 @@ export SIFT_PROVIDER_API_KEY=your_provider_api_key
 ```
 
 `SIFT_PROVIDER_API_KEY` is the generic wrapper env for custom or self-hosted compatible endpoints. Today's `openai-compatible` mode stays generic and does not imply OpenAI ownership.
+
+Known native env fallbacks for recognized compatible endpoints:
+
+- `OPENAI_API_KEY` for `https://api.openai.com/v1`
+- `OPENROUTER_API_KEY` for `https://openrouter.ai/api/v1`
+- `TOGETHER_API_KEY` for `https://api.together.xyz/v1`
+- `GROQ_API_KEY` for `https://api.groq.com/openai/v1`
 
 ## Quick start
 

@@ -87,7 +87,7 @@ function applySharedOptions(command: ReturnType<typeof cli.command>) {
     .option("--base-url <url>", "Provider base URL")
     .option(
       "--api-key <key>",
-      "Provider API key (or set SIFT_PROVIDER_API_KEY)"
+      "Provider API key (or set SIFT_PROVIDER_API_KEY; OPENAI_API_KEY also works for api.openai.com)"
     )
     .option(
       "--json-response-format <mode>",
