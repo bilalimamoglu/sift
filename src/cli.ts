@@ -10,6 +10,7 @@ import { readStdin } from "./core/stdin.js";
 import { runSift } from "./core/run.js";
 import { getPreset } from "./prompts/presets.js";
 import type {
+  JsonResponseFormatMode,
   OutputFormat,
   PartialSiftConfig,
   SiftConfig
@@ -35,6 +36,7 @@ function buildCliOverrides(options: Record<string, unknown>): PartialSiftConfig 
     options.model !== undefined ||
     options.baseUrl !== undefined ||
     options.apiKey !== undefined ||
+    options.jsonResponseFormat !== undefined ||
     options.timeoutMs !== undefined
   ) {
     overrides.provider = {
@@ -42,6 +44,8 @@ function buildCliOverrides(options: Record<string, unknown>): PartialSiftConfig 
       model: options.model as string | undefined,
       baseUrl: options.baseUrl as string | undefined,
       apiKey: options.apiKey as string | undefined,
+      jsonResponseFormat:
+        options.jsonResponseFormat as JsonResponseFormatMode | undefined,
       timeoutMs: toNumber(options.timeoutMs)
     };
   }
@@ -85,6 +89,10 @@ function applySharedOptions(command: ReturnType<typeof cli.command>) {
       "--api-key <key>",
       "Provider API key (or set SIFT_PROVIDER_API_KEY)"
     )
+    .option(
+      "--json-response-format <mode>",
+      "JSON response format mode: auto | on | off"
+    )
     .option("--timeout-ms <ms>", "Request timeout in milliseconds")
     .option("--format <format>", "brief | bullets | json | verdict")
     .option("--max-capture-chars <n>", "Maximum raw child output chars kept in memory")
@@ -95,6 +103,7 @@ function applySharedOptions(command: ReturnType<typeof cli.command>) {
     .option("--redact", "Enable standard redaction")
     .option("--redact-strict", "Enable strict redaction")
     .option("--raw-fallback", "Enable raw fallback text output")
+    .option("--dry-run", "Show the reduced input and prompt without calling the provider")
     .option("--config <path>", "Path to config file")
     .option("--verbose", "Enable verbose stderr logging");
 }
@@ -118,6 +127,7 @@ async function executeRun(args: {
     format: args.format,
     stdin,
     config,
+    dryRun: Boolean(args.options.dryRun),
     policyName: args.policyName,
     outputContract: args.outputContract,
     fallbackJson: args.fallbackJson
@@ -170,6 +180,7 @@ async function executeExec(args: {
     question: args.question,
     format: args.format,
     config,
+    dryRun: Boolean(args.options.dryRun),
     policyName: args.policyName,
     outputContract: args.outputContract,
     fallbackJson: args.fallbackJson,

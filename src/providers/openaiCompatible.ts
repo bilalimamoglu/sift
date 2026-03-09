@@ -6,6 +6,18 @@ interface OpenAICompatibleProviderOptions {
   apiKey?: string;
 }
 
+function supportsNativeJsonResponseFormat(baseUrl: string, mode: GenerateInput["jsonResponseFormat"]): boolean {
+  if (mode === "off") {
+    return false;
+  }
+
+  if (mode === "on") {
+    return true;
+  }
+
+  return /^https:\/\/api\.openai\.com(?:\/|$)/i.test(baseUrl);
+}
+
 function extractMessageText(payload: any): string {
   const content = payload?.choices?.[0]?.message?.content;
 
@@ -50,6 +62,10 @@ export class OpenAICompatibleProvider implements LLMProvider {
           model: input.model,
           temperature: input.temperature,
           max_tokens: input.maxOutputTokens,
+          ...(input.responseMode === "json" &&
+          supportsNativeJsonResponseFormat(this.baseUrl, input.jsonResponseFormat)
+            ? { response_format: { type: "json_object" } }
+            : {}),
           messages: [
             {
               role: "system",

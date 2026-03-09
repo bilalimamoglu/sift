@@ -130,6 +130,28 @@ describe("exec mode", () => {
     }
   });
 
+  it("supports dry-run mode without calling the provider", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "did the tests pass?",
+        "--dry-run",
+        "--",
+        "node",
+        "-e",
+        "console.log('Ran 12 tests\\n12 passed')"
+      ]
+    });
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      status: "dry-run",
+      strategy: "provider",
+      question: "did the tests pass?",
+      format: "brief"
+    });
+  });
+
   it("preserves a failing child exit code for preset exec mode", async () => {
     const server = await createFakeOpenAIServer(() => ({
       body: {

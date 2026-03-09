@@ -8,6 +8,7 @@ export const outputFormatSchema = z.enum([
   "verdict"
 ]);
 export const responseModeSchema = z.enum(["text", "json"]);
+export const jsonResponseFormatModeSchema = z.enum(["auto", "on", "off"]);
 export const promptPolicyNameSchema = z.enum([
   "test-status",
   "audit-critical",
@@ -22,6 +23,7 @@ export const providerConfigSchema = z.object({
   model: z.string().min(1),
   baseUrl: z.string().url(),
   apiKey: z.string().optional(),
+  jsonResponseFormat: jsonResponseFormatModeSchema,
   timeoutMs: z.number().int().positive(),
   temperature: z.number().min(0).max(2),
   maxOutputTokens: z.number().int().positive()

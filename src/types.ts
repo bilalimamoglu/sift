@@ -3,6 +3,7 @@ export type ProviderName = "openai-compatible";
 export type OutputFormat = "brief" | "bullets" | "json" | "verdict";
 
 export type ResponseMode = "text" | "json";
+export type JsonResponseFormatMode = "auto" | "on" | "off";
 
 export type PromptPolicyName =
   | "test-status"
@@ -17,6 +18,7 @@ export interface ProviderConfig {
   model: string;
   baseUrl: string;
   apiKey?: string;
+  jsonResponseFormat: JsonResponseFormatMode;
   timeoutMs: number;
   temperature: number;
   maxOutputTokens: number;
@@ -66,6 +68,7 @@ export interface GenerateInput {
   maxOutputTokens: number;
   timeoutMs: number;
   responseMode: ResponseMode;
+  jsonResponseFormat: JsonResponseFormatMode;
 }
 
 export interface UsageInfo {
@@ -85,6 +88,7 @@ export interface RunRequest {
   format: OutputFormat;
   stdin: string;
   config: SiftConfig;
+  dryRun?: boolean;
   policyName?: PromptPolicyName;
   outputContract?: string;
   fallbackJson?: unknown;

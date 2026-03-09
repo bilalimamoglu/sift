@@ -5,7 +5,9 @@ import { buildPrompt } from "../prompts/buildPrompt.js";
 import { buildFallbackOutput } from "./fallback.js";
 import { applyHeuristicPolicy } from "./heuristics.js";
 import { prepareInput } from "./pipeline.js";
-import { looksLikeRejectedModelOutput } from "./quality.js";
+import { isRetriableReason, looksLikeRejectedModelOutput } from "./quality.js";
+
+const RETRY_DELAY_MS = 300;
 
 function normalizeOutput(text: string, responseMode: "text" | "json"): string {
   if (responseMode !== "json") {
@@ -18,6 +20,87 @@ function normalizeOutput(text: string, responseMode: "text" | "json"): string {
   } catch {
     throw new Error("Provider returned invalid JSON");
   }
+}
+
+function buildDryRunOutput(args: {
+  request: RunRequest;
+  providerName: string;
+  prompt: string;
+  responseMode: "text" | "json";
+  prepared: ReturnType<typeof prepareInput>;
+  heuristicOutput: string | null;
+}): string {
+  return JSON.stringify(
+    {
+      status: "dry-run",
+      strategy: args.heuristicOutput ? "heuristic" : "provider",
+      provider: {
+        name: args.providerName,
+        model: args.request.config.provider.model,
+        baseUrl: args.request.config.provider.baseUrl,
+        jsonResponseFormat: args.request.config.provider.jsonResponseFormat
+      },
+      question: args.request.question,
+      format: args.request.format,
+      responseMode: args.responseMode,
+      policy: args.request.policyName ?? null,
+      heuristicOutput: args.heuristicOutput ?? null,
+      input: {
+        originalLength: args.prepared.meta.originalLength,
+        finalLength: args.prepared.meta.finalLength,
+        redactionApplied: args.prepared.meta.redactionApplied,
+        truncatedApplied: args.prepared.meta.truncatedApplied,
+        text: args.prepared.truncated
+      },
+      prompt: args.prompt
+    },
+    null,
+    2
+  );
+}
+
+async function delay(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function generateWithRetry(args: {
+  provider: ReturnType<typeof createProvider>;
+  request: RunRequest;
+  prompt: string;
+  responseMode: "text" | "json";
+}): Promise<Awaited<ReturnType<ReturnType<typeof createProvider>["generate"]>>> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await args.provider.generate({
+        model: args.request.config.provider.model,
+        prompt: args.prompt,
+        temperature: args.request.config.provider.temperature,
+        maxOutputTokens: args.request.config.provider.maxOutputTokens,
+        timeoutMs: args.request.config.provider.timeoutMs,
+        responseMode: args.responseMode,
+        jsonResponseFormat: args.request.config.provider.jsonResponseFormat
+      });
+    } catch (error) {
+      lastError = error;
+      const reason = error instanceof Error ? error.message : "unknown_error";
+
+      if (attempt > 0 || !isRetriableReason(reason)) {
+        throw error;
+      }
+
+      if (args.request.config.runtime.verbose) {
+        process.stderr.write(
+          `${pc.dim("sift")} retry=1 reason=${reason} delay_ms=${RETRY_DELAY_MS}\n`
+        );
+      }
+
+      await delay(RETRY_DELAY_MS);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("unknown_error");
 }
 
 export async function runSift(request: RunRequest): Promise<string> {
@@ -48,16 +131,36 @@ export async function runSift(request: RunRequest): Promise<string> {
       process.stderr.write(`${pc.dim("sift")} heuristic=${request.policyName}\n`);
     }
 
+    if (request.dryRun) {
+      return buildDryRunOutput({
+        request,
+        providerName: provider.name,
+        prompt,
+        responseMode,
+        prepared,
+        heuristicOutput
+      });
+    }
+
     return heuristicOutput;
   }
 
-  try {
-    const result = await provider.generate({
-      model: request.config.provider.model,
+  if (request.dryRun) {
+    return buildDryRunOutput({
+      request,
+      providerName: provider.name,
       prompt,
-      temperature: request.config.provider.temperature,
-      maxOutputTokens: request.config.provider.maxOutputTokens,
-      timeoutMs: request.config.provider.timeoutMs,
+      responseMode,
+      prepared,
+      heuristicOutput: null
+    });
+  }
+
+  try {
+    const result = await generateWithRetry({
+      provider,
+      request,
+      prompt,
       responseMode
     });
 

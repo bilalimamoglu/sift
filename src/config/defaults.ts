@@ -6,6 +6,7 @@ export const defaultConfig: SiftConfig = {
     model: "gpt-4.1-mini",
     baseUrl: "https://api.openai.com/v1",
     apiKey: "",
+    jsonResponseFormat: "auto",
     timeoutMs: 20_000,
     temperature: 0.1,
     maxOutputTokens: 220

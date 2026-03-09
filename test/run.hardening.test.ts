@@ -189,4 +189,61 @@ describe("runSift hardening", () => {
       evidence: ["Plan: 0 to destroy"]
     });
   });
+
+  it("retries once for retriable provider failures before succeeding", async () => {
+    server = await createFakeOpenAIServer((_body, index) => {
+      if (index === 0) {
+        return {
+          status: 429,
+          body: {
+            error: "rate limit"
+          }
+        };
+      }
+
+      return {
+        body: {
+          choices: [{ message: { content: "All tests passed." } }]
+        }
+      };
+    });
+
+    const output = await runSift({
+      question: "did tests pass?",
+      format: "brief",
+      stdin: "Ran 12 tests\n12 passed\n",
+      config: makeConfig(server.baseUrl)
+    });
+
+    expect(output).toBe("All tests passed.");
+    expect(server.requests).toHaveLength(2);
+  });
+
+  it("returns a dry-run payload instead of calling the provider", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [{ message: { content: "should not be used" } }]
+      }
+    }));
+
+    const output = await runSift({
+      question: "did tests pass?",
+      format: "brief",
+      stdin: "Ran 12 tests\n12 passed\n",
+      config: makeConfig(server.baseUrl),
+      dryRun: true
+    });
+
+    expect(JSON.parse(output)).toMatchObject({
+      status: "dry-run",
+      strategy: "provider",
+      provider: {
+        name: "openai-compatible",
+        model: "test-model"
+      },
+      question: "did tests pass?",
+      format: "brief"
+    });
+    expect(server.requests).toHaveLength(0);
+  });
 });
