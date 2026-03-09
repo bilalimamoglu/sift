@@ -83,7 +83,7 @@ describe("exec mode", () => {
       const result = await runCliAsync({
         args: [
           "exec",
-          "preset",
+          "--preset",
           "test-status",
           "--base-url",
           server.baseUrl,
@@ -109,7 +109,7 @@ describe("exec mode", () => {
     const result = await runCliAsync({
       args: [
         "exec",
-        "preset",
+        "--preset",
         "infra-risk",
         "--shell",
         "printf 'Plan: 2 to add, 1 to destroy\\n'"
@@ -172,6 +172,23 @@ describe("exec mode", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("Password:");
+  });
+
+  it("rejects the old exec preset syntax with a clear error", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "preset",
+        "test-status",
+        "--",
+        "node",
+        "-e",
+        "console.log('12 passed')"
+      ]
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Use 'sift exec --preset <name> -- <program> ...' instead.");
   });
 
 });

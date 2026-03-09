@@ -41,9 +41,9 @@ describe("README quick start acceptance", () => {
 
       const commands = [
         `${cli.join(" ")} exec "what changed?" -- node -e "console.log('diff --git a/file b/file\\n+change')"`,
-        `${cli.join(" ")} exec preset test-status -- node -e "console.log('12 passed')"`,
-        `${cli.join(" ")} exec preset audit-critical -- node -e "console.log('critical vuln')"`,
-        `${cli.join(" ")} exec preset infra-risk -- node -e "console.log('Plan: 2 to destroy')"`
+        `${cli.join(" ")} exec --preset test-status -- node -e "console.log('12 passed')"`,
+        `${cli.join(" ")} exec --preset audit-critical -- node -e "console.log('critical vuln')"`,
+        `${cli.join(" ")} exec --preset infra-risk -- node -e "console.log('Plan: 2 to destroy')"`
       ];
 
       const outputs: string[] = [];

@@ -37,6 +37,40 @@ describe("CLI smoke", () => {
     expect(validate.stdout).toContain("Config is valid");
   });
 
+  it("masks secrets in config show by default and reveals them with --show-secrets", async () => {
+    const masked = runCli({
+      args: ["config", "show"],
+      env: {
+        SIFT_API_KEY: "env-secret-key"
+      }
+    });
+    const revealed = runCli({
+      args: ["config", "show", "--show-secrets"],
+      env: {
+        SIFT_API_KEY: "env-secret-key"
+      }
+    });
+
+    expect(masked.status).toBe(0);
+    expect(JSON.parse(masked.stdout).provider.apiKey).toBe("***");
+    expect(revealed.status).toBe(0);
+    expect(JSON.parse(revealed.stdout).provider.apiKey).toBe("env-secret-key");
+  });
+
+  it("fails when an explicit config path does not exist", () => {
+    const show = runCli({
+      args: ["config", "show", "--config", "/tmp/definitely-missing-sift-config.yaml"]
+    });
+    const validate = runCli({
+      args: ["config", "validate", "--config", "/tmp/definitely-missing-sift-config.yaml"]
+    });
+
+    expect(show.status).toBe(1);
+    expect(show.stderr).toContain("Config file not found");
+    expect(validate.status).toBe(1);
+    expect(validate.stderr).toContain("Config file not found");
+  });
+
   it("lists and shows presets", () => {
     const list = runCli({
       args: ["presets", "list"]
@@ -44,11 +78,20 @@ describe("CLI smoke", () => {
     const show = runCli({
       args: ["presets", "show", "test-status"]
     });
+    const internal = runCli({
+      args: ["presets", "show", "test-status", "--internal"]
+    });
 
     expect(list.status).toBe(0);
     expect(list.stdout).toContain("test-status");
     expect(show.status).toBe(0);
-    expect(JSON.parse(show.stdout).question).toContain("tests");
+    expect(JSON.parse(show.stdout)).toEqual({
+      name: "test-status",
+      question: "Did the tests pass? If not, list only the failing tests or suites.",
+      format: "bullets"
+    });
+    expect(internal.status).toBe(0);
+    expect(JSON.parse(internal.stdout).policy).toBe("test-status");
   });
 
   it("runs freeform and preset modes", async () => {
@@ -125,5 +168,19 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("apiKey: set");
     expect(result.stdout).toContain("model: env-model");
     expect(result.stdout).toContain("baseUrl: https://example.test/v1");
+  });
+
+  it("fails doctor when api key is missing for openai-compatible", () => {
+    const result = runCli({
+      args: ["doctor"],
+      env: {
+        SIFT_BASE_URL: "https://example.test/v1",
+        SIFT_MODEL: "env-model"
+      }
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("apiKey: not set");
+    expect(result.stderr).toContain("Missing provider.apiKey");
   });
 });

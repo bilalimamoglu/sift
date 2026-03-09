@@ -204,19 +204,29 @@ applySharedOptions(
     .allowUnknownOptions()
 )
   .option("--shell <command>", "Execute a shell command string instead of argv mode")
+  .option("--preset <name>", "Run a named preset in exec mode")
   .action(async (question: string | undefined, options: Record<string, unknown>) => {
-    if (
-      question === "preset" &&
-      Array.isArray(cli.args) &&
-      typeof cli.args[1] === "string"
-    ) {
+    if (question === "preset") {
+      throw new Error("Use 'sift exec --preset <name> -- <program> ...' instead.");
+    }
+
+    const presetName =
+      typeof options.preset === "string" && options.preset.length > 0
+        ? options.preset
+        : undefined;
+
+    if (presetName) {
+      if (question) {
+        throw new Error("Use either a freeform question or --preset <name>, not both.");
+      }
+
       const preset = getPreset(
         resolveConfig({
           configPath: options.config as string | undefined,
           env: process.env,
           cliOverrides: buildCliOverrides(options)
         }),
-        cli.args[1]!
+        presetName
       );
 
       await executeExec({
@@ -235,7 +245,7 @@ applySharedOptions(
     }
 
     if (!question) {
-      throw new Error("Missing question.");
+      throw new Error("Missing question or preset.");
     }
 
     const format = (options.format as OutputFormat | undefined) ?? "brief";
@@ -250,6 +260,7 @@ cli
   .command("config <action>", "Config commands: init | show | validate")
   .option("--path <path>", "Target config path for init")
   .option("--config <path>", "Path to config file")
+  .option("--show-secrets", "Show secret values in config show")
   .action((action: string, options: Record<string, unknown>) => {
     if (action === "init") {
       configInit(options.path as string | undefined);
@@ -257,7 +268,10 @@ cli
     }
 
     if (action === "show") {
-      configShow(options.config as string | undefined);
+      configShow(
+        options.config as string | undefined,
+        Boolean(options.showSecrets)
+      );
       return;
     }
 
@@ -284,6 +298,7 @@ cli
 cli
   .command("presets <action> [name]", "Preset commands: list | show")
   .option("--config <path>", "Path to config file")
+  .option("--internal", "Show internal preset fields in presets show")
   .action((action: string, name: string | undefined, options: Record<string, unknown>) => {
     const config = resolveConfig({
       configPath: options.config as string | undefined,
@@ -300,7 +315,7 @@ cli
         throw new Error("Missing preset name.");
       }
 
-      showPreset(config, name);
+      showPreset(config, name, Boolean(options.internal));
       return;
     }
 

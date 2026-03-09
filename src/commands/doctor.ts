@@ -6,7 +6,7 @@ export function runDoctor(config: SiftConfig): number {
     `provider: ${config.provider.provider}`,
     `model: ${config.provider.model}`,
     `baseUrl: ${config.provider.baseUrl}`,
-    `apiKey: ${config.provider.apiKey ? "set" : "not set (may be optional for your backend)"}`,
+    `apiKey: ${config.provider.apiKey ? "set" : "not set"}`,
     `maxCaptureChars: ${config.input.maxCaptureChars}`,
     `maxInputChars: ${config.input.maxInputChars}`,
     `rawFallback: ${config.runtime.rawFallback}`
@@ -14,13 +14,22 @@ export function runDoctor(config: SiftConfig): number {
 
   process.stdout.write(`${lines.join("\n")}\n`);
 
+  const problems: string[] = [];
+
   if (!config.provider.baseUrl) {
-    process.stderr.write("Missing provider.baseUrl\n");
-    return 1;
+    problems.push("Missing provider.baseUrl");
   }
 
   if (!config.provider.model) {
-    process.stderr.write("Missing provider.model\n");
+    problems.push("Missing provider.model");
+  }
+
+  if (config.provider.provider === "openai-compatible" && !config.provider.apiKey) {
+    problems.push("Missing provider.apiKey");
+  }
+
+  if (problems.length > 0) {
+    process.stderr.write(`${problems.join("\n")}\n`);
     return 1;
   }
 

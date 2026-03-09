@@ -62,19 +62,10 @@ sift config init
 
 ```bash
 sift exec "what changed?" -- git diff
-sift exec preset test-status -- pytest
-sift exec preset audit-critical -- npm audit
-sift exec preset infra-risk -- terraform plan
+sift exec --preset test-status -- pytest
+sift exec --preset audit-critical -- npm audit
+sift exec --preset infra-risk -- terraform plan
 ```
-
-## Before / after
-
-There is a full example here:
-
-- [examples/1/BEFORE.md](/Users/bilalimamoglu/repos/sift/examples/1/BEFORE.md)
-- [examples/1/AFTER.md](/Users/bilalimamoglu/repos/sift/examples/1/AFTER.md)
-
-In that example, a long grep result is reduced to a short agent-facing answer about the parts of the repo that changed for agent workflows.
 
 ## Main workflow
 
@@ -83,7 +74,7 @@ In that example, a long grep result is reduced to a short agent-facing answer ab
 ```bash
 sift exec "did tests pass?" -- pytest
 sift exec "what changed?" -- git diff
-sift exec preset infra-risk -- terraform plan
+sift exec --preset infra-risk -- terraform plan
 ```
 
 What happens:
@@ -140,6 +131,8 @@ Generate an example config:
 sift config init
 ```
 
+`sift config show` masks secret values by default. Use `sift config show --show-secrets` only when you explicitly need the raw values.
+
 Resolution order:
 
 1. CLI flags
@@ -147,6 +140,8 @@ Resolution order:
 3. `sift.config.yaml` or `sift.config.yml`
 4. `~/.config/sift/config.yaml` or `~/.config/sift/config.yml`
 5. built-in defaults
+
+If you pass `--config <path>`, that path is treated strictly. Missing explicit config paths are errors; `sift` does not silently fall back to defaults in that case.
 
 Supported environment variables:
 
@@ -190,7 +185,9 @@ runtime:
 sift [question]
 sift preset <name>
 sift exec [question] -- <program> [args...]
+sift exec --preset <name> -- <program> [args...]
 sift exec [question] --shell "<command string>"
+sift exec --preset <name> --shell "<command string>"
 sift config init
 sift config show
 sift config validate
@@ -225,10 +222,12 @@ That gives the agent a simple habit:
 ## Safety and limits
 
 - Redaction is optional and regex-based.
+- Redaction is off by default. If command output may contain secrets, enable `--redact` or set it in config before sending output to a provider.
 - Built-in JSON and verdict flows return strict error objects on provider/model failure.
 - `sift exec` detects simple prompt-like output such as `[y/N]` or `password:` and skips reduction instead of guessing.
 - Pipe mode does not preserve upstream shell pipeline failures; use `set -o pipefail` if you need that behavior.
 - `sift exec` mirrors the wrapped command's exit code.
+- `sift doctor` is a conservative local config check. For the default OpenAI-compatible path it requires `baseUrl`, `model`, and `apiKey`.
 
 ## Current scope
 
@@ -247,3 +246,5 @@ It does not try to be a full agent platform.
 ## License
 
 MIT
+
+The top-level MIT license is the licensing surface for this repo. Per-file license headers are not required unless code is copied or adapted from another source that needs separate notice or attribution.

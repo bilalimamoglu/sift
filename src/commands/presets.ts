@@ -5,11 +5,23 @@ export function listPresets(config: SiftConfig): void {
   process.stdout.write(`${names.join("\n")}\n`);
 }
 
-export function showPreset(config: SiftConfig, name: string): void {
+export function showPreset(
+  config: SiftConfig,
+  name: string,
+  includeInternal = false
+): void {
   const preset = config.presets[name];
   if (!preset) {
     throw new Error(`Unknown preset: ${name}`);
   }
 
-  process.stdout.write(`${JSON.stringify(preset, null, 2)}\n`);
+  const output = includeInternal
+    ? { name, ...preset }
+    : {
+        name,
+        question: preset.question,
+        format: preset.format
+      };
+
+  process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
 }

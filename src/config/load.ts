@@ -6,7 +6,11 @@ import { DEFAULT_CONFIG_SEARCH_PATHS } from "../constants.js";
 export function findConfigPath(explicitPath?: string): string | null {
   if (explicitPath) {
     const resolved = path.resolve(explicitPath);
-    return fs.existsSync(resolved) ? resolved : null;
+    if (!fs.existsSync(resolved)) {
+      throw new Error(`Config file not found: ${resolved}`);
+    }
+
+    return resolved;
   }
 
   for (const candidate of DEFAULT_CONFIG_SEARCH_PATHS) {
