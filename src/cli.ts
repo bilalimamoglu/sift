@@ -200,7 +200,7 @@ applySharedOptions(
 
 applySharedOptions(
   cli
-    .command("exec [question]", "Run a command and distill its output")
+    .command("exec [question]", "Run a command and reduce its output")
     .allowUnknownOptions()
 )
   .option("--shell <command>", "Execute a shell command string instead of argv mode")

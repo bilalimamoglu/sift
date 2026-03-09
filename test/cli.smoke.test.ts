@@ -110,4 +110,20 @@ describe("CLI smoke", () => {
       await server.close();
     }
   });
+
+  it("reports api key presence from environment in doctor output", async () => {
+    const result = runCli({
+      args: ["doctor"],
+      env: {
+        SIFT_BASE_URL: "https://example.test/v1",
+        SIFT_API_KEY: "env-key",
+        SIFT_MODEL: "env-model"
+      }
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("apiKey: set");
+    expect(result.stdout).toContain("model: env-model");
+    expect(result.stdout).toContain("baseUrl: https://example.test/v1");
+  });
 });

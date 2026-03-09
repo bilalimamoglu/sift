@@ -40,13 +40,31 @@ then sending the full raw output to a large model is wasteful.
 npm install -g @bilalimamoglu/sift
 ```
 
+## One-time setup
+
+Set credentials once in your shell:
+
+```bash
+export SIFT_BASE_URL=https://api.openai.com/v1
+export SIFT_API_KEY=your_api_key
+export SIFT_MODEL=gpt-4.1-mini
+```
+
+Or write them to a config file:
+
+```bash
+sift config init
+```
+
+`sift` is remote-first today. The safe path is to set `SIFT_API_KEY`, `SIFT_BASE_URL`, and `SIFT_MODEL` once, then run `sift` normally.
+
 ## Quick start
 
 ```bash
-sift exec "what changed?" --api-key "$OPENAI_API_KEY" -- git diff
-sift exec preset test-status --api-key "$OPENAI_API_KEY" -- pytest
-sift exec preset audit-critical --api-key "$OPENAI_API_KEY" -- npm audit
-sift exec preset infra-risk --api-key "$OPENAI_API_KEY" -- terraform plan
+sift exec "what changed?" -- git diff
+sift exec preset test-status -- pytest
+sift exec preset audit-critical -- npm audit
+sift exec preset infra-risk -- terraform plan
 ```
 
 ## Before / after
@@ -82,7 +100,7 @@ What happens:
 If the output already exists in a pipeline, pipe mode still works:
 
 ```bash
-git diff 2>&1 | sift "what changed?" --api-key "$OPENAI_API_KEY"
+git diff 2>&1 | sift "what changed?"
 ```
 
 Use pipe mode when the command is already being produced elsewhere.
@@ -183,7 +201,14 @@ sift presets show <name>
 
 ## Using it with Codex
 
-`sift` does not install itself into Codex. The normal setup is to add a short rule to `~/.codex/AGENTS.md` manually:
+`sift` does not install itself into Codex. The normal setup is:
+
+1. put credentials in your shell environment or `sift.config.yaml`
+2. add a short rule to `~/.codex/AGENTS.md`
+
+That way Codex inherits credentials safely. It should not pass API keys inline on every command.
+
+Example:
 
 ```md
 Prefer `sift exec` for non-interactive shell commands whose output will be read or summarized.
@@ -201,7 +226,7 @@ That gives the agent a simple habit:
 
 - Redaction is optional and regex-based.
 - Built-in JSON and verdict flows return strict error objects on provider/model failure.
-- `sift exec` detects simple prompt-like output such as `[y/N]` or `password:` and skips distillation instead of guessing.
+- `sift exec` detects simple prompt-like output such as `[y/N]` or `password:` and skips reduction instead of guessing.
 - Pipe mode does not preserve upstream shell pipeline failures; use `set -o pipefail` if you need that behavior.
 - `sift exec` mirrors the wrapped command's exit code.
 

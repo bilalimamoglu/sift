@@ -3,7 +3,7 @@ import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
 import { runCliAsync } from "./helpers/cli.js";
 
 describe("exec mode", () => {
-  it("runs a freeform command and distills its output", async () => {
+  it("runs a freeform command and reduces its output", async () => {
     const server = await createFakeOpenAIServer(() => ({
       body: {
         choices: [{ message: { content: "All tests passed." } }]
@@ -30,6 +30,37 @@ describe("exec mode", () => {
 
       expect(result.status).toBe(0);
       expect(result.stdout.trim()).toBe("All tests passed.");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("accepts provider credentials from environment variables", async () => {
+    const server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [{ message: { content: "Environment-based auth worked." } }]
+      }
+    }));
+
+    try {
+      const result = await runCliAsync({
+        args: [
+          "exec",
+          "did the tests pass?",
+          "--",
+          "node",
+          "-e",
+          "console.log('Ran 12 tests\\n12 passed')"
+        ],
+        env: {
+          SIFT_BASE_URL: server.baseUrl,
+          SIFT_API_KEY: "test-key",
+          SIFT_MODEL: "test-model"
+        }
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout.trim()).toBe("Environment-based auth worked.");
     } finally {
       await server.close();
     }
@@ -93,7 +124,7 @@ describe("exec mode", () => {
     });
   });
 
-  it("keeps the child exit code when distillation falls back", async () => {
+  it("keeps the child exit code when reduction falls back", async () => {
     const server = await createFakeOpenAIServer(() => ({
       status: 429,
       body: {
@@ -126,11 +157,11 @@ describe("exec mode", () => {
     }
   });
 
-  it("bypasses distillation for interactive prompt-like output", async () => {
+  it("bypasses reduction for interactive prompt-like output", async () => {
     const result = await runCliAsync({
       args: [
         "exec",
-        "should not distill",
+        "should not reduce",
         "--",
         "node",
         "-e",
