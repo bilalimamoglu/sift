@@ -24,9 +24,11 @@ jobs:
       - name: Read package metadata
         id: pkg
         run: |
-          echo "name=$(node -p \"require('./package.json').name\")" >> "$GITHUB_OUTPUT"
-          echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
-          echo "tag=v$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+          NAME="$(node -e "console.log(require('./package.json').name)")"
+          VERSION="$(node -e "console.log(require('./package.json').version)")"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Fail if release tag already exists
         run: |
