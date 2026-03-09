@@ -182,6 +182,20 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("baseUrl: https://example.test/v1");
   });
 
+  it("accepts OPENAI_API_KEY for the default OpenAI-compatible endpoint", () => {
+    const result = runCli({
+      args: ["doctor"],
+      env: {
+        OPENAI_API_KEY: "openai-key",
+        SIFT_MODEL: "env-model"
+      }
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("apiKey: set");
+    expect(result.stdout).toContain("baseUrl: https://api.openai.com/v1");
+  });
+
   it("fails doctor when api key is missing for openai-compatible", () => {
     const result = runCli({
       args: ["doctor"],
@@ -194,5 +208,6 @@ describe("CLI smoke", () => {
     expect(result.status).toBe(1);
     expect(result.stdout).toContain("apiKey: not set");
     expect(result.stderr).toContain("Missing provider.apiKey");
+    expect(result.stderr).toContain("SIFT_PROVIDER_API_KEY");
   });
 });

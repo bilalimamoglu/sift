@@ -48,8 +48,8 @@ Set credentials once in your shell:
 
 ```bash
 export SIFT_BASE_URL=https://api.openai.com/v1
-export SIFT_PROVIDER_API_KEY=your_api_key
 export SIFT_MODEL=gpt-4.1-mini
+export OPENAI_API_KEY=your_openai_api_key
 ```
 
 Or write them to a config file:
@@ -58,8 +58,13 @@ Or write them to a config file:
 sift config init
 ```
 
-`sift` is remote-first today. The safe path is to set `SIFT_PROVIDER_API_KEY`, `SIFT_BASE_URL`, and `SIFT_MODEL` once, then run `sift` normally.
-`SIFT_PROVIDER_API_KEY` is the generic wrapper env. Provider-native env vars are reserved for future first-class providers. Today's `openai-compatible` mode intentionally stays generic and does not imply OpenAI ownership.
+For the default OpenAI-compatible setup, `OPENAI_API_KEY` works directly. If you point `SIFT_BASE_URL` at a different compatible endpoint, use that provider's native key when `sift` recognizes the endpoint, or set the generic fallback env:
+
+```bash
+export SIFT_PROVIDER_API_KEY=your_provider_api_key
+```
+
+`SIFT_PROVIDER_API_KEY` is the generic wrapper env for custom or self-hosted compatible endpoints. Today's `openai-compatible` mode stays generic and does not imply OpenAI ownership.
 
 ## Quick start
 
@@ -152,6 +157,10 @@ Supported environment variables:
 - `SIFT_MODEL`
 - `SIFT_BASE_URL`
 - `SIFT_PROVIDER_API_KEY`
+- `OPENAI_API_KEY` for `https://api.openai.com/v1`
+- `OPENROUTER_API_KEY` for `https://openrouter.ai/api/v1`
+- `TOGETHER_API_KEY` for `https://api.together.xyz/v1`
+- `GROQ_API_KEY` for `https://api.groq.com/openai/v1`
 - `SIFT_MAX_CAPTURE_CHARS`
 - `SIFT_TIMEOUT_MS`
 - `SIFT_MAX_INPUT_CHARS`

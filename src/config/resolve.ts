@@ -33,23 +33,35 @@ function mergeDefined<T>(base: T, override: unknown): T {
   return result as T;
 }
 
-function buildEnvOverrides(env: NodeJS.ProcessEnv): PartialSiftConfig {
+function stripApiKey(
+  overrides: PartialSiftConfig | undefined
+): PartialSiftConfig | undefined {
+  if (!overrides?.provider || overrides.provider.apiKey === undefined) {
+    return overrides;
+  }
+
+  return {
+    ...overrides,
+    provider: {
+      ...overrides.provider,
+      apiKey: undefined
+    }
+  };
+}
+
+function buildNonCredentialEnvOverrides(env: NodeJS.ProcessEnv): PartialSiftConfig {
   const overrides: PartialSiftConfig = {};
-  const provider = env.SIFT_PROVIDER;
-  const apiKey = resolveProviderApiKey(provider, env);
 
   if (
     env.SIFT_PROVIDER ||
     env.SIFT_MODEL ||
     env.SIFT_BASE_URL ||
-    apiKey ||
     env.SIFT_TIMEOUT_MS
   ) {
     overrides.provider = {
       provider: env.SIFT_PROVIDER as SiftConfig["provider"]["provider"] | undefined,
       model: env.SIFT_MODEL,
       baseUrl: env.SIFT_BASE_URL,
-      apiKey,
       timeoutMs: env.SIFT_TIMEOUT_MS ? Number(env.SIFT_TIMEOUT_MS) : undefined
     };
   }
@@ -68,6 +80,22 @@ function buildEnvOverrides(env: NodeJS.ProcessEnv): PartialSiftConfig {
   return overrides;
 }
 
+function buildCredentialEnvOverrides(
+  env: NodeJS.ProcessEnv,
+  context: Pick<SiftConfig["provider"], "provider" | "baseUrl">
+): PartialSiftConfig {
+  const apiKey = resolveProviderApiKey(context.provider, context.baseUrl, env);
+  if (apiKey === undefined) {
+    return {};
+  }
+
+  return {
+    provider: {
+      apiKey
+    }
+  };
+}
+
 export interface ResolveOptions {
   configPath?: string;
   env?: NodeJS.ProcessEnv;
@@ -77,9 +105,26 @@ export interface ResolveOptions {
 export function resolveConfig(options: ResolveOptions = {}): SiftConfig {
   const env = options.env ?? process.env;
   const fileConfig = loadRawConfig(options.configPath);
-  const envConfig = buildEnvOverrides(env);
+  const nonCredentialEnvConfig = buildNonCredentialEnvOverrides(env);
+  const contextConfig = mergeDefined(
+    mergeDefined(
+      mergeDefined(defaultConfig, fileConfig),
+      nonCredentialEnvConfig
+    ),
+    stripApiKey(options.cliOverrides) ?? {}
+  );
+  const credentialEnvConfig = buildCredentialEnvOverrides(env, {
+    provider: contextConfig.provider.provider,
+    baseUrl: contextConfig.provider.baseUrl
+  });
   const merged = mergeDefined(
-    mergeDefined(mergeDefined(defaultConfig, fileConfig), envConfig),
+    mergeDefined(
+      mergeDefined(
+        mergeDefined(defaultConfig, fileConfig),
+        nonCredentialEnvConfig
+      ),
+      credentialEnvConfig
+    ),
     options.cliOverrides ?? {}
   );
 

@@ -61,9 +61,21 @@ describe("resolveConfig", () => {
     expect(config.runtime.rawFallback).toBe(false);
   });
 
-  it("does not use OPENAI_API_KEY for the openai-compatible provider", () => {
+  it("uses OPENAI_API_KEY for the default OpenAI-compatible base URL", () => {
     const config = resolveConfig({
       env: {
+        OPENAI_API_KEY: "openai-fallback-key"
+      }
+    });
+
+    expect(config.provider.baseUrl).toBe("https://api.openai.com/v1");
+    expect(config.provider.apiKey).toBe("openai-fallback-key");
+  });
+
+  it("does not use OPENAI_API_KEY for unknown openai-compatible endpoints", () => {
+    const config = resolveConfig({
+      env: {
+        SIFT_BASE_URL: "https://proxy.example.test/v1",
         OPENAI_API_KEY: "openai-fallback-key"
       }
     });

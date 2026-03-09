@@ -66,7 +66,7 @@ describe("exec mode", () => {
     }
   });
 
-  it("does not use OPENAI_API_KEY as a fallback for openai-compatible", async () => {
+  it("does not use OPENAI_API_KEY for unknown openai-compatible endpoints", async () => {
     const server = await createFakeOpenAIServer(() => ({
       status: 401,
       body: {

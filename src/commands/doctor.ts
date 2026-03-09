@@ -1,3 +1,4 @@
+import { getProviderApiKeyEnvNames } from "../config/provider-api-key.js";
 import type { SiftConfig } from "../types.js";
 
 export function runDoctor(config: SiftConfig): number {
@@ -27,6 +28,12 @@ export function runDoctor(config: SiftConfig): number {
 
   if (config.provider.provider === "openai-compatible" && !config.provider.apiKey) {
     problems.push("Missing provider.apiKey");
+    problems.push(
+      `Set one of: ${getProviderApiKeyEnvNames(
+        config.provider.provider,
+        config.provider.baseUrl
+      ).join(", ")}`
+    );
   }
 
   if (problems.length > 0) {
