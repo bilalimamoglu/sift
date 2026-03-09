@@ -39,8 +39,11 @@ describe("release workflow", () => {
     expect(workflow).toContain("git tag -a");
     expect(workflow).toContain("gh release create");
     expect(workflow).toContain("fetch-depth: 0");
+    expect(workflow).toContain("actions: read");
     expect(workflow).toContain("contents: write");
     expect(workflow).toContain("id-token: write");
+    expect(workflow).toContain("actions/workflows/ci.yml/runs");
+    expect(workflow).toContain("CI must pass on this exact commit before release");
     expect(workflow).toContain('sift exec "did tests pass?" --dry-run -- node -e "console.log(\'12 passed\')"');
     expect(workflow).not.toContain("NODE_AUTH_TOKEN");
     expect(workflow).not.toContain("NPM_TOKEN");
