@@ -12,8 +12,12 @@ function normalizeOutput(text: string, responseMode: "text" | "json"): string {
     return text.trim();
   }
 
-  const parsed = JSON.parse(text);
-  return JSON.stringify(parsed, null, 2);
+  try {
+    const parsed = JSON.parse(text);
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    throw new Error("Provider returned invalid JSON");
+  }
 }
 
 export async function runSift(request: RunRequest): Promise<string> {

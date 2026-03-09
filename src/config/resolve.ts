@@ -51,19 +51,14 @@ function buildEnvOverrides(env: NodeJS.ProcessEnv): PartialSiftConfig {
     };
   }
 
-  if (env.SIFT_MAX_INPUT_CHARS) {
+  if (env.SIFT_MAX_INPUT_CHARS || env.SIFT_MAX_CAPTURE_CHARS) {
     overrides.input = {
-      ...overrides.input,
       maxCaptureChars: env.SIFT_MAX_CAPTURE_CHARS
         ? Number(env.SIFT_MAX_CAPTURE_CHARS)
         : undefined,
-      maxInputChars: Number(env.SIFT_MAX_INPUT_CHARS)
-    };
-  }
-
-  if (env.SIFT_MAX_CAPTURE_CHARS && !overrides.input) {
-    overrides.input = {
-      maxCaptureChars: Number(env.SIFT_MAX_CAPTURE_CHARS)
+      maxInputChars: env.SIFT_MAX_INPUT_CHARS
+        ? Number(env.SIFT_MAX_INPUT_CHARS)
+        : undefined
     };
   }
 

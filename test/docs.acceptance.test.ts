@@ -31,22 +31,19 @@ describe("README quick start acceptance", () => {
     });
 
     try {
-      const cli = [
-        process.execPath,
-        "dist/cli.js",
-        "--base-url",
-        server.baseUrl,
-        "--api-key",
-        "test-key",
-        "--model",
-        "test-model"
-      ];
+      const cli = [process.execPath, "dist/cli.js"];
+      const env = {
+        ...process.env,
+        SIFT_BASE_URL: server.baseUrl,
+        SIFT_API_KEY: "test-key",
+        SIFT_MODEL: "test-model"
+      };
 
       const commands = [
         `${cli.join(" ")} exec "what changed?" -- node -e "console.log('diff --git a/file b/file\\n+change')"`,
-        `${cli.join(" ")} exec preset test-status -- node -e "console.log('12 passed')"`,
-        `${cli.join(" ")} exec preset audit-critical -- node -e "console.log('critical vuln')"`,
-        `${cli.join(" ")} exec preset infra-risk -- node -e "console.log('Plan: 2 to destroy')"`
+        `${cli.join(" ")} exec --preset test-status -- node -e "console.log('12 passed')"`,
+        `${cli.join(" ")} exec --preset audit-critical -- node -e "console.log('critical vuln')"`,
+        `${cli.join(" ")} exec --preset infra-risk -- node -e "console.log('Plan: 2 to destroy')"`
       ];
 
       const outputs: string[] = [];
@@ -59,6 +56,7 @@ describe("README quick start acceptance", () => {
         }>((resolve, reject) => {
           const child = spawn("bash", ["-lc", command], {
             cwd: repoRoot(),
+            env,
             stdio: ["ignore", "pipe", "pipe"]
           });
 

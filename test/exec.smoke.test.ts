@@ -3,7 +3,7 @@ import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
 import { runCliAsync } from "./helpers/cli.js";
 
 describe("exec mode", () => {
-  it("runs a freeform command and distills its output", async () => {
+  it("runs a freeform command and reduces its output", async () => {
     const server = await createFakeOpenAIServer(() => ({
       body: {
         choices: [{ message: { content: "All tests passed." } }]
@@ -35,6 +35,37 @@ describe("exec mode", () => {
     }
   });
 
+  it("accepts provider credentials from environment variables", async () => {
+    const server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [{ message: { content: "Environment-based auth worked." } }]
+      }
+    }));
+
+    try {
+      const result = await runCliAsync({
+        args: [
+          "exec",
+          "did the tests pass?",
+          "--",
+          "node",
+          "-e",
+          "console.log('Ran 12 tests\\n12 passed')"
+        ],
+        env: {
+          SIFT_BASE_URL: server.baseUrl,
+          SIFT_API_KEY: "test-key",
+          SIFT_MODEL: "test-model"
+        }
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout.trim()).toBe("Environment-based auth worked.");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("preserves a failing child exit code for preset exec mode", async () => {
     const server = await createFakeOpenAIServer(() => ({
       body: {
@@ -52,7 +83,7 @@ describe("exec mode", () => {
       const result = await runCliAsync({
         args: [
           "exec",
-          "preset",
+          "--preset",
           "test-status",
           "--base-url",
           server.baseUrl,
@@ -78,7 +109,7 @@ describe("exec mode", () => {
     const result = await runCliAsync({
       args: [
         "exec",
-        "preset",
+        "--preset",
         "infra-risk",
         "--shell",
         "printf 'Plan: 2 to add, 1 to destroy\\n'"
@@ -93,7 +124,7 @@ describe("exec mode", () => {
     });
   });
 
-  it("keeps the child exit code when distillation falls back", async () => {
+  it("keeps the child exit code when reduction falls back", async () => {
     const server = await createFakeOpenAIServer(() => ({
       status: 429,
       body: {
@@ -126,11 +157,11 @@ describe("exec mode", () => {
     }
   });
 
-  it("bypasses distillation for interactive prompt-like output", async () => {
+  it("bypasses reduction for interactive prompt-like output", async () => {
     const result = await runCliAsync({
       args: [
         "exec",
-        "should not distill",
+        "should not reduce",
         "--",
         "node",
         "-e",
@@ -141,6 +172,23 @@ describe("exec mode", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("Password:");
+  });
+
+  it("rejects the old exec preset syntax with a clear error", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "preset",
+        "test-status",
+        "--",
+        "node",
+        "-e",
+        "console.log('12 passed')"
+      ]
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Use 'sift exec --preset <name> -- <program> ...' instead.");
   });
 
 });
