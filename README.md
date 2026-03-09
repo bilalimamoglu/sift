@@ -1,28 +1,38 @@
 # sift
 
-Agent-first command-output reduction for agents, CI, and automation.
+`sift` is a small wrapper for agent workflows.
 
-## Why
+Instead of giving a model the full output of `pytest`, `git diff`, `npm audit`, or `terraform plan`, you run the command through `sift`. `sift` captures the output, trims the noise, and returns a much smaller answer.
 
-CLI output is often too noisy, too long, and too expensive to pass directly into a larger model.
+That answer can be short text or structured JSON.
 
-Sift can run a command for you, capture its output, reduce it locally, and send only the useful signal to an OpenAI-compatible backend.
+## What it is
 
-The result is a short answer or a small JSON payload that automation can use directly.
+- a command-output reducer for agents
+- best used with `sift exec ... -- <command>`
+- designed for non-interactive shell commands
+- compatible with OpenAI-style APIs
 
-## Features
+## What it is not
 
-- agent-first `sift exec` workflow
-- OpenAI-compatible provider interface
-- brief, bullets, json, and verdict output modes
-- preset system for common tasks
-- YAML config with env and CLI overrides
-- local sanitize, redact, and truncate pipeline
-- bounded raw capture before reduction
-- strict error objects for JSON/verdict provider failures
-- quality gate for meta or malformed model output
-- prompt bypass for simple interactive prompts
-- doctor command for runtime inspection
+- not a native Codex tool
+- not an MCP server
+- not a replacement for raw shell output when exact logs matter
+- not meant for TUI or interactive password/confirmation flows
+
+## Why use it
+
+Large shell output is expensive and noisy.
+
+If an agent only needs to know:
+- did tests pass
+- what changed
+- are there critical vulnerabilities
+- is this infra plan risky
+
+then sending the full raw output to a large model is wasteful.
+
+`sift` keeps the shell command, but shrinks what the model has to read.
 
 ## Installation
 
@@ -39,13 +49,70 @@ sift exec preset audit-critical --api-key "$OPENAI_API_KEY" -- npm audit
 sift exec preset infra-risk --api-key "$OPENAI_API_KEY" -- terraform plan
 ```
 
-## Existing pipelines
+## Before / after
 
-If you already have command output in a pipeline, pipe mode still works:
+There is a full example here:
+
+- [examples/1/BEFORE.md](/Users/bilalimamoglu/repos/sift/examples/1/BEFORE.md)
+- [examples/1/AFTER.md](/Users/bilalimamoglu/repos/sift/examples/1/AFTER.md)
+
+In that example, a long grep result is reduced to a short agent-facing answer about the parts of the repo that changed for agent workflows.
+
+## Main workflow
+
+`sift exec` is the main path:
+
+```bash
+sift exec "did tests pass?" -- pytest
+sift exec "what changed?" -- git diff
+sift exec preset infra-risk -- terraform plan
+```
+
+What happens:
+
+1. `sift` runs the command.
+2. It captures `stdout` and `stderr`.
+3. It sanitizes, optionally redacts, and truncates the result.
+4. It sends the reduced input to a smaller model.
+5. It prints a short answer or JSON.
+6. It preserves the wrapped command's exit code.
+
+## Pipe mode
+
+If the output already exists in a pipeline, pipe mode still works:
 
 ```bash
 git diff 2>&1 | sift "what changed?" --api-key "$OPENAI_API_KEY"
 ```
+
+Use pipe mode when the command is already being produced elsewhere.
+
+## Presets
+
+Built-in presets:
+
+- `test-status`
+- `audit-critical`
+- `diff-summary`
+- `build-failure`
+- `log-errors`
+- `infra-risk`
+
+Inspect them with:
+
+```bash
+sift presets list
+sift presets show audit-critical
+```
+
+## Output modes
+
+- `brief`: short plain-text answer
+- `bullets`: short bullet list
+- `json`: structured JSON
+- `verdict`: `{ verdict, reason, evidence }`
+
+Some built-in presets also use local heuristics before calling a model. For example, `infra-risk` can mark obvious destructive plans as `fail` without sending the whole decision to the model.
 
 ## Config
 
@@ -55,7 +122,7 @@ Generate an example config:
 sift config init
 ```
 
-Sift resolves configuration in this order:
+Resolution order:
 
 1. CLI flags
 2. environment variables
@@ -73,22 +140,7 @@ Supported environment variables:
 - `SIFT_TIMEOUT_MS`
 - `SIFT_MAX_INPUT_CHARS`
 
-## Commands
-
-```bash
-sift [question]
-sift preset <name>
-sift exec [question] -- <program> [args...]
-sift exec [question] --shell "<command string>"
-sift config init
-sift config show
-sift config validate
-sift doctor
-sift presets list
-sift presets show <name>
-```
-
-## Example config
+Example config:
 
 ```yaml
 provider:
@@ -114,27 +166,24 @@ runtime:
   verbose: false
 ```
 
-## Presets
-
-Built-in presets:
-
-- `test-status`
-- `audit-critical`
-- `diff-summary`
-- `build-failure`
-- `log-errors`
-- `infra-risk`
-
-Inspect them with:
+## Commands
 
 ```bash
+sift [question]
+sift preset <name>
+sift exec [question] -- <program> [args...]
+sift exec [question] --shell "<command string>"
+sift config init
+sift config show
+sift config validate
+sift doctor
 sift presets list
-sift presets show audit-critical
+sift presets show <name>
 ```
 
-## Codex setup
+## Using it with Codex
 
-If you want Codex to prefer `sift`, add a short rule to `~/.codex/AGENTS.md` manually:
+`sift` does not install itself into Codex. The normal setup is to add a short rule to `~/.codex/AGENTS.md` manually:
 
 ```md
 Prefer `sift exec` for non-interactive shell commands whose output will be read or summarized.
@@ -143,17 +192,32 @@ Do not use `sift` when exact raw output is required.
 Do not use `sift` for interactive or TUI workflows.
 ```
 
-## Safety
+That gives the agent a simple habit:
 
-Redaction is optional and regex-based in v0.1. It can mask bearer tokens, API keys, password-style assignments, JWT-like tokens, emails, and strict-mode URL query secrets before the prompt is sent to a provider. Built-in JSON presets return strict error objects on provider/model failure instead of empty success-like objects.
+- run command through `sift exec` when a summary is enough
+- skip `sift` when exact output matters
 
-`sift exec` is intended for non-interactive commands. If it detects simple prompt-like output such as `[y/N]` or `password:`, it skips distillation and passes raw output through.
+## Safety and limits
 
-## CI usage
+- Redaction is optional and regex-based.
+- Built-in JSON and verdict flows return strict error objects on provider/model failure.
+- `sift exec` detects simple prompt-like output such as `[y/N]` or `password:` and skips distillation instead of guessing.
+- Pipe mode does not preserve upstream shell pipeline failures; use `set -o pipefail` if you need that behavior.
+- `sift exec` mirrors the wrapped command's exit code.
 
-Pipe mode does not attempt to mirror upstream pipeline exit codes from `stdin`. If you need shell pipeline failures to propagate there, use `set -o pipefail` in `bash` or `zsh`.
+## Current scope
 
-`sift exec` mirrors the wrapped command's exit code.
+`sift` is intentionally small.
+
+Today it supports:
+- OpenAI-compatible providers
+- agent-first `exec` mode
+- pipe mode
+- presets
+- local redaction and truncation
+- strict JSON/verdict fallbacks
+
+It does not try to be a full agent platform.
 
 ## License
 
