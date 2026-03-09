@@ -13,6 +13,17 @@ describe("CLI smoke", () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("sift [question]");
+    expect(result.stdout).toContain("SIFT_PROVIDER_API_KEY");
+  });
+
+  it("prints exec help with passthrough usage", () => {
+    const result = runCli({
+      args: ["exec", "--help"]
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("sift exec [question] [options] -- <program> [args...]");
+    expect(result.stdout).toContain("exec --preset test-status -- pytest");
   });
 
   it("supports config init, show, and validate", async () => {
@@ -34,20 +45,20 @@ describe("CLI smoke", () => {
     expect(show.status).toBe(0);
     expect(JSON.parse(show.stdout).provider.provider).toBe("openai-compatible");
     expect(validate.status).toBe(0);
-    expect(validate.stdout).toContain("Config is valid");
+    expect(validate.stdout).toContain("Resolved config is valid");
   });
 
   it("masks secrets in config show by default and reveals them with --show-secrets", async () => {
     const masked = runCli({
       args: ["config", "show"],
       env: {
-        SIFT_API_KEY: "env-secret-key"
+        SIFT_PROVIDER_API_KEY: "env-secret-key"
       }
     });
     const revealed = runCli({
       args: ["config", "show", "--show-secrets"],
       env: {
-        SIFT_API_KEY: "env-secret-key"
+        SIFT_PROVIDER_API_KEY: "env-secret-key"
       }
     });
 
@@ -159,12 +170,13 @@ describe("CLI smoke", () => {
       args: ["doctor"],
       env: {
         SIFT_BASE_URL: "https://example.test/v1",
-        SIFT_API_KEY: "env-key",
+        SIFT_PROVIDER_API_KEY: "env-key",
         SIFT_MODEL: "env-model"
       }
     });
 
     expect(result.status).toBe(0);
+    expect(result.stdout).toContain("mode: local config completeness check");
     expect(result.stdout).toContain("apiKey: set");
     expect(result.stdout).toContain("model: env-model");
     expect(result.stdout).toContain("baseUrl: https://example.test/v1");

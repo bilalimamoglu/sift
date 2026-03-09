@@ -48,7 +48,7 @@ Set credentials once in your shell:
 
 ```bash
 export SIFT_BASE_URL=https://api.openai.com/v1
-export SIFT_API_KEY=your_api_key
+export SIFT_PROVIDER_API_KEY=your_api_key
 export SIFT_MODEL=gpt-4.1-mini
 ```
 
@@ -58,7 +58,8 @@ Or write them to a config file:
 sift config init
 ```
 
-`sift` is remote-first today. The safe path is to set `SIFT_API_KEY`, `SIFT_BASE_URL`, and `SIFT_MODEL` once, then run `sift` normally.
+`sift` is remote-first today. The safe path is to set `SIFT_PROVIDER_API_KEY`, `SIFT_BASE_URL`, and `SIFT_MODEL` once, then run `sift` normally.
+`SIFT_PROVIDER_API_KEY` is the generic wrapper env. Provider-native env vars are reserved for future first-class providers. Today's `openai-compatible` mode intentionally stays generic and does not imply OpenAI ownership.
 
 ## Quick start
 
@@ -150,7 +151,7 @@ Supported environment variables:
 - `SIFT_PROVIDER`
 - `SIFT_MODEL`
 - `SIFT_BASE_URL`
-- `SIFT_API_KEY`
+- `SIFT_PROVIDER_API_KEY`
 - `SIFT_MAX_CAPTURE_CHARS`
 - `SIFT_TIMEOUT_MS`
 - `SIFT_MAX_INPUT_CHARS`

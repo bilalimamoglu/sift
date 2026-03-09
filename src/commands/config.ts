@@ -49,6 +49,6 @@ export function configValidate(configPath?: string): void {
 
   const resolvedPath = findConfigPath(configPath);
   process.stdout.write(
-    `Config is valid${resolvedPath ? ` (${resolvedPath})` : " (using defaults)" }.\n`
+    `Resolved config is valid${resolvedPath ? ` (${resolvedPath})` : " (using defaults)" }.\n`
   );
 }

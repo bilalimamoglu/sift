@@ -1,5 +1,6 @@
 import { defaultConfig } from "./defaults.js";
 import { loadRawConfig } from "./load.js";
+import { resolveProviderApiKey } from "./provider-api-key.js";
 import { siftConfigSchema } from "./schema.js";
 import type { PartialSiftConfig, SiftConfig } from "../types.js";
 
@@ -34,19 +35,21 @@ function mergeDefined<T>(base: T, override: unknown): T {
 
 function buildEnvOverrides(env: NodeJS.ProcessEnv): PartialSiftConfig {
   const overrides: PartialSiftConfig = {};
+  const provider = env.SIFT_PROVIDER;
+  const apiKey = resolveProviderApiKey(provider, env);
 
   if (
     env.SIFT_PROVIDER ||
     env.SIFT_MODEL ||
     env.SIFT_BASE_URL ||
-    env.SIFT_API_KEY ||
+    apiKey ||
     env.SIFT_TIMEOUT_MS
   ) {
     overrides.provider = {
       provider: env.SIFT_PROVIDER as SiftConfig["provider"]["provider"] | undefined,
       model: env.SIFT_MODEL,
       baseUrl: env.SIFT_BASE_URL,
-      apiKey: env.SIFT_API_KEY,
+      apiKey,
       timeoutMs: env.SIFT_TIMEOUT_MS ? Number(env.SIFT_TIMEOUT_MS) : undefined
     };
   }

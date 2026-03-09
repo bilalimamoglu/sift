@@ -3,6 +3,7 @@ import type { SiftConfig } from "../types.js";
 export function runDoctor(config: SiftConfig): number {
   const lines = [
     "sift doctor",
+    "mode: local config completeness check",
     `provider: ${config.provider.provider}`,
     `model: ${config.provider.model}`,
     `baseUrl: ${config.provider.baseUrl}`,
