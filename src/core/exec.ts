@@ -3,6 +3,7 @@ import { constants as osConstants } from "node:os";
 import pc from "picocolors";
 import { CAPTURE_OMITTED_MARKER } from "../constants.js";
 import type { OutputFormat, RunRequest, SiftConfig } from "../types.js";
+import { evaluateGate, supportsFailOnPreset } from "./gate.js";
 import { runSift } from "./run.js";
 
 const PROMPT_PATTERNS = [
@@ -97,6 +98,7 @@ function normalizeChildExitCode(status: number | null, signal: NodeJS.Signals | 
 
 export interface ExecRequest extends Omit<RunRequest, "stdin"> {
   command?: string[];
+  failOn?: boolean;
   shellCommand?: string;
 }
 
@@ -204,6 +206,19 @@ export async function runExec(request: ExecRequest): Promise<number> {
     });
 
     process.stdout.write(`${output}\n`);
+
+    if (
+      request.failOn &&
+      !request.dryRun &&
+      exitCode === 0 &&
+      supportsFailOnPreset(request.presetName) &&
+      evaluateGate({
+        presetName: request.presetName,
+        output
+      }).shouldFail
+    ) {
+      return 1;
+    }
   }
 
   return exitCode;

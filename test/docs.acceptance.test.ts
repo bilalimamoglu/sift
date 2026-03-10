@@ -62,12 +62,16 @@ describe("README quick start acceptance", () => {
         `${cli.join(" ")} exec --preset typecheck-summary -- node -e "console.error('src/app.ts:1:1 - error TS2322: Type string is not assignable to type number')"`,
         `${cli.join(" ")} exec --preset lint-failures -- node -e "console.error('src/app.ts\\n  1:1  error  Unexpected any  @typescript-eslint/no-explicit-any')"`,
         `${cli.join(" ")} exec --preset audit-critical -- node -e "console.log('critical vuln')"`,
-        `${cli.join(" ")} exec --preset infra-risk -- node -e "console.log('Plan: 2 to destroy')"`
+        `${cli.join(" ")} exec --preset infra-risk -- node -e "console.log('Plan: 2 to destroy')"`,
+        `${cli.join(" ")} exec --preset audit-critical --fail-on -- node -e "console.log('lodash: critical vulnerability')"`,
+        `${cli.join(" ")} exec --preset infra-risk --fail-on -- node -e "console.log('Plan: 2 to destroy')"`
       ];
+
+      const expectedStatuses = [0, 0, 0, 0, 0, 0, 1, 1];
 
       const outputs: string[] = [];
 
-      for (const command of commands) {
+      for (const [index, command] of commands.entries()) {
         const result = await new Promise<{
           status: number | null;
           stdout: string;
@@ -100,7 +104,7 @@ describe("README quick start acceptance", () => {
 
         outputs.push(result.stdout.trim());
 
-        expect(result.status).toBe(0);
+        expect(result.status).toBe(expectedStatuses[index]);
         expect(result.stderr).toBe("");
       }
 
@@ -114,6 +118,8 @@ describe("README quick start acceptance", () => {
         summary: "No high or critical vulnerabilities found in the provided input."
       });
       expect(JSON.parse(outputs[5]!).verdict).toBe("fail");
+      expect(JSON.parse(outputs[6]!).vulnerabilities).toHaveLength(1);
+      expect(JSON.parse(outputs[7]!).verdict).toBe("fail");
     } finally {
       await server.close();
     }

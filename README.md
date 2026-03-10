@@ -89,6 +89,7 @@ sift exec --preset audit-critical -- npm audit
 sift exec --preset typecheck-summary -- tsc --noEmit
 sift exec --preset lint-failures -- eslint .
 sift exec --preset infra-risk -- terraform plan
+sift exec --preset infra-risk --fail-on -- terraform plan
 ```
 
 ## Main workflow
@@ -99,6 +100,7 @@ sift exec --preset infra-risk -- terraform plan
 sift exec "did tests pass?" -- pytest
 sift exec "what changed?" -- git diff
 sift exec --preset infra-risk -- terraform plan
+sift exec --preset audit-critical --fail-on -- npm audit
 sift exec --dry-run "what changed?" -- git diff
 ```
 
@@ -112,6 +114,8 @@ What happens:
 6. It preserves the wrapped command's exit code.
 
 Use `--dry-run` to inspect the reduced input and prompt without calling the provider.
+
+Use `--fail-on` with supported built-in semantic presets when a command may succeed technically but still produce a result that should block CI.
 
 ## Pipe mode
 
@@ -151,6 +155,11 @@ sift presets show audit-critical
 - `verdict`: `{ verdict, reason, evidence }`
 
 Some built-in presets also use local heuristics before calling a model. For example, `infra-risk` can mark obvious destructive plans as `fail` without sending the whole decision to the model.
+
+`--fail-on` currently supports only:
+
+- `infra-risk`
+- `audit-critical`
 
 ## JSON response format
 

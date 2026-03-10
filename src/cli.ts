@@ -6,6 +6,11 @@ import { runDoctor } from "./commands/doctor.js";
 import { listPresets, showPreset } from "./commands/presets.js";
 import { resolveConfig } from "./config/resolve.js";
 import { runExec } from "./core/exec.js";
+import {
+  assertSupportedFailOnFormat,
+  assertSupportedFailOnPreset,
+  evaluateGate
+} from "./core/gate.js";
 import { readStdin } from "./core/stdin.js";
 import { runSift } from "./core/run.js";
 import { getPreset } from "./prompts/presets.js";
@@ -104,6 +109,10 @@ function applySharedOptions(command: ReturnType<typeof cli.command>) {
     .option("--redact-strict", "Enable strict redaction")
     .option("--raw-fallback", "Enable raw fallback text output")
     .option("--dry-run", "Show the reduced input and prompt without calling the provider")
+    .option(
+      "--fail-on",
+      "Fail with exit code 1 when a supported built-in preset produces a blocking result"
+    )
     .option("--config <path>", "Path to config file")
     .option("--verbose", "Enable verbose stderr logging");
 }
@@ -111,11 +120,20 @@ function applySharedOptions(command: ReturnType<typeof cli.command>) {
 async function executeRun(args: {
   question: string;
   format: OutputFormat;
+  presetName?: string;
   policyName?: SiftConfig["presets"][string]["policy"];
   outputContract?: string;
   fallbackJson?: unknown;
   options: Record<string, unknown>;
 }): Promise<void> {
+  if (Boolean(args.options.failOn)) {
+    assertSupportedFailOnPreset(args.presetName);
+    assertSupportedFailOnFormat({
+      presetName: args.presetName,
+      format: args.format
+    });
+  }
+
   const config = resolveConfig({
     configPath: args.options.config as string | undefined,
     env: process.env,
@@ -128,12 +146,25 @@ async function executeRun(args: {
     stdin,
     config,
     dryRun: Boolean(args.options.dryRun),
+    presetName: args.presetName,
     policyName: args.policyName,
     outputContract: args.outputContract,
     fallbackJson: args.fallbackJson
   });
 
   process.stdout.write(`${output}\n`);
+
+  if (
+    Boolean(args.options.failOn) &&
+    !Boolean(args.options.dryRun) &&
+    args.presetName &&
+    evaluateGate({
+      presetName: args.presetName,
+      output
+    }).shouldFail
+  ) {
+    process.exitCode = 1;
+  }
 }
 
 function extractExecCommand(options: Record<string, unknown>): {
@@ -165,11 +196,20 @@ function extractExecCommand(options: Record<string, unknown>): {
 async function executeExec(args: {
   question: string;
   format: OutputFormat;
+  presetName?: string;
   policyName?: SiftConfig["presets"][string]["policy"];
   outputContract?: string;
   fallbackJson?: unknown;
   options: Record<string, unknown>;
 }): Promise<void> {
+  if (Boolean(args.options.failOn)) {
+    assertSupportedFailOnPreset(args.presetName);
+    assertSupportedFailOnFormat({
+      presetName: args.presetName,
+      format: args.format
+    });
+  }
+
   const config = resolveConfig({
     configPath: args.options.config as string | undefined,
     env: process.env,
@@ -181,6 +221,8 @@ async function executeExec(args: {
     format: args.format,
     config,
     dryRun: Boolean(args.options.dryRun),
+    failOn: Boolean(args.options.failOn),
+    presetName: args.presetName,
     policyName: args.policyName,
     outputContract: args.outputContract,
     fallbackJson: args.fallbackJson,
@@ -204,6 +246,7 @@ applySharedOptions(
   await executeRun({
     question: preset.question,
     format: (options.format as OutputFormat | undefined) ?? preset.format,
+    presetName: name,
     policyName:
       (options.format as OutputFormat | undefined) === undefined ||
       (options.format as OutputFormat | undefined) === preset.format
@@ -253,6 +296,7 @@ applySharedOptions(
       await executeExec({
         question: preset.question,
         format: (options.format as OutputFormat | undefined) ?? preset.format,
+        presetName,
         policyName:
           (options.format as OutputFormat | undefined) === undefined ||
           (options.format as OutputFormat | undefined) === preset.format

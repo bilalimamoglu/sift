@@ -161,6 +161,8 @@ describe("CLI smoke", () => {
       const freeform = await runCliAsync({
         args: [
           "what changed?",
+          "--provider",
+          "openai-compatible",
           "--base-url",
           server.baseUrl,
           "--api-key",
@@ -174,6 +176,8 @@ describe("CLI smoke", () => {
         args: [
           "preset",
           "audit-critical",
+          "--provider",
+          "openai-compatible",
           "--base-url",
           server.baseUrl,
           "--api-key",
@@ -195,6 +199,36 @@ describe("CLI smoke", () => {
     } finally {
       await server.close();
     }
+  });
+
+  it("supports --fail-on in preset pipe mode for infra-risk", async () => {
+    const result = await runCliAsync({
+      args: ["preset", "infra-risk", "--fail-on"],
+      input: "Plan: 2 to add, 1 to destroy\n"
+    });
+
+    expect(result.status).toBe(1);
+    expect(JSON.parse(result.stdout).verdict).toBe("fail");
+  });
+
+  it("rejects --fail-on for unsupported preset pipe mode", async () => {
+    const result = await runCliAsync({
+      args: ["preset", "test-status", "--fail-on"],
+      input: "Ran 12 tests\n12 passed\n"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("supported only for built-in presets: infra-risk, audit-critical");
+  });
+
+  it("rejects --fail-on for freeform pipe mode", async () => {
+    const result = await runCliAsync({
+      args: ["did the tests pass?", "--fail-on"],
+      input: "Ran 12 tests\n12 passed\n"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("supported only for built-in presets: infra-risk, audit-critical");
   });
 
   it("reports api key presence from environment in doctor output", async () => {

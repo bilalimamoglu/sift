@@ -62,6 +62,8 @@ describe("exec mode", () => {
         args: [
           "exec",
           "did the tests pass?",
+          "--provider",
+          "openai-compatible",
           "--base-url",
           server.baseUrl,
           "--api-key",
@@ -100,6 +102,7 @@ describe("exec mode", () => {
           "console.log('Ran 12 tests\\n12 passed')"
         ],
         env: {
+          SIFT_PROVIDER: "openai-compatible",
           SIFT_BASE_URL: server.baseUrl,
           SIFT_PROVIDER_API_KEY: "test-key",
           SIFT_MODEL: "test-model"
@@ -186,6 +189,8 @@ describe("exec mode", () => {
           "exec",
           "--preset",
           "test-status",
+          "--provider",
+          "openai-compatible",
           "--base-url",
           server.baseUrl,
           "--api-key",
@@ -225,6 +230,190 @@ describe("exec mode", () => {
     });
   });
 
+  it("returns exit 1 for infra-risk fail verdicts when --fail-on is enabled", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "infra-risk",
+        "--fail-on",
+        "--shell",
+        "printf 'Plan: 2 to add, 1 to destroy\\n'"
+      ]
+    });
+
+    expect(result.status).toBe(1);
+    expect(JSON.parse(result.stdout).verdict).toBe("fail");
+  });
+
+  it("returns exit 0 for infra-risk pass verdicts when --fail-on is enabled", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "infra-risk",
+        "--fail-on",
+        "--shell",
+        "printf 'Plan: 0 to destroy\\nNo changes. Infrastructure is up-to-date.\\n'"
+      ]
+    });
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout).verdict).toBe("pass");
+  });
+
+  it("returns exit 1 for audit-critical findings when --fail-on is enabled", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "audit-critical",
+        "--fail-on",
+        "--shell",
+        "printf 'lodash: critical vulnerability\\n'"
+      ]
+    });
+
+    expect(result.status).toBe(1);
+    expect(JSON.parse(result.stdout).vulnerabilities).toHaveLength(1);
+  });
+
+  it("returns exit 0 for empty audit-critical findings when --fail-on is enabled", async () => {
+    const server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                status: "ok",
+                vulnerabilities: [],
+                summary: "No high or critical vulnerabilities found in the provided input."
+              })
+            }
+          }
+        ]
+      }
+    }));
+
+    try {
+      const result = await runCliAsync({
+        args: [
+          "exec",
+          "--preset",
+          "audit-critical",
+          "--fail-on",
+          "--provider",
+          "openai-compatible",
+          "--base-url",
+          server.baseUrl,
+          "--api-key",
+          "test-key",
+          "--model",
+          "test-model",
+          "--",
+          "node",
+          "-e",
+          "console.log('No vulnerabilities found')"
+        ]
+      });
+
+      expect(result.status).toBe(0);
+      expect(JSON.parse(result.stdout).vulnerabilities).toHaveLength(0);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("skips gate evaluation in dry-run mode", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "infra-risk",
+        "--fail-on",
+        "--dry-run",
+        "--shell",
+        "printf 'Plan: 2 to add, 1 to destroy\\n'"
+      ]
+    });
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      status: "dry-run",
+      format: "verdict",
+      policy: "infra-risk"
+    });
+  });
+
+  it("keeps the original failing child exit code when --fail-on is enabled", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "infra-risk",
+        "--fail-on",
+        "--shell",
+        "printf 'Plan: 2 to add, 1 to destroy\\n'; exit 2"
+      ]
+    });
+
+    expect(result.status).toBe(2);
+    expect(JSON.parse(result.stdout).verdict).toBe("fail");
+  });
+
+  it("fails clearly when --fail-on is used with unsupported presets", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "test-status",
+        "--fail-on",
+        "--",
+        "node",
+        "-e",
+        "console.log('12 passed')"
+      ]
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("supported only for built-in presets: infra-risk, audit-critical");
+  });
+
+  it("fails clearly when --fail-on is used with freeform questions", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "did the tests pass?",
+        "--fail-on",
+        "--",
+        "node",
+        "-e",
+        "console.log('12 passed')"
+      ]
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("supported only for built-in presets: infra-risk, audit-critical");
+  });
+
+  it("fails clearly when --fail-on is used with a non-default preset format", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "infra-risk",
+        "--format",
+        "json",
+        "--fail-on",
+        "--shell",
+        "printf 'Plan: 2 to add, 1 to destroy\\n'"
+      ]
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("default verdict format for preset infra-risk");
+  });
+
   it("supports typecheck-summary preset exec flows", async () => {
     const server = await createFakeOpenAIServer(() => ({
       body: {
@@ -245,6 +434,8 @@ describe("exec mode", () => {
           "exec",
           "--preset",
           "typecheck-summary",
+          "--provider",
+          "openai-compatible",
           "--base-url",
           server.baseUrl,
           "--api-key",
@@ -285,6 +476,8 @@ describe("exec mode", () => {
           "exec",
           "--preset",
           "lint-failures",
+          "--provider",
+          "openai-compatible",
           "--base-url",
           server.baseUrl,
           "--api-key",

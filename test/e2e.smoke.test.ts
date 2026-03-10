@@ -23,6 +23,8 @@ describe("dist e2e", () => {
         useDist: true,
         args: [
           "did tests pass?",
+          "--provider",
+          "openai-compatible",
           "--base-url",
           server.baseUrl,
           "--api-key",
