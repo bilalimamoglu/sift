@@ -24,6 +24,12 @@ import type {
 const require = createRequire(import.meta.url);
 const pkg = require("../package.json") as { version: string };
 const cli = cac("sift");
+const HELP_BANNER = [
+  "   \\\\  //",
+  "    \\\\//",
+  "     ||",
+  "     o"
+].join("\n");
 
 function toNumber(value: unknown): number | undefined {
   if (value === undefined || value === null || value === "") {
@@ -413,7 +419,12 @@ applySharedOptions(
   });
 });
 
-cli.help();
+cli.help((sections) => [
+  {
+    body: `${HELP_BANNER}\n`
+  },
+  ...sections
+]);
 cli.version(pkg.version);
 
 async function main(): Promise<void> {

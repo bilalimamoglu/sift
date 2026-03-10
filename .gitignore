@@ -7,3 +7,7 @@ examples/
 sift.config.yaml
 sift.config.yml
 CLAUDE.md
+assets/*
+!assets/brand/
+assets/brand/*
+!assets/brand/*.svg

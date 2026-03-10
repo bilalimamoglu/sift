@@ -1,5 +1,7 @@
 # sift
 
+<img src="assets/brand/sift-logo-badge-monochrome.svg" alt="sift logo" width="88" />
+
 `sift` is a small command-output reducer for agent workflows.
 
 Instead of feeding a model the full output of `pytest`, `git diff`, `npm audit`, `tsc --noEmit`, `eslint .`, or `terraform plan`, you run the command through `sift`. It captures the output, trims the noise, and returns a much smaller answer.
@@ -194,6 +196,15 @@ The workflow:
 4. publishes to npm
 5. creates and pushes the `vX.Y.Z` tag
 6. creates a GitHub Release
+
+## Brand assets
+
+Curated public logo assets live in `assets/brand/`.
+
+Included SVG sets:
+- badge/app: teal, black, monochrome
+- icon-only: teal, black, monochrome
+- 24px icon: teal, black, monochrome
 
 ## License
 

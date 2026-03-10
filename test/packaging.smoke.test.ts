@@ -12,6 +12,9 @@ describe("packaging smoke", () => {
       cwd: root,
       encoding: "utf8"
     }).trim();
+    const tarballContents = execSync(`tar -tf "${path.join(root, tarball)}"`, {
+      encoding: "utf8"
+    });
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-pack-"));
 
     execSync(`npm init -y`, {
@@ -29,6 +32,8 @@ describe("packaging smoke", () => {
     });
 
     expect(result.status).toBe(0);
+    expect(tarballContents).not.toContain("assets/brand");
     expect(result.stdout).toContain("sift [question]");
+    expect(result.stdout).toContain("  \\\\  //");
   });
 });
