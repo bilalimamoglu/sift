@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { defaultConfig } from "../src/config/defaults.js";
 import { runSift } from "../src/core/run.js";
+import type { SiftConfig } from "../src/types.js";
 import { createFakeOpenAIServer, type FakeOpenAIServer } from "./helpers/fake-openai.js";
 
 let server: FakeOpenAIServer | undefined;
@@ -10,11 +11,12 @@ afterEach(async () => {
   server = undefined;
 });
 
-function makeConfig(baseUrl: string) {
+function makeConfig(baseUrl: string): SiftConfig {
   return {
     ...defaultConfig,
     provider: {
       ...defaultConfig.provider,
+      provider: "openai-compatible" as const,
       baseUrl,
       model: "test-model",
       apiKey: "test-key"
@@ -245,5 +247,69 @@ describe("runSift hardening", () => {
       format: "brief"
     });
     expect(server.requests).toHaveLength(0);
+  });
+
+  it("supports typecheck-summary through the provider path", async () => {
+    const preset = defaultConfig.presets["typecheck-summary"]!;
+
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [
+          {
+            message: {
+              content:
+                "- Typecheck failed.\n- TS2322 appears repeatedly around UserCard props.\n- Start with src/components/UserCard.tsx and src/types/user.ts."
+            }
+          }
+        ]
+      }
+    }));
+
+    const output = await runSift({
+      question: preset.question,
+      format: "bullets",
+      policyName: "typecheck-summary",
+      stdin:
+        "src/components/UserCard.tsx:12:3 - error TS2322: Type 'string' is not assignable to type 'number'.\n" +
+        "src/components/UserCard.tsx:18:7 - error TS2322: Type 'string' is not assignable to type 'number'.\n" +
+        "src/types/user.ts:4:5 - error TS2741: Property 'id' is missing.\n",
+      config: makeConfig(server.baseUrl)
+    });
+
+    expect(output).toContain("Typecheck failed.");
+    expect(output).toContain("TS2322");
+    expect(output.split("\n").length).toBeLessThanOrEqual(3);
+  });
+
+  it("supports lint-failures through the provider path", async () => {
+    const preset = defaultConfig.presets["lint-failures"]!;
+
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [
+          {
+            message: {
+              content:
+                "- Lint failed.\n- @typescript-eslint/no-explicit-any is the main repeated rule.\n- Focus on src/app.ts and src/routes/api.ts first."
+            }
+          }
+        ]
+      }
+    }));
+
+    const output = await runSift({
+      question: preset.question,
+      format: "bullets",
+      policyName: "lint-failures",
+      stdin:
+        "src/app.ts\n  1:12  error  Unexpected any  @typescript-eslint/no-explicit-any\n" +
+        "src/routes/api.ts\n  4:10  error  Unexpected any  @typescript-eslint/no-explicit-any\n" +
+        "src/routes/api.ts\n  7:3  warning  Unexpected console statement  no-console\n",
+      config: makeConfig(server.baseUrl)
+    });
+
+    expect(output).toContain("Lint failed.");
+    expect(output).toContain("@typescript-eslint/no-explicit-any");
+    expect(output.split("\n").length).toBeLessThanOrEqual(3);
   });
 });

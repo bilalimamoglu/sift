@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { OpenAIProvider } from "../src/providers/openai.js";
 import { OpenAICompatibleProvider } from "../src/providers/openaiCompatible.js";
 import { createFakeOpenAIServer, type FakeOpenAIServer } from "./helpers/fake-openai.js";
 
@@ -41,11 +42,13 @@ describe("OpenAICompatibleProvider", () => {
     expect(server.requests[0].model).toBe("test-model");
   });
 
-  it("throws on non-200 responses", async () => {
+  it("throws actionable errors on non-200 responses", async () => {
     server = await createFakeOpenAIServer(() => ({
       status: 500,
       body: {
-        error: "boom"
+        error: {
+          message: "upstream exploded"
+        }
       }
     }));
 
@@ -63,7 +66,7 @@ describe("OpenAICompatibleProvider", () => {
         responseMode: "text",
         jsonResponseFormat: "auto"
       })
-    ).rejects.toThrow("HTTP 500");
+    ).rejects.toThrow("HTTP 500: upstream exploded");
   });
 
   it("times out slow requests", async () => {
@@ -179,5 +182,182 @@ describe("OpenAICompatibleProvider", () => {
     });
 
     expect(server.requests[0].response_format).toBeUndefined();
+  });
+});
+
+describe("OpenAIProvider", () => {
+  it("parses a successful responses API payload and usage", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        output: [
+          {
+            type: "message",
+            content: [
+              {
+                type: "output_text",
+                text: "All tests passed."
+              }
+            ]
+          }
+        ],
+        usage: {
+          input_tokens: 10,
+          output_tokens: 5,
+          total_tokens: 15
+        }
+      }
+    }));
+
+    const provider = new OpenAIProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key"
+    });
+    const result = await provider.generate({
+      model: "test-model",
+      prompt: "hello",
+      temperature: 0.1,
+      maxOutputTokens: 50,
+      timeoutMs: 1000,
+      responseMode: "text",
+      jsonResponseFormat: "auto"
+    });
+
+    expect(result.text).toBe("All tests passed.");
+    expect(result.usage?.totalTokens).toBe(15);
+    expect(server.requests[0].model).toBe("test-model");
+    expect(server.requests[0].max_output_tokens).toBe(50);
+    expect(server.requests[0].input).toBe("hello");
+    expect(server.requests[0].temperature).toBeUndefined();
+    expect(server.requests[0].reasoning).toEqual({ effort: "minimal" });
+    expect(server.requests[0].text).toEqual({ verbosity: "low" });
+  });
+
+  it("throws actionable errors on non-200 responses", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      status: 400,
+      body: {
+        error: {
+          message: "Unsupported parameter: max_tokens"
+        }
+      }
+    }));
+
+    const provider = new OpenAIProvider({
+      baseUrl: server.baseUrl
+    });
+
+    await expect(
+      provider.generate({
+        model: "test-model",
+        prompt: "hello",
+        temperature: 0.1,
+        maxOutputTokens: 50,
+        timeoutMs: 1000,
+        responseMode: "text",
+        jsonResponseFormat: "auto"
+      })
+    ).rejects.toThrow("HTTP 400: Unsupported parameter: max_tokens");
+  });
+
+  it("uses native JSON shaping in auto mode", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        output: [
+          {
+            type: "message",
+            content: [
+              {
+                type: "output_text",
+                text: "{\"status\":\"ok\"}"
+              }
+            ]
+          }
+        ]
+      }
+    }));
+
+    const provider = new OpenAIProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key"
+    });
+
+    await provider.generate({
+      model: "test-model",
+      prompt: "Return valid JSON with status ok.",
+      temperature: 0.1,
+      maxOutputTokens: 50,
+      timeoutMs: 1000,
+      responseMode: "json",
+      jsonResponseFormat: "auto"
+    });
+
+    expect(server.requests[0].reasoning).toEqual({ effort: "minimal" });
+    expect(server.requests[0].text).toEqual({
+      verbosity: "low",
+      format: {
+        type: "json_object"
+      }
+    });
+  });
+
+  it("does not use native JSON shaping when turned off", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        output: [
+          {
+            type: "message",
+            content: [
+              {
+                type: "output_text",
+                text: "{\"status\":\"ok\"}"
+              }
+            ]
+          }
+        ]
+      }
+    }));
+
+    const provider = new OpenAIProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key"
+    });
+
+    await provider.generate({
+      model: "test-model",
+      prompt: "Return valid JSON with status ok.",
+      temperature: 0.1,
+      maxOutputTokens: 50,
+      timeoutMs: 1000,
+      responseMode: "json",
+      jsonResponseFormat: "off"
+    });
+
+    expect(server.requests[0].reasoning).toEqual({ effort: "minimal" });
+    expect(server.requests[0].text).toEqual({ verbosity: "low" });
+  });
+
+  it("throws when the responses payload has no text output", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        output: []
+      }
+    }));
+
+    const provider = new OpenAIProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key"
+    });
+
+    await expect(
+      provider.generate({
+        model: "test-model",
+        prompt: "hello",
+        temperature: 0.1,
+        maxOutputTokens: 50,
+        timeoutMs: 1000,
+        responseMode: "text",
+        jsonResponseFormat: "auto"
+      })
+    ).rejects.toThrow("empty response");
   });
 });

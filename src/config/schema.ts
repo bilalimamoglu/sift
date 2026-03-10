@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const providerNameSchema = z.enum(["openai-compatible"]);
+export const providerNameSchema = z.enum(["openai", "openai-compatible"]);
 export const outputFormatSchema = z.enum([
   "brief",
   "bullets",
@@ -15,7 +15,9 @@ export const promptPolicyNameSchema = z.enum([
   "diff-summary",
   "build-failure",
   "log-errors",
-  "infra-risk"
+  "infra-risk",
+  "typecheck-summary",
+  "lint-failures"
 ]);
 
 export const providerConfigSchema = z.object({

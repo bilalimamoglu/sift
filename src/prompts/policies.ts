@@ -87,6 +87,33 @@ const BUILT_IN_POLICIES: Record<PromptPolicyName, Omit<PromptPolicy, "sharedRule
       `If there is no clear error signal, reply exactly with: ${INSUFFICIENT_SIGNAL_TEXT}`
     ]
   },
+  "typecheck-summary": {
+    name: "typecheck-summary",
+    responseMode: "text",
+    taskRules: [
+      "Return at most 5 short bullet points.",
+      "Determine whether the typecheck failed or passed.",
+      "Group repeated diagnostics into root-cause buckets instead of echoing many duplicate lines.",
+      "Mention the first concrete files, symbols, or error categories to fix when they are visible.",
+      "Prefer compiler or type-system errors over timing, progress, or summary noise.",
+      "If the output clearly indicates success, say that briefly and do not add extra bullets.",
+      `If you cannot tell whether the typecheck failed, reply exactly with: ${INSUFFICIENT_SIGNAL_TEXT}`
+    ]
+  },
+  "lint-failures": {
+    name: "lint-failures",
+    responseMode: "text",
+    taskRules: [
+      "Return at most 5 short bullet points.",
+      "Determine whether lint failed or whether there are no blocking lint failures.",
+      "Group repeated rule violations instead of listing the same rule many times.",
+      "Mention the top offending files and rule names when they are visible.",
+      "Distinguish blocking failures from warnings only when that distinction is clearly visible in the input.",
+      "Do not invent autofixability; only mention autofix or --fix support when the tool output explicitly says so.",
+      "If the output clearly indicates success or no blocking failures, say that briefly and stop.",
+      `If there is not enough evidence to determine the lint result, reply exactly with: ${INSUFFICIENT_SIGNAL_TEXT}`
+    ]
+  },
   "infra-risk": {
     name: "infra-risk",
     responseMode: "json",

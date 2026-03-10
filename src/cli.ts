@@ -82,12 +82,12 @@ function buildCliOverrides(options: Record<string, unknown>): PartialSiftConfig 
 
 function applySharedOptions(command: ReturnType<typeof cli.command>) {
   return command
-    .option("--provider <provider>", "Provider: openai-compatible")
+    .option("--provider <provider>", "Provider: openai | openai-compatible")
     .option("--model <model>", "Model name")
     .option("--base-url <url>", "Provider base URL")
     .option(
       "--api-key <key>",
-      "Provider API key (or set SIFT_PROVIDER_API_KEY; OPENAI_API_KEY also works for api.openai.com)"
+      "Provider API key (or set OPENAI_API_KEY for provider=openai; use SIFT_PROVIDER_API_KEY or endpoint-native envs for openai-compatible)"
     )
     .option(
       "--json-response-format <mode>",

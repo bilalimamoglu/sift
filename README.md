@@ -2,7 +2,7 @@
 
 `sift` is a small wrapper for agent workflows.
 
-Instead of giving a model the full output of `pytest`, `git diff`, `npm audit`, or `terraform plan`, you run the command through `sift`. `sift` captures the output, trims the noise, and returns a much smaller answer.
+Instead of giving a model the full output of `pytest`, `git diff`, `npm audit`, `tsc --noEmit`, `eslint .`, or `terraform plan`, you run the command through `sift`. `sift` captures the output, trims the noise, and returns a much smaller answer.
 
 That answer can be short text or structured JSON.
 
@@ -11,7 +11,7 @@ That answer can be short text or structured JSON.
 - a command-output reducer for agents
 - best used with `sift exec ... -- <command>`
 - designed for non-interactive shell commands
-- compatible with OpenAI-style APIs
+- supports native OpenAI and OpenAI-compatible APIs
 
 ## What it is not
 
@@ -28,6 +28,8 @@ If an agent only needs to know:
 - did tests pass
 - what changed
 - are there critical vulnerabilities
+- what are the blocking type errors
+- what lint failures actually matter
 - is this infra plan risky
 
 then sending the full raw output to a large model is wasteful.
@@ -47,8 +49,9 @@ npm install -g @bilalimamoglu/sift
 Set credentials once in your shell:
 
 ```bash
+export SIFT_PROVIDER=openai
 export SIFT_BASE_URL=https://api.openai.com/v1
-export SIFT_MODEL=gpt-4.1-mini
+export SIFT_MODEL=gpt-5-nano
 export OPENAI_API_KEY=your_openai_api_key
 ```
 
@@ -58,13 +61,15 @@ Or write them to a config file:
 sift config init
 ```
 
-For the default OpenAI-compatible setup, `OPENAI_API_KEY` works directly. If you point `SIFT_BASE_URL` at a different compatible endpoint, use that provider's native key when `sift` recognizes the endpoint, or set the generic fallback env:
+For OpenAI-hosted models on `api.openai.com`, use `provider: openai` with `OPENAI_API_KEY`.
+
+If you point `SIFT_BASE_URL` at a different compatible endpoint, switch to `provider: openai-compatible` and use that provider's native key when `sift` recognizes the endpoint, or set the generic fallback env:
 
 ```bash
 export SIFT_PROVIDER_API_KEY=your_provider_api_key
 ```
 
-`SIFT_PROVIDER_API_KEY` is the generic wrapper env for custom or self-hosted compatible endpoints. Today's `openai-compatible` mode stays generic and does not imply OpenAI ownership.
+`SIFT_PROVIDER_API_KEY` is the generic wrapper env for custom or self-hosted compatible endpoints. `openai-compatible` stays generic and does not imply OpenAI ownership.
 
 Known native env fallbacks for recognized compatible endpoints:
 
@@ -73,12 +78,16 @@ Known native env fallbacks for recognized compatible endpoints:
 - `TOGETHER_API_KEY` for `https://api.together.xyz/v1`
 - `GROQ_API_KEY` for `https://api.groq.com/openai/v1`
 
+Use `provider: openai-compatible` for those compatible endpoints. Use `provider: openai` for OpenAI-hosted models.
+
 ## Quick start
 
 ```bash
 sift exec "what changed?" -- git diff
 sift exec --preset test-status -- pytest
 sift exec --preset audit-critical -- npm audit
+sift exec --preset typecheck-summary -- tsc --noEmit
+sift exec --preset lint-failures -- eslint .
 sift exec --preset infra-risk -- terraform plan
 ```
 
@@ -123,6 +132,8 @@ Built-in presets:
 - `diff-summary`
 - `build-failure`
 - `log-errors`
+- `typecheck-summary`: groups blocking type errors by root cause and points to the first files or symbols to fix.
+- `lint-failures`: groups repeated lint violations and highlights the files and rules that matter.
 - `infra-risk`
 
 Inspect them with:
@@ -181,7 +192,7 @@ Supported environment variables:
 - `SIFT_MODEL`
 - `SIFT_BASE_URL`
 - `SIFT_PROVIDER_API_KEY`
-- `OPENAI_API_KEY` for `https://api.openai.com/v1`
+- `OPENAI_API_KEY` for `provider: openai` and for `https://api.openai.com/v1` in `openai-compatible` mode
 - `OPENROUTER_API_KEY` for `https://openrouter.ai/api/v1`
 - `TOGETHER_API_KEY` for `https://api.together.xyz/v1`
 - `GROQ_API_KEY` for `https://api.groq.com/openai/v1`
@@ -193,22 +204,22 @@ Example config:
 
 ```yaml
 provider:
-  provider: openai-compatible
-  model: gpt-4.1-mini
+  provider: openai
+  model: gpt-5-nano
   baseUrl: https://api.openai.com/v1
   apiKey: YOUR_API_KEY
   timeoutMs: 20000
   temperature: 0.1
-  maxOutputTokens: 220
+  maxOutputTokens: 400
 
 input:
   stripAnsi: true
   redact: true
   redactStrict: false
-  maxCaptureChars: 250000
-  maxInputChars: 20000
-  headChars: 6000
-  tailChars: 6000
+  maxCaptureChars: 400000
+  maxInputChars: 60000
+  headChars: 20000
+  tailChars: 20000
 
 runtime:
   rawFallback: true
@@ -260,28 +271,41 @@ The workflow will:
 
 `release.yml` uses OIDC trusted publishing, so it does not require an `NPM_TOKEN`.
 
-## Using it with Codex
+## Using it with Claude Code
 
-`sift` does not install itself into Codex. The normal setup is:
-
-1. put credentials in your shell environment or `sift.config.yaml`
-2. add a short rule to `~/.codex/AGENTS.md`
-
-That way Codex inherits credentials safely. It should not pass API keys inline on every command.
-
-Example:
+Add a short rule to your project's `CLAUDE.md`:
 
 ```md
-Prefer `sift exec` for non-interactive shell commands whose output will be read or summarized.
-Use pipe mode only when the output already exists from another pipeline.
-Do not use `sift` when exact raw output is required.
-Do not use `sift` for interactive or TUI workflows.
+## Command output
+
+When running shell commands whose output will be read or summarized, prefer
+`sift exec` over running the command directly. This reduces the context window
+cost of large outputs.
+
+Examples:
+- Tests: `sift exec --preset test-status -- npm test`
+- Typecheck: `sift exec --preset typecheck-summary -- tsc --noEmit`
+- Lint: `sift exec --preset lint-failures -- eslint .`
+- Audit: `sift exec --preset audit-critical -- npm audit`
+- Diff: `sift exec "what changed?" -- git diff`
+- Infra: `sift exec --preset infra-risk -- terraform plan`
+
+Do not use `sift` when exact raw output is required (e.g. reading file contents,
+debugging a specific line number, or copying verbatim output).
 ```
 
-That gives the agent a simple habit:
+Claude Code reads `CLAUDE.md` at the start of every conversation, so it will
+use `sift exec` for noisy commands and skip it when exact output matters.
 
-- run command through `sift exec` when a summary is enough
-- skip `sift` when exact output matters
+Credentials are inherited from the shell environment or `sift.config.yaml`.
+Do not put API keys in `CLAUDE.md`.
+
+## Using it with Codex
+
+The same pattern works for Codex. Add the rule to `~/.codex/AGENTS.md` instead.
+
+Codex inherits credentials from the shell environment or `sift.config.yaml`.
+It should not pass API keys inline on every command.
 
 ## Safety and limits
 
@@ -299,7 +323,7 @@ That gives the agent a simple habit:
 `sift` is intentionally small.
 
 Today it supports:
-- OpenAI-compatible providers
+- native OpenAI (Responses API) and OpenAI-compatible providers
 - agent-first `exec` mode
 - pipe mode
 - presets

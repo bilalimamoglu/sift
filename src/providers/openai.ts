@@ -2,41 +2,33 @@ import type { GenerateInput, GenerateResult } from "../types.js";
 import type { LLMProvider } from "./base.js";
 import { REDUCTION_SYSTEM_INSTRUCTION } from "./systemInstruction.js";
 
-interface OpenAICompatibleProviderOptions {
+interface OpenAIProviderOptions {
   baseUrl: string;
   apiKey?: string;
 }
 
-function supportsNativeJsonResponseFormat(baseUrl: string, mode: GenerateInput["jsonResponseFormat"]): boolean {
-  if (mode === "off") {
-    return false;
-  }
-
-  if (mode === "on") {
-    return true;
-  }
-
-  return /^https:\/\/api\.openai\.com(?:\/|$)/i.test(baseUrl);
+function usesNativeJsonResponseFormat(mode: GenerateInput["jsonResponseFormat"]): boolean {
+  return mode !== "off";
 }
 
-function extractMessageText(payload: any): string {
-  const content = payload?.choices?.[0]?.message?.content;
-
-  if (typeof content === "string") {
-    return content;
+function extractResponseText(payload: any): string {
+  if (typeof payload?.output_text === "string") {
+    return payload.output_text.trim();
   }
 
-  if (Array.isArray(content)) {
-    return content
-      .map((item) => (typeof item?.text === "string" ? item.text : ""))
-      .join("")
-      .trim();
+  if (!Array.isArray(payload?.output)) {
+    return "";
   }
 
-  return "";
+  return payload.output
+    .flatMap((item: any) => (Array.isArray(item?.content) ? item.content : []))
+    .map((item: any) => (item?.type === "output_text" ? item.text : ""))
+    .filter((text: unknown) => typeof text === "string" && text.trim().length > 0)
+    .join("")
+    .trim();
 }
 
-async function buildOpenAICompatibleError(response: Response): Promise<Error> {
+async function buildOpenAIError(response: Response): Promise<Error> {
   let detail = `Provider returned HTTP ${response.status}`;
 
   try {
@@ -52,12 +44,12 @@ async function buildOpenAICompatibleError(response: Response): Promise<Error> {
   return new Error(detail);
 }
 
-export class OpenAICompatibleProvider implements LLMProvider {
-  readonly name = "openai-compatible";
+export class OpenAIProvider implements LLMProvider {
+  readonly name = "openai";
   private readonly baseUrl: string;
   private readonly apiKey?: string;
 
-  constructor(options: OpenAICompatibleProviderOptions) {
+  constructor(options: OpenAIProviderOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
     this.apiKey = options.apiKey;
   }
@@ -67,7 +59,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
     const timeout = setTimeout(() => controller.abort(), input.timeoutMs);
 
     try {
-      const url = new URL("chat/completions", `${this.baseUrl}/`);
+      const url = new URL("responses", `${this.baseUrl}/`);
       const response = await fetch(url, {
         method: "POST",
         signal: controller.signal,
@@ -77,33 +69,34 @@ export class OpenAICompatibleProvider implements LLMProvider {
         },
         body: JSON.stringify({
           model: input.model,
-          temperature: input.temperature,
-          max_tokens: input.maxOutputTokens,
-          ...(input.responseMode === "json" &&
-          supportsNativeJsonResponseFormat(this.baseUrl, input.jsonResponseFormat)
-            ? { response_format: { type: "json_object" } }
-            : {}),
-          messages: [
-            {
-              role: "system",
-              content: REDUCTION_SYSTEM_INSTRUCTION
-            },
-            {
-              role: "user",
-              content: input.prompt
-            }
-          ]
+          instructions: REDUCTION_SYSTEM_INSTRUCTION,
+          input: input.prompt,
+          reasoning: {
+            effort: "minimal"
+          },
+          text: {
+            verbosity: "low",
+            ...(input.responseMode === "json" &&
+            usesNativeJsonResponseFormat(input.jsonResponseFormat)
+              ? {
+                  format: {
+                    type: "json_object"
+                  }
+                }
+              : {})
+          },
+          max_output_tokens: input.maxOutputTokens,
         })
       });
 
       if (!response.ok) {
-        throw await buildOpenAICompatibleError(response);
+        throw await buildOpenAIError(response);
       }
 
       const data = (await response.json()) as any;
-      const text = extractMessageText(data);
+      const text = extractResponseText(data);
 
-      if (!text.trim()) {
+      if (!text) {
         throw new Error("Provider returned an empty response");
       }
 
@@ -111,8 +104,8 @@ export class OpenAICompatibleProvider implements LLMProvider {
         text,
         usage: data?.usage
           ? {
-              inputTokens: data.usage.prompt_tokens,
-              outputTokens: data.usage.completion_tokens,
+              inputTokens: data.usage.input_tokens,
+              outputTokens: data.usage.output_tokens,
               totalTokens: data.usage.total_tokens
             }
           : undefined,

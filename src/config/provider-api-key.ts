@@ -43,21 +43,25 @@ export function resolveProviderApiKey(
   baseUrl: string | undefined,
   env: NodeJS.ProcessEnv
 ): string | undefined {
-  if (env.SIFT_PROVIDER_API_KEY) {
-    return env.SIFT_PROVIDER_API_KEY;
-  }
-
   if (provider === "openai-compatible") {
+    if (env.SIFT_PROVIDER_API_KEY) {
+      return env.SIFT_PROVIDER_API_KEY;
+    }
+
     const envName = resolveCompatibleEnvName(baseUrl);
     return envName ? env[envName] : undefined;
   }
 
   if (!provider) {
-    return undefined;
+    return env.SIFT_PROVIDER_API_KEY;
   }
 
   const envName = PROVIDER_API_KEY_ENV[provider];
-  return envName ? env[envName] : undefined;
+  if (envName && env[envName]) {
+    return env[envName];
+  }
+
+  return env.SIFT_PROVIDER_API_KEY;
 }
 
 export function getProviderApiKeyEnvNames(
@@ -80,7 +84,7 @@ export function getProviderApiKeyEnvNames(
 
   const envName = PROVIDER_API_KEY_ENV[provider];
   if (envName) {
-    envNames.push(envName);
+    return [envName, ...envNames];
   }
 
   return envNames;

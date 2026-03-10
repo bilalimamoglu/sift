@@ -39,4 +39,32 @@ describe("buildPrompt", () => {
     expect(prompt.prompt).toContain("Task policy: infra-risk");
     expect(prompt.prompt).toContain("IAM risk");
   });
+
+  it("builds a typecheck-summary policy prompt", () => {
+    const prompt = buildPrompt({
+      question: "what failed in typecheck?",
+      format: "bullets",
+      policyName: "typecheck-summary",
+      input: "src/app.ts:10:5 - error TS2322: Type 'string' is not assignable to type 'number'."
+    });
+
+    expect(prompt.responseMode).toBe("text");
+    expect(prompt.prompt).toContain("Task policy: typecheck-summary");
+    expect(prompt.prompt).toContain("Group repeated diagnostics into root-cause buckets");
+    expect(prompt.prompt).toContain("reply exactly with: Insufficient signal in the provided input.");
+  });
+
+  it("builds a lint-failures policy prompt", () => {
+    const prompt = buildPrompt({
+      question: "what broke lint?",
+      format: "bullets",
+      policyName: "lint-failures",
+      input: "src/app.ts:1:1  error  Unexpected any  @typescript-eslint/no-explicit-any"
+    });
+
+    expect(prompt.responseMode).toBe("text");
+    expect(prompt.prompt).toContain("Task policy: lint-failures");
+    expect(prompt.prompt).toContain("Group repeated rule violations");
+    expect(prompt.prompt).toContain("Do not invent autofixability");
+  });
 });

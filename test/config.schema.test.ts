@@ -7,6 +7,18 @@ describe("siftConfigSchema", () => {
     expect(siftConfigSchema.parse(defaultConfig)).toEqual(defaultConfig);
   });
 
+  it("accepts the native openai provider", () => {
+    const parsed = siftConfigSchema.parse({
+      ...defaultConfig,
+      provider: {
+        ...defaultConfig.provider,
+        provider: "openai"
+      }
+    });
+
+    expect(parsed.provider.provider).toBe("openai");
+  });
+
   it("accepts preset contracts and fallback JSON", () => {
     const parsed = siftConfigSchema.parse({
       ...defaultConfig,

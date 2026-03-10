@@ -4,3 +4,5 @@ coverage
 *.tgz
 .DS_Store
 examples/
+sift.config.yaml
+sift.config.yml

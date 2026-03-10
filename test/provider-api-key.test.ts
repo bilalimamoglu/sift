@@ -5,13 +5,13 @@ import {
 } from "../src/config/provider-api-key.js";
 
 describe("resolveProviderApiKey", () => {
-  it("prefers SIFT_PROVIDER_API_KEY over provider-specific fallback env vars", () => {
+  it("prefers provider-native env vars over SIFT_PROVIDER_API_KEY for native providers", () => {
     const apiKey = resolveProviderApiKey("openai", undefined, {
       OPENAI_API_KEY: "openai-key",
       SIFT_PROVIDER_API_KEY: "sift-key"
     });
 
-    expect(apiKey).toBe("sift-key");
+    expect(apiKey).toBe("openai-key");
   });
 
   it("uses OPENAI_API_KEY for the default OpenAI-compatible base URL", () => {
@@ -108,5 +108,10 @@ describe("resolveProviderApiKey", () => {
     expect(
       getProviderApiKeyEnvNames("openai-compatible", "https://proxy.example.test/v1")
     ).toEqual(["SIFT_PROVIDER_API_KEY"]);
+
+    expect(getProviderApiKeyEnvNames("openai", "https://api.openai.com/v1")).toEqual([
+      "OPENAI_API_KEY",
+      "SIFT_PROVIDER_API_KEY"
+    ]);
   });
 });

@@ -2,23 +2,23 @@ import type { SiftConfig } from "../types.js";
 
 export const defaultConfig: SiftConfig = {
   provider: {
-    provider: "openai-compatible",
-    model: "gpt-4.1-mini",
+    provider: "openai",
+    model: "gpt-5-nano",
     baseUrl: "https://api.openai.com/v1",
     apiKey: "",
     jsonResponseFormat: "auto",
     timeoutMs: 20_000,
     temperature: 0.1,
-    maxOutputTokens: 220
+    maxOutputTokens: 400
   },
   input: {
     stripAnsi: true,
     redact: false,
     redactStrict: false,
-    maxCaptureChars: 250_000,
-    maxInputChars: 20_000,
-    headChars: 6_000,
-    tailChars: 6_000
+    maxCaptureChars: 400_000,
+    maxInputChars: 60_000,
+    headChars: 20_000,
+    tailChars: 20_000
   },
   runtime: {
     rawFallback: true,
@@ -56,6 +56,18 @@ export const defaultConfig: SiftConfig = {
       question: "Extract only the most relevant errors or failure signals.",
       format: "bullets",
       policy: "log-errors"
+    },
+    "typecheck-summary": {
+      question:
+        "Summarize the blocking typecheck failures. Group repeated errors by root cause and point to the first files or symbols to fix.",
+      format: "bullets",
+      policy: "typecheck-summary"
+    },
+    "lint-failures": {
+      question:
+        "Summarize the blocking lint failures. Group repeated rules, highlight the top offending files, and call out only failures that matter for fixing the run.",
+      format: "bullets",
+      policy: "lint-failures"
     },
     "infra-risk": {
       question:

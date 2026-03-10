@@ -1,19 +1,20 @@
 provider:
-  provider: openai-compatible
-  model: gpt-4.1-mini
+  provider: openai
+  model: gpt-5-nano
   baseUrl: https://api.openai.com/v1
   apiKey: YOUR_API_KEY
   timeoutMs: 20000
   temperature: 0.1
-  maxOutputTokens: 220
+  maxOutputTokens: 400
 
 input:
   stripAnsi: true
   redact: true
   redactStrict: false
-  maxInputChars: 20000
-  headChars: 6000
-  tailChars: 6000
+  maxCaptureChars: 400000
+  maxInputChars: 60000
+  headChars: 20000
+  tailChars: 20000
 
 runtime:
   rawFallback: true

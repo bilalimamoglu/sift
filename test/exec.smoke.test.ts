@@ -3,6 +3,53 @@ import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
 import { runCliAsync } from "./helpers/cli.js";
 
 describe("exec mode", () => {
+  it("runs against the native openai provider", async () => {
+    const server = await createFakeOpenAIServer((_body, _index, request) => ({
+      body:
+        request.path.includes("/responses")
+          ? {
+              output: [
+                {
+                  type: "message",
+                  content: [
+                    {
+                      type: "output_text",
+                      text: "All tests passed."
+                    }
+                  ]
+                }
+              ]
+            }
+          : {}
+    }));
+
+    try {
+      const result = await runCliAsync({
+        args: [
+          "exec",
+          "did the tests pass?",
+          "--provider",
+          "openai",
+          "--base-url",
+          server.baseUrl,
+          "--api-key",
+          "test-key",
+          "--model",
+          "test-model",
+          "--",
+          "node",
+          "-e",
+          "console.log('Ran 12 tests\\n12 passed')"
+        ]
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout.trim()).toBe("All tests passed.");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("runs a freeform command and reduces its output", async () => {
     const server = await createFakeOpenAIServer(() => ({
       body: {
@@ -176,6 +223,86 @@ describe("exec mode", () => {
       reason: "Destructive or clearly risky infrastructure change signals are present.",
       evidence: ["Plan: 2 to add, 1 to destroy"]
     });
+  });
+
+  it("supports typecheck-summary preset exec flows", async () => {
+    const server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [
+          {
+            message: {
+              content:
+                "- Typecheck failed.\n- TS2322 repeats in src/app.ts.\n- Fix src/app.ts before chasing downstream errors."
+            }
+          }
+        ]
+      }
+    }));
+
+    try {
+      const result = await runCliAsync({
+        args: [
+          "exec",
+          "--preset",
+          "typecheck-summary",
+          "--base-url",
+          server.baseUrl,
+          "--api-key",
+          "test-key",
+          "--model",
+          "test-model",
+          "--",
+          "node",
+          "-e",
+          "console.error('src/app.ts:1:1 - error TS2322: Type string is not assignable to type number'); process.exit(1)"
+        ]
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain("Typecheck failed.");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("supports lint-failures preset exec flows", async () => {
+    const server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [
+          {
+            message: {
+              content:
+                "- Lint failed.\n- no-explicit-any is the top repeated rule.\n- Start with src/app.ts."
+            }
+          }
+        ]
+      }
+    }));
+
+    try {
+      const result = await runCliAsync({
+        args: [
+          "exec",
+          "--preset",
+          "lint-failures",
+          "--base-url",
+          server.baseUrl,
+          "--api-key",
+          "test-key",
+          "--model",
+          "test-model",
+          "--",
+          "node",
+          "-e",
+          "console.error('src/app.ts\\n  1:1  error  Unexpected any  @typescript-eslint/no-explicit-any'); process.exit(1)"
+        ]
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain("Lint failed.");
+    } finally {
+      await server.close();
+    }
   });
 
   it("keeps the child exit code when reduction falls back", async () => {

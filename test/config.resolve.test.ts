@@ -4,6 +4,13 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { resolveConfig } from "../src/config/resolve.js";
 
+async function createEmptyConfigFile(): Promise<string> {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-empty-config-"));
+  const configPath = path.join(dir, "sift.config.yaml");
+  await fs.writeFile(configPath, "presets: {}\n", "utf8");
+  return configPath;
+}
+
 describe("resolveConfig", () => {
   it("applies config file, env, then CLI precedence", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-config-"));
@@ -61,8 +68,10 @@ describe("resolveConfig", () => {
     expect(config.runtime.rawFallback).toBe(false);
   });
 
-  it("uses OPENAI_API_KEY for the default OpenAI-compatible base URL", () => {
+  it("uses OPENAI_API_KEY for the default OpenAI-compatible base URL", async () => {
+    const configPath = await createEmptyConfigFile();
     const config = resolveConfig({
+      configPath,
       env: {
         OPENAI_API_KEY: "openai-fallback-key"
       }
@@ -72,9 +81,12 @@ describe("resolveConfig", () => {
     expect(config.provider.apiKey).toBe("openai-fallback-key");
   });
 
-  it("does not use OPENAI_API_KEY for unknown openai-compatible endpoints", () => {
+  it("does not use OPENAI_API_KEY for unknown openai-compatible endpoints", async () => {
+    const configPath = await createEmptyConfigFile();
     const config = resolveConfig({
+      configPath,
       env: {
+        SIFT_PROVIDER: "openai-compatible",
         SIFT_BASE_URL: "https://proxy.example.test/v1",
         OPENAI_API_KEY: "openai-fallback-key"
       }
@@ -83,14 +95,31 @@ describe("resolveConfig", () => {
     expect(config.provider.apiKey).toBe("");
   });
 
-  it("reads SIFT_PROVIDER_API_KEY for the openai-compatible provider", () => {
+  it("reads SIFT_PROVIDER_API_KEY for the openai-compatible provider", async () => {
+    const configPath = await createEmptyConfigFile();
     const config = resolveConfig({
+      configPath,
       env: {
+        SIFT_PROVIDER: "openai-compatible",
         SIFT_PROVIDER_API_KEY: "provider-key"
       }
     });
 
     expect(config.provider.apiKey).toBe("provider-key");
+  });
+
+  it("uses OPENAI_API_KEY for the openai provider", async () => {
+    const configPath = await createEmptyConfigFile();
+    const config = resolveConfig({
+      configPath,
+      env: {
+        SIFT_PROVIDER: "openai",
+        OPENAI_API_KEY: "openai-key"
+      }
+    });
+
+    expect(config.provider.provider).toBe("openai");
+    expect(config.provider.apiKey).toBe("openai-key");
   });
 
 });

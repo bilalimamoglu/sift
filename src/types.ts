@@ -1,4 +1,4 @@
-export type ProviderName = "openai-compatible";
+export type ProviderName = "openai" | "openai-compatible";
 
 export type OutputFormat = "brief" | "bullets" | "json" | "verdict";
 
@@ -11,7 +11,9 @@ export type PromptPolicyName =
   | "diff-summary"
   | "build-failure"
   | "log-errors"
-  | "infra-risk";
+  | "infra-risk"
+  | "typecheck-summary"
+  | "lint-failures";
 
 export interface ProviderConfig {
   provider: ProviderName;

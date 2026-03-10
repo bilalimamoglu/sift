@@ -12,10 +12,12 @@ beforeAll(() => {
 
 describe("README quick start acceptance", () => {
   it("supports the documented quick-start commands", async () => {
-    const server = await createFakeOpenAIServer((_body, index) => {
+    const server = await createFakeOpenAIServer((_body, index, request) => {
       const payloads = [
         "Changed one file.",
         "- tests passed",
+        "- Typecheck failed\n- TS2322 repeats in src/app.ts",
+        "- Lint failed\n- no-explicit-any is the top repeated rule",
         JSON.stringify({
           status: "ok",
           vulnerabilities: [],
@@ -24,9 +26,23 @@ describe("README quick start acceptance", () => {
       ];
 
       return {
-        body: {
-          choices: [{ message: { content: payloads[index] } }]
-        }
+        body: request.path.includes("/responses")
+          ? {
+              output: [
+                {
+                  type: "message",
+                  content: [
+                    {
+                      type: "output_text",
+                      text: payloads[index]
+                    }
+                  ]
+                }
+              ]
+            }
+          : {
+              choices: [{ message: { content: payloads[index] } }]
+            }
       };
     });
 
@@ -34,14 +50,17 @@ describe("README quick start acceptance", () => {
       const cli = [process.execPath, "dist/cli.js"];
       const env = {
         ...process.env,
+        SIFT_PROVIDER: "openai",
         SIFT_BASE_URL: server.baseUrl,
-        SIFT_PROVIDER_API_KEY: "test-key",
+        OPENAI_API_KEY: "test-key",
         SIFT_MODEL: "test-model"
       };
 
       const commands = [
         `${cli.join(" ")} exec "what changed?" -- node -e "console.log('diff --git a/file b/file\\n+change')"`,
         `${cli.join(" ")} exec --preset test-status -- node -e "console.log('12 passed')"`,
+        `${cli.join(" ")} exec --preset typecheck-summary -- node -e "console.error('src/app.ts:1:1 - error TS2322: Type string is not assignable to type number')"`,
+        `${cli.join(" ")} exec --preset lint-failures -- node -e "console.error('src/app.ts\\n  1:1  error  Unexpected any  @typescript-eslint/no-explicit-any')"`,
         `${cli.join(" ")} exec --preset audit-critical -- node -e "console.log('critical vuln')"`,
         `${cli.join(" ")} exec --preset infra-risk -- node -e "console.log('Plan: 2 to destroy')"`
       ];
@@ -87,12 +106,14 @@ describe("README quick start acceptance", () => {
 
       expect(outputs[0]).toContain("Changed one file.");
       expect(outputs[1]).toContain("tests passed");
-      expect(JSON.parse(outputs[2]!)).toEqual({
+      expect(outputs[2]).toContain("Typecheck failed");
+      expect(outputs[3]).toContain("Lint failed");
+      expect(JSON.parse(outputs[4]!)).toEqual({
         status: "ok",
         vulnerabilities: [],
         summary: "No high or critical vulnerabilities found in the provided input."
       });
-      expect(JSON.parse(outputs[3]!).verdict).toBe("fail");
+      expect(JSON.parse(outputs[5]!).verdict).toBe("fail");
     } finally {
       await server.close();
     }

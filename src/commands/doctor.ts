@@ -26,7 +26,11 @@ export function runDoctor(config: SiftConfig): number {
     problems.push("Missing provider.model");
   }
 
-  if (config.provider.provider === "openai-compatible" && !config.provider.apiKey) {
+  if (
+    (config.provider.provider === "openai" ||
+      config.provider.provider === "openai-compatible") &&
+    !config.provider.apiKey
+  ) {
     problems.push("Missing provider.apiKey");
     problems.push(
       `Set one of: ${getProviderApiKeyEnvNames(

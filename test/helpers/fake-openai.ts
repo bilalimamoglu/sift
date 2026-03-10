@@ -6,6 +6,10 @@ export interface FakeOpenAIResponse {
   delayMs?: number;
 }
 
+export interface FakeOpenAIRequest {
+  path: string;
+}
+
 export interface FakeOpenAIServer {
   baseUrl: string;
   requests: any[];
@@ -13,7 +17,11 @@ export interface FakeOpenAIServer {
 }
 
 export async function createFakeOpenAIServer(
-  responder: (body: any, index: number) => FakeOpenAIResponse | Promise<FakeOpenAIResponse>
+  responder: (
+    body: any,
+    index: number,
+    request: FakeOpenAIRequest
+  ) => FakeOpenAIResponse | Promise<FakeOpenAIResponse>
 ): Promise<FakeOpenAIServer> {
   const requests: any[] = [];
 
@@ -23,7 +31,9 @@ export async function createFakeOpenAIServer(
     if (
       request.method !== "POST" ||
       (requestPath !== "/chat/completions" &&
-        requestPath !== "/v1/chat/completions")
+        requestPath !== "/v1/chat/completions" &&
+        requestPath !== "/responses" &&
+        requestPath !== "/v1/responses")
     ) {
       response.statusCode = 404;
       response.end("not found");
@@ -38,7 +48,9 @@ export async function createFakeOpenAIServer(
     const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
     requests.push(body);
 
-    const result = await responder(body, requests.length - 1);
+    const result = await responder(body, requests.length - 1, {
+      path: requestPath ?? ""
+    });
     if (result.delayMs) {
       await new Promise((resolve) => setTimeout(resolve, result.delayMs));
     }

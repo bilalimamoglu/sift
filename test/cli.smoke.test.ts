@@ -1,9 +1,17 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { execSync } from "node:child_process";
+import { beforeAll, describe, expect, it } from "vitest";
 import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
-import { runCli, runCliAsync } from "./helpers/cli.js";
+import { repoRoot, runCli, runCliAsync } from "./helpers/cli.js";
+
+beforeAll(() => {
+  execSync("npm run build", {
+    cwd: repoRoot(),
+    stdio: "pipe"
+  });
+});
 
 describe("CLI smoke", () => {
   it("prints help", () => {
@@ -13,7 +21,9 @@ describe("CLI smoke", () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("sift [question]");
+    expect(result.stdout).toContain("Provider: openai | openai-compatible");
     expect(result.stdout).toContain("SIFT_PROVIDER_API_KEY");
+    expect(result.stdout).toContain("OPENAI_API_KEY");
   });
 
   it("prints exec help with passthrough usage", () => {
@@ -43,7 +53,7 @@ describe("CLI smoke", () => {
     expect(init.status).toBe(0);
     expect(init.stdout).toContain(configPath);
     expect(show.status).toBe(0);
-    expect(JSON.parse(show.stdout).provider.provider).toBe("openai-compatible");
+    expect(JSON.parse(show.stdout).provider.provider).toBe("openai");
     expect(validate.status).toBe(0);
     expect(validate.stdout).toContain("Resolved config is valid");
   });
@@ -92,9 +102,17 @@ describe("CLI smoke", () => {
     const internal = runCli({
       args: ["presets", "show", "test-status", "--internal"]
     });
+    const typecheck = runCli({
+      args: ["presets", "show", "typecheck-summary"]
+    });
+    const lint = runCli({
+      args: ["presets", "show", "lint-failures"]
+    });
 
     expect(list.status).toBe(0);
     expect(list.stdout).toContain("test-status");
+    expect(list.stdout).toContain("typecheck-summary");
+    expect(list.stdout).toContain("lint-failures");
     expect(show.status).toBe(0);
     expect(JSON.parse(show.stdout)).toEqual({
       name: "test-status",
@@ -103,6 +121,20 @@ describe("CLI smoke", () => {
     });
     expect(internal.status).toBe(0);
     expect(JSON.parse(internal.stdout).policy).toBe("test-status");
+    expect(typecheck.status).toBe(0);
+    expect(JSON.parse(typecheck.stdout)).toEqual({
+      name: "typecheck-summary",
+      question:
+        "Summarize the blocking typecheck failures. Group repeated errors by root cause and point to the first files or symbols to fix.",
+      format: "bullets"
+    });
+    expect(lint.status).toBe(0);
+    expect(JSON.parse(lint.stdout)).toEqual({
+      name: "lint-failures",
+      question:
+        "Summarize the blocking lint failures. Group repeated rules, highlight the top offending files, and call out only failures that matter for fixing the run.",
+      format: "bullets"
+    });
   });
 
   it("runs freeform and preset modes", async () => {
@@ -166,8 +198,11 @@ describe("CLI smoke", () => {
   });
 
   it("reports api key presence from environment in doctor output", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
     const result = runCli({
       args: ["doctor"],
+      useDist: true,
+      cwd,
       env: {
         SIFT_BASE_URL: "https://example.test/v1",
         SIFT_PROVIDER_API_KEY: "env-key",
@@ -182,23 +217,49 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("baseUrl: https://example.test/v1");
   });
 
-  it("accepts OPENAI_API_KEY for the default OpenAI-compatible endpoint", () => {
+  it("accepts OPENAI_API_KEY for the openai provider", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
     const result = runCli({
       args: ["doctor"],
+      useDist: true,
+      cwd,
       env: {
+        SIFT_PROVIDER: "openai",
         OPENAI_API_KEY: "openai-key",
         SIFT_MODEL: "env-model"
       }
     });
 
     expect(result.status).toBe(0);
+    expect(result.stdout).toContain("provider: openai");
     expect(result.stdout).toContain("apiKey: set");
     expect(result.stdout).toContain("baseUrl: https://api.openai.com/v1");
   });
 
-  it("fails doctor when api key is missing for openai-compatible", () => {
+  it("still accepts OPENAI_API_KEY for the default OpenAI-compatible endpoint", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
     const result = runCli({
       args: ["doctor"],
+      useDist: true,
+      cwd,
+      env: {
+        SIFT_PROVIDER: "openai-compatible",
+        OPENAI_API_KEY: "openai-key",
+        SIFT_MODEL: "env-model"
+      }
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("provider: openai-compatible");
+    expect(result.stdout).toContain("apiKey: set");
+  });
+
+  it("fails doctor when api key is missing for openai-compatible", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
+    const result = runCli({
+      args: ["doctor"],
+      useDist: true,
+      cwd,
       env: {
         SIFT_BASE_URL: "https://example.test/v1",
         SIFT_MODEL: "env-model"
