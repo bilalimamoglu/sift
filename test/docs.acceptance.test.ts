@@ -1,14 +1,7 @@
-import { beforeAll, describe, expect, it } from "vitest";
-import { execSync, spawn } from "node:child_process";
+import { describe, expect, it } from "vitest";
+import { spawn } from "node:child_process";
 import { repoRoot } from "./helpers/cli.js";
 import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
-
-beforeAll(() => {
-  execSync("npm run build", {
-    cwd: repoRoot(),
-    stdio: "pipe"
-  });
-});
 
 describe("README quick start acceptance", () => {
   it("supports the documented quick-start commands", async () => {

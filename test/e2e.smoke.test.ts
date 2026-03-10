@@ -1,14 +1,6 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
 import { repoRoot, runCliAsync } from "./helpers/cli.js";
-import { execSync } from "node:child_process";
-
-beforeAll(() => {
-  execSync("npm run build", {
-    cwd: repoRoot(),
-    stdio: "pipe"
-  });
-});
 
 describe("dist e2e", () => {
   it("runs the built cli against a fake provider", async () => {

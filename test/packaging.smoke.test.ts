@@ -2,15 +2,8 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { execSync, spawnSync } from "node:child_process";
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { repoRoot } from "./helpers/cli.js";
-
-beforeAll(() => {
-  execSync("npm run build", {
-    cwd: repoRoot(),
-    stdio: "pipe"
-  });
-});
 
 describe("packaging smoke", () => {
   it("packs and runs the installed binary", async () => {

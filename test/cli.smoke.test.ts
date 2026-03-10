@@ -1,17 +1,9 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { execSync } from "node:child_process";
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
-import { repoRoot, runCli, runCliAsync } from "./helpers/cli.js";
-
-beforeAll(() => {
-  execSync("npm run build", {
-    cwd: repoRoot(),
-    stdio: "pipe"
-  });
-});
+import { runCli, runCliAsync } from "./helpers/cli.js";
 
 describe("CLI smoke", () => {
   it("prints help", () => {
