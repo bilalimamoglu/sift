@@ -22,7 +22,7 @@ export interface ConfigSetupIO {
   close?(): void;
 }
 
-function createTerminalIO(): ConfigSetupIO {
+export function createTerminalIO(): ConfigSetupIO {
   let rl:
     | ReturnType<typeof createInterface>
     | undefined;
@@ -102,7 +102,7 @@ function getSetupPresenter(io: ConfigSetupIO) {
 
 async function promptForProvider(io: ConfigSetupIO): Promise<"openai"> {
   if (io.select) {
-    const choice = await io.select("Select provider", ["OpenAI"]);
+    const choice = await io.select("Select provider for this machine", ["OpenAI"]);
     if (choice === "OpenAI") {
       return "openai";
     }
@@ -158,11 +158,11 @@ async function promptForOverwrite(io: ConfigSetupIO, targetPath: string): Promis
 function writeSetupSuccess(io: ConfigSetupIO, writtenPath: string): void {
   const ui = getSetupPresenter(io);
 
-  io.write(`${ui.success("Setup complete.")}\n`);
-  io.write(`${ui.info(`Wrote machine-wide config to ${writtenPath}`)}\n`);
-  io.write(`${ui.note("Any terminal on this machine can use sift now.")}\n`);
+  io.write(`\n${ui.success("You're set.")}\n`);
+  io.write(`${ui.info(`Machine-wide config: ${writtenPath}`)}\n`);
+  io.write(`${ui.note("sift is ready to use from any terminal on this machine.")}\n`);
   io.write(
-    `${ui.note("This is your machine-wide default config. Repo-local sift.config.yaml can still override it later.")}\n`
+    `${ui.note("A repo-local sift.config.yaml can still override it when a project needs its own settings.")}\n`
   );
 }
 
@@ -176,7 +176,7 @@ function writeOverrideWarning(io: ConfigSetupIO, activeConfigPath: string): void
 function writeNextSteps(io: ConfigSetupIO): void {
   const ui = getSetupPresenter(io);
 
-  io.write(`${ui.section("Try next")}\n`);
+  io.write(`\n${ui.section("Try next")}\n`);
   io.write(`  ${ui.command("sift doctor")}\n`);
   io.write(`  ${ui.command("sift exec --preset test-status -- pytest")}\n`);
 }
@@ -210,17 +210,16 @@ export async function configSetup(options: {
       }
     }
 
-    const provider = await promptForProvider(io);
-    if (provider !== "openai") {
-      io.error("Unsupported provider selection.\n");
-      return 1;
-    }
+    await promptForProvider(io);
 
-    io.write(`${ui.info("Using OpenAI defaults.")}\n`);
+    io.write(`${ui.info("Using OpenAI defaults for your first run.")}\n`);
     io.write(`${ui.labelValue("Default model", "gpt-5-nano")}\n`);
     io.write(`${ui.labelValue("Default base URL", "https://api.openai.com/v1")}\n`);
     io.write(
-      `${ui.note("You can change these later with 'sift config show --show-secrets' or by editing the config file.")}\n`
+      `${ui.note(`Want to switch providers or tweak defaults later? Edit ${resolvedPath}.`)}\n`
+    );
+    io.write(
+      `${ui.note("Want to inspect the active values first? Run 'sift config show --show-secrets'.")}\n`
     );
 
     const apiKey = await promptForApiKey(io);

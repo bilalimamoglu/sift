@@ -6,7 +6,7 @@ export { configSetup, resolveSetupPath } from "./config-setup.js";
 
 const MASKED_SECRET = "***";
 
-function maskConfigSecrets(value: unknown): unknown {
+export function maskConfigSecrets(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(maskConfigSecrets);
   }

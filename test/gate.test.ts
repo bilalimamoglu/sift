@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertSupportedFailOnPreset,
   assertSupportedFailOnFormat,
   evaluateGate,
   supportsFailOnPreset
@@ -14,6 +15,11 @@ describe("gate evaluation", () => {
   });
 
   it("requires the preset's default machine-readable format", () => {
+    expect(() => assertSupportedFailOnPreset("infra-risk")).not.toThrow();
+    expect(() => assertSupportedFailOnPreset(undefined)).toThrow(
+      "supported only for built-in presets"
+    );
+
     expect(() =>
       assertSupportedFailOnFormat({
         presetName: "infra-risk",
@@ -131,6 +137,13 @@ describe("gate evaluation", () => {
       evaluateGate({
         presetName: "infra-risk",
         output: "Sift fallback triggered (Provider returned HTTP 429)."
+      }).shouldFail
+    ).toBe(false);
+
+    expect(
+      evaluateGate({
+        presetName: "test-status",
+        output: JSON.stringify({ verdict: "fail" })
       }).shouldFail
     ).toBe(false);
   });

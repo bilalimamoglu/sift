@@ -2,7 +2,8 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { resolveConfig } from "../src/config/resolve.js";
+import { defaultConfig } from "../src/config/defaults.js";
+import { mergeDefined, resolveConfig } from "../src/config/resolve.js";
 
 async function createEmptyConfigFile(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-empty-config-"));
@@ -120,6 +121,67 @@ describe("resolveConfig", () => {
 
     expect(config.provider.provider).toBe("openai");
     expect(config.provider.apiKey).toBe("openai-key");
+  });
+
+  it("ignores non-object file config and preserves CLI apiKey precedence", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-config-non-object-"));
+    const configPath = path.join(dir, "sift.config.yaml");
+    await fs.writeFile(configPath, "[]\n", "utf8");
+
+    const config = resolveConfig({
+      configPath,
+      env: {
+        SIFT_PROVIDER_API_KEY: "env-key"
+      },
+      cliOverrides: {
+        provider: {
+          apiKey: "cli-key"
+        }
+      }
+    });
+
+    expect(config.provider.apiKey).toBe("cli-key");
+    expect(config.provider.model).toBe("gpt-5-nano");
+  });
+
+  it("handles partial input env overrides independently", async () => {
+    const configPath = await createEmptyConfigFile();
+    const captureOnly = resolveConfig({
+      configPath,
+      env: {
+        SIFT_MAX_CAPTURE_CHARS: "1234"
+      }
+    });
+    const inputOnly = resolveConfig({
+      configPath,
+      env: {
+        SIFT_MAX_INPUT_CHARS: "4321"
+      }
+    });
+
+    expect(captureOnly.input.maxCaptureChars).toBe(1234);
+    expect(captureOnly.input.maxInputChars).toBe(defaultConfig.input.maxInputChars);
+    expect(inputOnly.input.maxInputChars).toBe(4321);
+    expect(inputOnly.input.maxCaptureChars).toBe(defaultConfig.input.maxCaptureChars);
+  });
+
+  it("covers mergeDefined primitive bases and default env resolution", () => {
+    expect(mergeDefined("base", { nested: true } as unknown)).toEqual({
+      nested: true
+    });
+
+    const originalProvider = process.env.SIFT_PROVIDER;
+    const originalOpenAIKey = process.env.OPENAI_API_KEY;
+
+    process.env.SIFT_PROVIDER = "openai";
+    process.env.OPENAI_API_KEY = "default-openai-key";
+
+    try {
+      expect(resolveConfig().provider.apiKey).toBe("default-openai-key");
+    } finally {
+      process.env.SIFT_PROVIDER = originalProvider;
+      process.env.OPENAI_API_KEY = originalOpenAIKey;
+    }
   });
 
 });

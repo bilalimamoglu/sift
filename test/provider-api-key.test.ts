@@ -100,6 +100,20 @@ describe("resolveProviderApiKey", () => {
     expect(apiKey).toBeUndefined();
   });
 
+  it("falls back to SIFT_PROVIDER_API_KEY for unknown or missing providers", () => {
+    expect(
+      resolveProviderApiKey(undefined, undefined, {
+        SIFT_PROVIDER_API_KEY: "generic-key"
+      })
+    ).toBe("generic-key");
+
+    expect(
+      resolveProviderApiKey("custom-provider", undefined, {
+        SIFT_PROVIDER_API_KEY: "generic-key"
+      })
+    ).toBe("generic-key");
+  });
+
   it("reports env names for the active provider/base URL combination", () => {
     expect(
       getProviderApiKeyEnvNames("openai-compatible", "https://api.openai.com/v1")
@@ -111,6 +125,12 @@ describe("resolveProviderApiKey", () => {
 
     expect(getProviderApiKeyEnvNames("openai", "https://api.openai.com/v1")).toEqual([
       "OPENAI_API_KEY",
+      "SIFT_PROVIDER_API_KEY"
+    ]);
+    expect(getProviderApiKeyEnvNames(undefined, undefined)).toEqual([
+      "SIFT_PROVIDER_API_KEY"
+    ]);
+    expect(getProviderApiKeyEnvNames("custom-provider", "https://example.test")).toEqual([
       "SIFT_PROVIDER_API_KEY"
     ]);
   });

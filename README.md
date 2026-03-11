@@ -104,6 +104,7 @@ sift exec --preset infra-risk --fail-on -- terraform plan
 ```bash
 sift exec "did tests pass?" -- pytest
 sift exec --dry-run "what changed?" -- git diff
+sift exec --preset test-status --show-raw -- pytest
 ```
 
 What it does:
@@ -115,6 +116,8 @@ What it does:
 6. preserves the wrapped command's exit code
 
 Use `--dry-run` to inspect the reduced input and prompt without calling the provider.
+
+Use `--show-raw` to print the captured raw input to `stderr` while keeping the reduced answer on `stdout`.
 
 Use `--fail-on` when a built-in semantic preset should turn a technically successful command into a CI failure. Supported presets:
 - `infra-risk`

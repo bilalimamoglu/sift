@@ -28,6 +28,75 @@ function inferRemediation(pkg: string): string {
   return `Upgrade ${pkg} to a patched version.`;
 }
 
+function getCount(input: string, label: string): number {
+  const matches = [...input.matchAll(new RegExp(`(\\d+)\\s+${label}`, "gi"))];
+  const lastMatch = matches.at(-1);
+  return lastMatch ? Number(lastMatch[1]) : 0;
+}
+
+function formatCount(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function testStatusHeuristic(input: string): string | null {
+  const normalized = input.trim();
+  if (normalized === "") {
+    return null;
+  }
+
+  const passed = getCount(input, "passed");
+  const failed = getCount(input, "failed");
+  const errors = Math.max(
+    getCount(input, "errors"),
+    getCount(input, "error")
+  );
+  const skipped = getCount(input, "skipped");
+  const collectionErrors = input.match(/(\d+)\s+errors?\s+during collection/i);
+
+  if (collectionErrors) {
+    const count = Number(collectionErrors[1]);
+    return [
+      "- Tests did not complete.",
+      `- ${formatCount(count, "error")} occurred during collection.`
+    ].join("\n");
+  }
+
+  if (failed === 0 && errors === 0 && passed > 0) {
+    const details = [formatCount(passed, "test")];
+    if (skipped > 0) {
+      details.push(formatCount(skipped, "skip"));
+    }
+
+    return [
+      "- Tests passed.",
+      `- ${details.join(", ")}.`
+    ].join("\n");
+  }
+
+  if (failed > 0 || errors > 0) {
+    const detailLines = [];
+
+    if (failed > 0) {
+      detailLines.push(`- ${formatCount(failed, "test")} failed.`);
+    }
+
+    if (errors > 0) {
+      detailLines.push(`- ${formatCount(errors, "error")} occurred.`);
+    }
+
+    const evidence = input
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => /\b(FAILED|ERROR)\b/.test(line))
+      .slice(0, 3)
+      .map((line) => `- ${line}`);
+
+    return ["- Tests did not pass.", ...detailLines, ...evidence].join("\n");
+  }
+
+  return null;
+}
+
 function auditCriticalHeuristic(input: string): string | null {
   const vulnerabilities = input
     .split("\n")
@@ -142,6 +211,10 @@ export function applyHeuristicPolicy(
 
   if (policyName === "infra-risk") {
     return infraRiskHeuristic(input);
+  }
+
+  if (policyName === "test-status") {
+    return testStatusHeuristic(input);
   }
 
   return null;

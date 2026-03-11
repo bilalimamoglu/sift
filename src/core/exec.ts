@@ -4,6 +4,10 @@ import pc from "picocolors";
 import { CAPTURE_OMITTED_MARKER } from "../constants.js";
 import type { OutputFormat, RunRequest, SiftConfig } from "../types.js";
 import { evaluateGate, supportsFailOnPreset } from "./gate.js";
+import {
+  buildInsufficientSignalOutput,
+  isInsufficientSignalOutput
+} from "./insufficient.js";
 import { runSift } from "./run.js";
 
 const PROMPT_PATTERNS = [
@@ -18,7 +22,7 @@ const PROMPT_PATTERNS = [
 
 const PROMPT_WINDOW_CHARS = 512;
 
-class BoundedCapture {
+export class BoundedCapture {
   private readonly headBudget: number;
   private readonly tailBudget: number;
   private readonly maxChars: number;
@@ -71,7 +75,7 @@ class BoundedCapture {
   }
 }
 
-function looksInteractivePrompt(windowText: string): boolean {
+export function looksInteractivePrompt(windowText: string): boolean {
   return PROMPT_PATTERNS.some((pattern) => pattern.test(windowText));
 }
 
@@ -88,7 +92,10 @@ function signalToExitCode(signal: NodeJS.Signals | null): number {
   return 128 + signalNumber;
 }
 
-function normalizeChildExitCode(status: number | null, signal: NodeJS.Signals | null): number {
+export function normalizeChildExitCode(
+  status: number | null,
+  signal: NodeJS.Signals | null
+): number {
   if (typeof status === "number") {
     return status;
   }
@@ -99,10 +106,11 @@ function normalizeChildExitCode(status: number | null, signal: NodeJS.Signals | 
 export interface ExecRequest extends Omit<RunRequest, "stdin"> {
   command?: string[];
   failOn?: boolean;
+  showRaw?: boolean;
   shellCommand?: string;
 }
 
-function buildCommandPreview(request: ExecRequest): string {
+export function buildCommandPreview(request: ExecRequest): string {
   if (request.shellCommand) {
     return request.shellCommand;
   }
@@ -110,7 +118,7 @@ function buildCommandPreview(request: ExecRequest): string {
   return (request.command ?? []).join(" ");
 }
 
-function getExecSuccessShortcut(args: {
+export function getExecSuccessShortcut(args: {
   presetName?: string;
   exitCode: number;
   capturedOutput: string;
@@ -146,7 +154,6 @@ export async function runExec(request: ExecRequest): Promise<number> {
   let bypassed = false;
   let childStatus: number | null = null;
   let childSignal: NodeJS.Signals | null = null;
-  let childSpawnError: Error | null = null;
 
   const child = hasShellCommand
     ? spawn(shellPath, ["-lc", request.shellCommand as string], {
@@ -187,7 +194,6 @@ export async function runExec(request: ExecRequest): Promise<number> {
 
   await new Promise<void>((resolve, reject) => {
     child.on("error", (error: Error) => {
-      childSpawnError = error;
       reject(error);
     });
     child.on("close", (status: number | null, signal: NodeJS.Signals | null) => {
@@ -203,10 +209,6 @@ export async function runExec(request: ExecRequest): Promise<number> {
     throw new Error("Failed to start child process.");
   });
 
-  if (childSpawnError) {
-    throw childSpawnError;
-  }
-
   const exitCode = normalizeChildExitCode(childStatus, childSignal);
   const capturedOutput = capture.render();
 
@@ -217,6 +219,13 @@ export async function runExec(request: ExecRequest): Promise<number> {
   }
 
   if (!bypassed) {
+    if (request.showRaw && capturedOutput.length > 0) {
+      process.stderr.write(capturedOutput);
+      if (!capturedOutput.endsWith("\n")) {
+        process.stderr.write("\n");
+      }
+    }
+
     const execSuccessShortcut = getExecSuccessShortcut({
       presetName: request.presetName,
       exitCode,
@@ -234,10 +243,19 @@ export async function runExec(request: ExecRequest): Promise<number> {
       return exitCode;
     }
 
-    const output = await runSift({
+    let output = await runSift({
       ...request,
       stdin: capturedOutput
     });
+
+    if (isInsufficientSignalOutput(output)) {
+      output = buildInsufficientSignalOutput({
+        presetName: request.presetName,
+        originalLength: capture.getTotalChars(),
+        truncatedApplied: capture.wasTruncated(),
+        exitCode
+      });
+    }
 
     process.stdout.write(`${output}\n`);
 

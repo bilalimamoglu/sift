@@ -18,6 +18,6 @@ jobs:
 
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run test:coverage
       - run: npm run build
       - run: npm pack

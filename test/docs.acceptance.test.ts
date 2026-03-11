@@ -14,21 +14,35 @@ describe("README quick start acceptance", () => {
     expect(readme).toContain("~/.config/sift/config.yaml");
     expect(readme).toContain("repo-local config can still override it");
     expect(readme).toContain("any terminal on the machine can use `sift`");
+    expect(readme).toContain("--show-raw");
   });
 
   it("supports the documented quick-start commands", async () => {
-    const server = await createFakeOpenAIServer((_body, index, request) => {
-      const payloads = [
-        "Changed one file.",
-        "- tests passed",
-        "- Typecheck failed\n- TS2322 repeats in src/app.ts",
-        "- Lint failed\n- no-explicit-any is the top repeated rule",
-        JSON.stringify({
-          status: "ok",
-          vulnerabilities: [],
-          summary: "No high or critical vulnerabilities found in the provided input."
-        })
-      ];
+    const server = await createFakeOpenAIServer((body, _index, request) => {
+      const serializedBody = JSON.stringify(body);
+      const payload = (() => {
+        if (serializedBody.includes("what changed?")) {
+          return "Changed one file.";
+        }
+
+        if (serializedBody.includes("typecheck-summary")) {
+          return "- Typecheck failed\n- TS2322 repeats in src/app.ts";
+        }
+
+        if (serializedBody.includes("lint-failures")) {
+          return "- Lint failed\n- no-explicit-any is the top repeated rule";
+        }
+
+        if (serializedBody.includes("audit-critical")) {
+          return JSON.stringify({
+            status: "ok",
+            vulnerabilities: [],
+            summary: "No high or critical vulnerabilities found in the provided input."
+          });
+        }
+
+        return "- Tests passed";
+      })();
 
       return {
         body: request.path.includes("/responses")
@@ -39,14 +53,14 @@ describe("README quick start acceptance", () => {
                   content: [
                     {
                       type: "output_text",
-                      text: payloads[index]
+                      text: payload
                     }
                   ]
                 }
               ]
             }
           : {
-              choices: [{ message: { content: payloads[index] } }]
+              choices: [{ message: { content: payload } }]
             }
       };
     });
@@ -116,7 +130,8 @@ describe("README quick start acceptance", () => {
       }
 
       expect(outputs[0]).toContain("Changed one file.");
-      expect(outputs[1]).toContain("tests passed");
+      expect(outputs[1]).toBeDefined();
+      expect((outputs[1] as string).toLowerCase()).toContain("tests passed");
       expect(outputs[2]).toContain("Typecheck failed");
       expect(outputs[3]).toContain("Lint failed");
       expect(JSON.parse(outputs[4]!)).toEqual({
@@ -126,7 +141,8 @@ describe("README quick start acceptance", () => {
       });
       expect(JSON.parse(outputs[5]!).verdict).toBe("fail");
       expect(JSON.parse(outputs[6]!).vulnerabilities).toHaveLength(1);
-      expect(JSON.parse(outputs[7]!).verdict).toBe("fail");
+      expect(outputs[7]).toBeDefined();
+      expect(JSON.parse(outputs[7] as string).verdict).toBe("fail");
     } finally {
       await server.close();
     }

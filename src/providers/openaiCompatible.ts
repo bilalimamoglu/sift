@@ -107,7 +107,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
         throw new Error("Provider returned an empty response");
       }
 
-      return {
+      const result = {
         text,
         usage: data?.usage
           ? {
@@ -118,14 +118,16 @@ export class OpenAICompatibleProvider implements LLMProvider {
           : undefined,
         raw: data
       };
+      clearTimeout(timeout);
+      return result;
     } catch (error) {
+      clearTimeout(timeout);
+
       if ((error as NodeJS.ErrnoException).name === "AbortError") {
         throw new Error("Provider request timed out");
       }
 
       throw error;
-    } finally {
-      clearTimeout(timeout);
     }
   }
 }

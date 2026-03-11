@@ -21,20 +21,19 @@ export interface Presentation {
 export function createPresentation(useColor: boolean): Presentation {
   return {
     useColor,
-    banner(version: string): string {
+    banner(_version: string): string {
       const mark = [
-        "   \\\\  //",
-        "    \\\\//",
-        "     ||",
-        "     o"
+        "    \\\\  //",
+        "     \\\\//",
+        "     |  |",
+        "      o"
       ]
         .map((line) => applyColor(useColor, pc.cyan, line))
         .join("\n");
 
-      const title = applyColor(useColor, (value) => pc.bold(pc.white(value)), `sift/${version}`);
       const tagline = applyColor(useColor, pc.dim, "Trim the noise. Keep the signal.");
 
-      return `${mark}\n\n${title}\n${tagline}`;
+      return `${mark}\n${tagline}`;
     },
     welcome(text: string): string {
       return useColor
@@ -57,13 +56,13 @@ export function createPresentation(useColor: boolean): Presentation {
       return applyColor(useColor, pc.dim, text);
     },
     section(text: string): string {
-      return applyColor(useColor, pc.bold, text);
+      return applyColor(useColor, (value) => pc.bold(pc.yellow(value)), text);
     },
     labelValue(label: string, value: string): string {
       return `${applyColor(useColor, (entry) => pc.bold(pc.cyan(entry)), label)}: ${value}`;
     },
     command(text: string): string {
-      return applyColor(useColor, pc.bold, text);
+      return applyColor(useColor, (value) => pc.bold(pc.cyan(value)), text);
     }
   };
 }

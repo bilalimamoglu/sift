@@ -13,6 +13,7 @@ describe("release workflow", () => {
       repository?: { type?: string; url?: string };
       homepage?: string;
       bugs?: { url?: string };
+      scripts?: Record<string, string>;
     };
 
     expect(pkg.repository).toEqual({
@@ -23,6 +24,24 @@ describe("release workflow", () => {
     expect(pkg.bugs).toEqual({
       url: "https://github.com/bilalimamoglu/sift/issues"
     });
+    expect(pkg.scripts?.["test:coverage"]).toBe("vitest run --coverage");
+    expect(pkg.scripts?.prepublishOnly).toContain("npm run test:coverage");
+  });
+
+  it("enforces measured coverage in vitest and CI", () => {
+    const vitestConfig = fs.readFileSync(path.join(root, "vitest.config.ts"), "utf8");
+    const ciWorkflow = fs.readFileSync(
+      path.join(root, ".github", "workflows", "ci.yml"),
+      "utf8"
+    );
+
+    expect(vitestConfig).toContain("provider: \"v8\"");
+    expect(vitestConfig).toContain("thresholds:");
+    expect(vitestConfig).toContain("lines: 100");
+    expect(vitestConfig).toContain("functions: 100");
+    expect(vitestConfig).toContain("branches: 100");
+    expect(vitestConfig).toContain("statements: 100");
+    expect(ciWorkflow).toContain("npm run test:coverage");
   });
 
   it("defines a manual trusted-publishing release workflow with tag and GitHub release creation", () => {

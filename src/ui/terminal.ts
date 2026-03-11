@@ -1,7 +1,10 @@
+import { execFileSync } from "node:child_process";
 import { clearScreenDown, cursorTo, moveCursor } from "node:readline";
+import { stdin as defaultStdin } from "node:process";
 
 export interface KeypressInput {
   isRaw?: boolean;
+  pause?(): void;
   resume(): void;
   on(event: "keypress", listener: (value: string, key: { name?: string; ctrl?: boolean }) => void): this;
   off(event: "keypress", listener: (value: string, key: { name?: string; ctrl?: boolean }) => void): this;
@@ -12,6 +15,27 @@ export interface TerminalOutput {
   write(message: string): void;
 }
 
+function setPosixEcho(enabled: boolean): void {
+  const command = enabled ? "echo" : "-echo";
+
+  try {
+    execFileSync("sh", ["-c", `stty ${command} < /dev/tty`], {
+      stdio: ["inherit", "inherit", "ignore"]
+    });
+    return;
+  } catch {
+    // Fall through to a less-targeted best-effort attempt.
+  }
+
+  try {
+    execFileSync("stty", [command], {
+      stdio: ["inherit", "inherit", "ignore"]
+    });
+  } catch {
+    // Best-effort only. Raw mode still provides a partial fallback.
+  }
+}
+
 export function renderSelectionBlock(args: {
   prompt: string;
   options: string[];
@@ -19,7 +43,9 @@ export function renderSelectionBlock(args: {
 }): string[] {
   return [
     `${args.prompt} (use ↑/↓ and Enter)`,
-    ...args.options.map((option, index) => `${index === args.selectedIndex ? "›" : " "} ${option}`)
+    ...args.options.map((option, index) =>
+      `${index === args.selectedIndex ? "›" : " "} ${option}${index === args.selectedIndex ? " (selected)" : ""}`
+    )
   ];
 }
 
@@ -76,6 +102,7 @@ export async function promptSelect(args: {
         input.off("keypress", onKeypress);
         cleanup();
         input.setRawMode?.(wasRaw);
+        input.pause?.();
         reject(new Error("Aborted."));
         return;
       }
@@ -97,6 +124,7 @@ export async function promptSelect(args: {
         input.off("keypress", onKeypress);
         cleanup(selected);
         input.setRawMode?.(wasRaw);
+        input.pause?.();
         resolve(selected);
       }
     };
@@ -112,17 +140,32 @@ export async function promptSecret(args: {
 }): Promise<string> {
   const { input, output, prompt } = args;
   let value = "";
+  const shouldToggleEcho =
+    process.platform !== "win32" &&
+    input === (defaultStdin as unknown as KeypressInput) &&
+    Boolean(defaultStdin.isTTY);
 
   output.write(prompt);
   input.resume();
   const wasRaw = Boolean(input.isRaw);
   input.setRawMode?.(true);
+  if (shouldToggleEcho) {
+    setPosixEcho(false);
+  }
 
   return await new Promise<string>((resolve, reject) => {
+    const restoreInputState = () => {
+      input.setRawMode?.(wasRaw);
+      input.pause?.();
+      if (shouldToggleEcho) {
+        setPosixEcho(true);
+      }
+    };
+
     const onKeypress = (chunk: string, key: { name?: string; ctrl?: boolean }) => {
       if (key.ctrl && key.name === "c") {
         input.off("keypress", onKeypress);
-        input.setRawMode?.(wasRaw);
+        restoreInputState();
         output.write("\n");
         reject(new Error("Aborted."));
         return;
@@ -130,7 +173,7 @@ export async function promptSecret(args: {
 
       if (key.name === "return" || key.name === "enter") {
         input.off("keypress", onKeypress);
-        input.setRawMode?.(wasRaw);
+        restoreInputState();
         output.write("\n");
         resolve(value);
         return;

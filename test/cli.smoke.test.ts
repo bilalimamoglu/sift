@@ -18,6 +18,7 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("Provider: openai | openai-compatible");
     expect(result.stdout).toContain("SIFT_PROVIDER_API_KEY");
     expect(result.stdout).toContain("OPENAI_API_KEY");
+    expect(result.stdout).toContain("--show-raw");
   });
 
   it("prints exec help with passthrough usage", () => {
@@ -231,6 +232,39 @@ describe("CLI smoke", () => {
         vulnerabilities: [],
         summary: "No high or critical vulnerabilities found in the provided input."
       });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("prints raw stdin to stderr in pipe mode when --show-raw is set", async () => {
+    const server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [{ message: { content: "Short answer." } }]
+      }
+    }));
+
+    try {
+      const result = await runCliAsync({
+        args: [
+          "what changed?",
+          "--show-raw",
+          "--provider",
+          "openai-compatible",
+          "--base-url",
+          server.baseUrl,
+          "--api-key",
+          "test-key",
+          "--model",
+          "test-model"
+        ],
+        input: "diff --git a/file b/file\n+change\n"
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout.trim()).toBe("Short answer.");
+      expect(result.stderr).toContain("diff --git a/file b/file");
+      expect(result.stderr).toContain("+change");
     } finally {
       await server.close();
     }

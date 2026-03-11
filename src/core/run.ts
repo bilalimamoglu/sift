@@ -4,6 +4,10 @@ import { createProvider } from "../providers/factory.js";
 import { buildPrompt } from "../prompts/buildPrompt.js";
 import { buildFallbackOutput } from "./fallback.js";
 import { applyHeuristicPolicy } from "./heuristics.js";
+import {
+  buildInsufficientSignalOutput,
+  isInsufficientSignalOutput
+} from "./insufficient.js";
 import { prepareInput } from "./pipeline.js";
 import { isRetriableReason, looksLikeRejectedModelOutput } from "./quality.js";
 
@@ -63,44 +67,58 @@ async function delay(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function withInsufficientHint(args: {
+  output: string;
+  request: RunRequest;
+  prepared: ReturnType<typeof prepareInput>;
+}): string {
+  if (!isInsufficientSignalOutput(args.output)) {
+    return args.output;
+  }
+
+  return buildInsufficientSignalOutput({
+    presetName: args.request.presetName,
+    originalLength: args.prepared.meta.originalLength,
+    truncatedApplied: args.prepared.meta.truncatedApplied
+  });
+}
+
 async function generateWithRetry(args: {
   provider: ReturnType<typeof createProvider>;
   request: RunRequest;
   prompt: string;
   responseMode: "text" | "json";
 }): Promise<Awaited<ReturnType<ReturnType<typeof createProvider>["generate"]>>> {
-  let lastError: unknown;
+  const generate = () =>
+    args.provider.generate({
+      model: args.request.config.provider.model,
+      prompt: args.prompt,
+      temperature: args.request.config.provider.temperature,
+      maxOutputTokens: args.request.config.provider.maxOutputTokens,
+      timeoutMs: args.request.config.provider.timeoutMs,
+      responseMode: args.responseMode,
+      jsonResponseFormat: args.request.config.provider.jsonResponseFormat
+    });
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      return await args.provider.generate({
-        model: args.request.config.provider.model,
-        prompt: args.prompt,
-        temperature: args.request.config.provider.temperature,
-        maxOutputTokens: args.request.config.provider.maxOutputTokens,
-        timeoutMs: args.request.config.provider.timeoutMs,
-        responseMode: args.responseMode,
-        jsonResponseFormat: args.request.config.provider.jsonResponseFormat
-      });
-    } catch (error) {
-      lastError = error;
-      const reason = error instanceof Error ? error.message : "unknown_error";
+  try {
+    return await generate();
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "unknown_error";
 
-      if (attempt > 0 || !isRetriableReason(reason)) {
-        throw error;
-      }
-
-      if (args.request.config.runtime.verbose) {
-        process.stderr.write(
-          `${pc.dim("sift")} retry=1 reason=${reason} delay_ms=${RETRY_DELAY_MS}\n`
-        );
-      }
-
-      await delay(RETRY_DELAY_MS);
+    if (!isRetriableReason(reason)) {
+      throw error;
     }
+
+    if (args.request.config.runtime.verbose) {
+      process.stderr.write(
+        `${pc.dim("sift")} retry=1 reason=${reason} delay_ms=${RETRY_DELAY_MS}\n`
+      );
+    }
+
+    await delay(RETRY_DELAY_MS);
   }
 
-  throw lastError instanceof Error ? lastError : new Error("unknown_error");
+  return generate();
 }
 
 export async function runSift(request: RunRequest): Promise<string> {
@@ -142,7 +160,11 @@ export async function runSift(request: RunRequest): Promise<string> {
       });
     }
 
-    return heuristicOutput;
+    return withInsufficientHint({
+      output: heuristicOutput,
+      request,
+      prepared
+    });
   }
 
   if (request.dryRun) {
@@ -174,16 +196,24 @@ export async function runSift(request: RunRequest): Promise<string> {
       throw new Error("Model output rejected by quality gate");
     }
 
-    return normalizeOutput(result.text, responseMode);
+    return withInsufficientHint({
+      output: normalizeOutput(result.text, responseMode),
+      request,
+      prepared
+    });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "unknown_error";
 
-    return buildFallbackOutput({
-      format: request.format,
-      reason,
-      rawInput: prepared.truncated,
-      rawFallback: request.config.runtime.rawFallback,
-      jsonFallback: request.fallbackJson
+    return withInsufficientHint({
+      output: buildFallbackOutput({
+        format: request.format,
+        reason,
+        rawInput: prepared.truncated,
+        rawFallback: request.config.runtime.rawFallback,
+        jsonFallback: request.fallbackJson
+      }),
+      request,
+      prepared
     });
   }
 }

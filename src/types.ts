@@ -91,6 +91,7 @@ export interface RunRequest {
   stdin: string;
   config: SiftConfig;
   dryRun?: boolean;
+  showRaw?: boolean;
   presetName?: string;
   policyName?: PromptPolicyName;
   outputContract?: string;

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { OpenAIProvider } from "../src/providers/openai.js";
 import { OpenAICompatibleProvider } from "../src/providers/openaiCompatible.js";
 import { createFakeOpenAIServer, type FakeOpenAIServer } from "./helpers/fake-openai.js";
@@ -183,6 +183,231 @@ describe("OpenAICompatibleProvider", () => {
 
     expect(server.requests[0].response_format).toBeUndefined();
   });
+
+  it("does not use native JSON response_format when turned off", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [{ message: { content: "{\"status\":\"ok\"}" } }]
+      }
+    }));
+
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key"
+    });
+
+    await provider.generate({
+      model: "test-model",
+      prompt: "hello",
+      temperature: 0.1,
+      maxOutputTokens: 50,
+      timeoutMs: 1000,
+      responseMode: "json",
+      jsonResponseFormat: "off"
+    });
+
+    expect(server.requests[0].response_format).toBeUndefined();
+  });
+
+  it("uses native JSON response_format when explicitly enabled", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [{ message: { content: "{\"status\":\"ok\"}" } }]
+      }
+    }));
+
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key"
+    });
+
+    await provider.generate({
+      model: "test-model",
+      prompt: "hello",
+      temperature: 0.1,
+      maxOutputTokens: 50,
+      timeoutMs: 1000,
+      responseMode: "json",
+      jsonResponseFormat: "on"
+    });
+
+    expect(server.requests[0].response_format).toEqual({ type: "json_object" });
+  });
+
+  it("parses array-based message content and rejects empty responses", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [
+          {
+            message: {
+              content: [
+                { text: "All " },
+                { text: "tests passed." }
+              ]
+            }
+          }
+        ]
+      }
+    }));
+
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key"
+    });
+
+    await expect(
+      provider.generate({
+        model: "test-model",
+        prompt: "hello",
+        temperature: 0.1,
+        maxOutputTokens: 50,
+        timeoutMs: 1000,
+        responseMode: "text",
+        jsonResponseFormat: "auto"
+      })
+    ).resolves.toMatchObject({ text: "All tests passed." });
+
+    await server.close();
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [{ message: { content: [] } }]
+      }
+    }));
+
+    const emptyProvider = new OpenAICompatibleProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key"
+    });
+
+    await expect(
+      emptyProvider.generate({
+        model: "test-model",
+        prompt: "hello",
+        temperature: 0.1,
+        maxOutputTokens: 50,
+        timeoutMs: 1000,
+        responseMode: "text",
+        jsonResponseFormat: "auto"
+      })
+    ).rejects.toThrow("empty response");
+  });
+
+  it("rejects non-string and non-array content as empty", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [{ message: { content: { text: "ignored" } } }]
+      }
+    }));
+
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key"
+    });
+
+    await expect(
+      provider.generate({
+        model: "test-model",
+        prompt: "hello",
+        temperature: 0.1,
+        maxOutputTokens: 50,
+        timeoutMs: 1000,
+        responseMode: "text",
+        jsonResponseFormat: "auto"
+      })
+    ).rejects.toThrow("empty response");
+  });
+
+  it("ignores non-text array items in compatible message content", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [
+          {
+            message: {
+              content: [
+                { type: "input_text" },
+                { text: "usable text" }
+              ]
+            }
+          }
+        ]
+      }
+    }));
+
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key"
+    });
+
+    await expect(
+      provider.generate({
+        model: "test-model",
+        prompt: "hello",
+        temperature: 0.1,
+        maxOutputTokens: 50,
+        timeoutMs: 1000,
+        responseMode: "text",
+        jsonResponseFormat: "auto"
+      })
+    ).resolves.toMatchObject({ text: "usable text" });
+  });
+
+  it("keeps generic HTTP errors when the error body is not JSON", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response("bad gateway", {
+        status: 502,
+        headers: {
+          "content-type": "text/plain"
+        }
+      })) as typeof fetch;
+
+    try {
+      const provider = new OpenAICompatibleProvider({
+        baseUrl: "https://example.test/v1"
+      });
+
+      await expect(
+        provider.generate({
+          model: "test-model",
+          prompt: "hello",
+          temperature: 0.1,
+          maxOutputTokens: 50,
+          timeoutMs: 1000,
+          responseMode: "text",
+          jsonResponseFormat: "auto"
+        })
+      ).rejects.toThrow("Provider returned HTTP 502");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("rethrows non-timeout fetch errors for compatible providers", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error("socket hang up");
+    }) as typeof fetch;
+
+    try {
+      const provider = new OpenAICompatibleProvider({
+        baseUrl: "https://example.test/v1"
+      });
+
+      await expect(
+        provider.generate({
+          model: "test-model",
+          prompt: "hello",
+          temperature: 0.1,
+          maxOutputTokens: 50,
+          timeoutMs: 1000,
+          responseMode: "text",
+          jsonResponseFormat: "auto"
+        })
+      ).rejects.toThrow("socket hang up");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
 
 describe("OpenAIProvider", () => {
@@ -359,5 +584,217 @@ describe("OpenAIProvider", () => {
         jsonResponseFormat: "auto"
       })
     ).rejects.toThrow("empty response");
+  });
+
+  it("rejects responses payloads without an output array", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        output: { type: "message" }
+      }
+    }));
+
+    const provider = new OpenAIProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key"
+    });
+
+    await expect(
+      provider.generate({
+        model: "test-model",
+        prompt: "hello",
+        temperature: 0.1,
+        maxOutputTokens: 50,
+        timeoutMs: 1000,
+        responseMode: "text",
+        jsonResponseFormat: "auto"
+      })
+    ).rejects.toThrow("empty response");
+  });
+
+  it("supports output_text shortcuts and generic HTTP errors", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        output_text: "All tests passed."
+      }
+    }));
+
+    const provider = new OpenAIProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key"
+    });
+
+    await expect(
+      provider.generate({
+        model: "test-model",
+        prompt: "hello",
+        temperature: 0.1,
+        maxOutputTokens: 50,
+        timeoutMs: 1000,
+        responseMode: "text",
+        jsonResponseFormat: "auto"
+      })
+    ).resolves.toMatchObject({ text: "All tests passed." });
+
+    await server.close();
+    server = undefined;
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response("bad request", {
+        status: 400,
+        headers: {
+          "content-type": "text/plain"
+        }
+      })) as typeof fetch;
+
+    try {
+      const failingProvider = new OpenAIProvider({
+        baseUrl: "https://api.openai.com/v1"
+      });
+
+      await expect(
+        failingProvider.generate({
+          model: "test-model",
+          prompt: "hello",
+          temperature: 0.1,
+          maxOutputTokens: 50,
+          timeoutMs: 1000,
+          responseMode: "text",
+          jsonResponseFormat: "auto"
+        })
+      ).rejects.toThrow("Provider returned HTTP 400");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("ignores non-output_text items in responses content", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        output: [
+          {
+            type: "message",
+            content: [
+              {
+                type: "tool_call",
+                text: "ignored"
+              },
+              {
+                type: "output_text",
+                text: "All tests passed."
+              }
+            ]
+          }
+        ]
+      }
+    }));
+
+    const provider = new OpenAIProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key"
+    });
+
+    await expect(
+      provider.generate({
+        model: "test-model",
+        prompt: "hello",
+        temperature: 0.1,
+        maxOutputTokens: 50,
+        timeoutMs: 1000,
+        responseMode: "text",
+        jsonResponseFormat: "auto"
+      })
+    ).resolves.toMatchObject({ text: "All tests passed." });
+  });
+
+  it("ignores output items without content arrays and rethrows non-timeout fetch errors", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        output: [
+          {
+            type: "message"
+          },
+          {
+            type: "message",
+            content: [
+              {
+                type: "output_text",
+                text: "All tests passed."
+              }
+            ]
+          }
+        ]
+      }
+    }));
+
+    const provider = new OpenAIProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key"
+    });
+
+    await expect(
+      provider.generate({
+        model: "test-model",
+        prompt: "hello",
+        temperature: 0.1,
+        maxOutputTokens: 50,
+        timeoutMs: 1000,
+        responseMode: "text",
+        jsonResponseFormat: "auto"
+      })
+    ).resolves.toMatchObject({ text: "All tests passed." });
+
+    await server.close();
+    server = undefined;
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error("network down");
+    }) as typeof fetch;
+
+    try {
+      const failingProvider = new OpenAIProvider({
+        baseUrl: "https://api.openai.com/v1"
+      });
+
+      await expect(
+        failingProvider.generate({
+          model: "test-model",
+          prompt: "hello",
+          temperature: 0.1,
+          maxOutputTokens: 50,
+          timeoutMs: 1000,
+          responseMode: "text",
+          jsonResponseFormat: "auto"
+        })
+      ).rejects.toThrow("network down");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("times out slow responses API requests", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      delayMs: 200,
+      body: {
+        output_text: "late"
+      }
+    }));
+
+    const provider = new OpenAIProvider({
+      baseUrl: server.baseUrl
+    });
+
+    await expect(
+      provider.generate({
+        model: "test-model",
+        prompt: "hello",
+        temperature: 0.1,
+        maxOutputTokens: 50,
+        timeoutMs: 20,
+        responseMode: "text",
+        jsonResponseFormat: "auto"
+      })
+    ).rejects.toThrow("timed out");
   });
 });

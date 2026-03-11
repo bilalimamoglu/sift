@@ -170,6 +170,66 @@ describe("exec mode", () => {
     });
   });
 
+  it("prints captured raw output to stderr when --show-raw is set", async () => {
+    const server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [{ message: { content: "All tests passed." } }]
+      }
+    }));
+
+    try {
+      const result = await runCliAsync({
+        args: [
+          "exec",
+          "did the tests pass?",
+          "--show-raw",
+          "--provider",
+          "openai-compatible",
+          "--base-url",
+          server.baseUrl,
+          "--api-key",
+          "test-key",
+          "--model",
+          "test-model",
+          "--",
+          "node",
+          "-e",
+          "console.log('Ran 12 tests\\n12 passed')"
+        ]
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout.trim()).toBe("All tests passed.");
+      expect(result.stderr).toContain("Ran 12 tests");
+      expect(result.stderr).toContain("12 passed");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("shows raw output on stderr and dry-run JSON on stdout", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "did the tests pass?",
+        "--dry-run",
+        "--show-raw",
+        "--",
+        "node",
+        "-e",
+        "console.log('Ran 12 tests\\n12 passed')"
+      ]
+    });
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      status: "dry-run",
+      question: "did the tests pass?"
+    });
+    expect(result.stderr).toContain("Ran 12 tests");
+    expect(result.stderr).toContain("12 passed");
+  });
+
   it("preserves a failing child exit code for preset exec mode", async () => {
     const server = await createFakeOpenAIServer(() => ({
       body: {
@@ -228,6 +288,130 @@ describe("exec mode", () => {
       reason: "Destructive or clearly risky infrastructure change signals are present.",
       evidence: ["Plan: 2 to add, 1 to destroy"]
     });
+  });
+
+  it("uses a local summary for obvious pytest success output", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "test-status",
+        "--shell",
+        "printf '================ 12 passed, 1 skipped in 0.42s ================\\n'"
+      ]
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("- Tests passed.\n- 12 tests, 1 skip.");
+    expect(result.stderr).toBe("");
+  });
+
+  it("uses a local summary for pytest collection errors", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "test-status",
+        "--shell",
+        "printf '================ 134 errors during collection ================\\n'; exit 2"
+      ]
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stdout.trim()).toBe("- Tests did not complete.\n- 134 errors occurred during collection.");
+    expect(result.stderr).toBe("");
+  });
+
+  it("explains insufficient test-status output after a successful command", async () => {
+    const server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [
+          {
+            message: {
+              content: "Insufficient signal in the provided input."
+            }
+          }
+        ]
+      }
+    }));
+
+    try {
+      const result = await runCliAsync({
+        args: [
+          "exec",
+          "--preset",
+          "test-status",
+          "--provider",
+          "openai-compatible",
+          "--base-url",
+          server.baseUrl,
+          "--api-key",
+          "test-key",
+          "--model",
+          "test-model",
+          "--",
+          "node",
+          "-e",
+          "console.log('test runner output without a summary line')"
+        ]
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout.trim()).toBe(
+        [
+          "Insufficient signal in the provided input.",
+          "Hint: command succeeded, but no recognizable test summary was found."
+        ].join("\n")
+      );
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("explains insufficient test-status output after a failing command", async () => {
+    const server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [
+          {
+            message: {
+              content: "Insufficient signal in the provided input."
+            }
+          }
+        ]
+      }
+    }));
+
+    try {
+      const result = await runCliAsync({
+        args: [
+          "exec",
+          "--preset",
+          "test-status",
+          "--provider",
+          "openai-compatible",
+          "--base-url",
+          server.baseUrl,
+          "--api-key",
+          "test-key",
+          "--model",
+          "test-model",
+          "--",
+          "node",
+          "-e",
+          "console.error('some opaque failure output'); process.exit(3)"
+        ]
+      });
+
+      expect(result.status).toBe(3);
+      expect(result.stdout.trim()).toBe(
+        [
+          "Insufficient signal in the provided input.",
+          "Hint: command failed, but the captured output did not include a recognizable test summary."
+        ].join("\n")
+      );
+    } finally {
+      await server.close();
+    }
   });
 
   it("returns exit 1 for infra-risk fail verdicts when --fail-on is enabled", async () => {
