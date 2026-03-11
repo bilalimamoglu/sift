@@ -322,6 +322,164 @@ describe("exec mode", () => {
     expect(result.stderr).toBe("");
   });
 
+  it("groups repeated import-time root causes for collection failures", async () => {
+    const script = [
+      "const lines = [",
+      "  '================ 114 errors during collection ================',",
+      "  '_ ERROR collecting tests/unit/test_auth.py _',",
+      "  \"ImportError while importing test module '/tmp/tests/unit/test_auth.py'.\",",
+      "  \"E   ModuleNotFoundError: No module named 'pydantic'\",",
+      "  '_ ERROR collecting tests/unit/test_api.py _',",
+      "  \"ImportError while importing test module '/tmp/tests/unit/test_api.py'.\",",
+      "  \"E   ModuleNotFoundError: No module named 'fastapi'\",",
+      "  '_ ERROR collecting tests/unit/test_jobs.py _',",
+      "  \"ImportError while importing test module '/tmp/tests/unit/test_jobs.py'.\",",
+      "  \"E   ModuleNotFoundError: No module named 'botocore'\"",
+      "];",
+      "console.error(lines.join('\\n'));",
+      "process.exit(2);"
+    ].join(" ");
+
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "test-status",
+        "--",
+        "node",
+        "-e",
+        script
+      ]
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stdout.trim()).toBe(
+      [
+        "- Tests did not complete.",
+        "- 114 errors occurred during collection.",
+        "- Most failures are import/dependency errors during test collection.",
+        "- Missing modules include pydantic, fastapi, botocore."
+      ].join("\n")
+    );
+    expect(result.stderr).toBe("");
+  });
+
+  it("supports focused test-status output for visible collection failures", async () => {
+    const script = [
+      "const lines = [",
+      "  '================ 4 errors during collection ================',",
+      "  '_ ERROR collecting tests/unit/test_auth.py _',",
+      "  \"ImportError while importing test module '/tmp/tests/unit/test_auth.py'.\",",
+      "  \"E   ModuleNotFoundError: No module named 'pydantic'\",",
+      "  '_ ERROR collecting tests/unit/test_api.py _',",
+      "  \"ImportError while importing test module '/tmp/tests/unit/test_api.py'.\",",
+      "  \"E   ModuleNotFoundError: No module named 'fastapi'\"",
+      "];",
+      "console.error(lines.join('\\n'));",
+      "process.exit(2);"
+    ].join(" ");
+
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "test-status",
+        "--detail",
+        "focused",
+        "--",
+        "node",
+        "-e",
+        script
+      ]
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stdout.trim()).toBe(
+      [
+        "- Tests did not complete.",
+        "- 4 errors occurred during collection.",
+        "- import/dependency errors during collection",
+        "  - tests/unit/test_auth.py -> missing module: pydantic",
+        "  - tests/unit/test_api.py -> missing module: fastapi"
+      ].join("\n")
+    );
+  });
+
+  it("supports verbose test-status output for visible collection failures", async () => {
+    const script = [
+      "const lines = [",
+      "  '================ 4 errors during collection ================',",
+      "  '_ ERROR collecting tests/unit/test_auth.py _',",
+      "  \"ImportError while importing test module '/tmp/tests/unit/test_auth.py'.\",",
+      "  \"E   ModuleNotFoundError: No module named 'pydantic'\",",
+      "  '_ ERROR collecting tests/unit/test_api.py _',",
+      "  \"ImportError while importing test module '/tmp/tests/unit/test_api.py'.\",",
+      "  \"E   ModuleNotFoundError: No module named 'fastapi'\"",
+      "];",
+      "console.error(lines.join('\\n'));",
+      "process.exit(2);"
+    ].join(" ");
+
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "test-status",
+        "--detail",
+        "verbose",
+        "--",
+        "node",
+        "-e",
+        script
+      ]
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stdout.trim()).toBe(
+      [
+        "- Tests did not complete.",
+        "- 4 errors occurred during collection.",
+        "- tests/unit/test_auth.py -> missing module: pydantic",
+        "- tests/unit/test_api.py -> missing module: fastapi"
+      ].join("\n")
+    );
+  });
+
+  it("treats standard as the default detail level for test-status", async () => {
+    const script = [
+      "const lines = [",
+      "  '================ 4 errors during collection ================',",
+      "  '_ ERROR collecting tests/unit/test_auth.py _',",
+      "  \"ImportError while importing test module '/tmp/tests/unit/test_auth.py'.\",",
+      "  \"E   ModuleNotFoundError: No module named 'pydantic'\",",
+      "  '_ ERROR collecting tests/unit/test_api.py _',",
+      "  \"ImportError while importing test module '/tmp/tests/unit/test_api.py'.\",",
+      "  \"E   ModuleNotFoundError: No module named 'fastapi'\"",
+      "];",
+      "console.error(lines.join('\\n'));",
+      "process.exit(2);"
+    ].join(" ");
+
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "test-status",
+        "--detail",
+        "standard",
+        "--",
+        "node",
+        "-e",
+        script
+      ]
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stdout).toContain("Most failures are import/dependency errors during test collection.");
+    expect(result.stdout).toContain("Missing modules include pydantic, fastapi.");
+    expect(result.stdout).not.toContain("->");
+  });
+
   it("explains insufficient test-status output after a successful command", async () => {
     const server = await createFakeOpenAIServer(() => ({
       body: {
@@ -563,6 +721,23 @@ describe("exec mode", () => {
     expect(result.stderr).toContain("supported only for built-in presets: infra-risk, audit-critical");
   });
 
+  it("fails clearly when --detail is used with unsupported presets", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "infra-risk",
+        "--detail",
+        "focused",
+        "--shell",
+        "printf 'Plan: 2 to add, 1 to destroy\\n'"
+      ]
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("--detail is supported only with --preset test-status.");
+  });
+
   it("fails clearly when --fail-on is used with freeform questions", async () => {
     const result = await runCliAsync({
       args: [
@@ -578,6 +753,24 @@ describe("exec mode", () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("supported only for built-in presets: infra-risk, audit-critical");
+  });
+
+  it("fails clearly when --detail is used with freeform questions", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "did the tests pass?",
+        "--detail",
+        "focused",
+        "--",
+        "node",
+        "-e",
+        "console.log('12 passed')"
+      ]
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("--detail is supported only with --preset test-status.");
   });
 
   it("fails clearly when --fail-on is used with a non-default preset format", async () => {

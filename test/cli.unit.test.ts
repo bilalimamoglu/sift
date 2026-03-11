@@ -6,6 +6,8 @@ import {
   createCliApp,
   extractExecCommand,
   handleCliError,
+  normalizeDetail,
+  resolveDetail,
   runCli,
   toNumber,
   type CliDeps
@@ -180,6 +182,28 @@ describe("cli app unit", () => {
     });
   });
 
+  it("covers detail parsing helpers directly", () => {
+    expect(normalizeDetail(undefined)).toBeUndefined();
+    expect(normalizeDetail("standard")).toBe("standard");
+    expect(normalizeDetail("focused")).toBe("focused");
+    expect(normalizeDetail("verbose")).toBe("verbose");
+    expect(() => normalizeDetail("full")).toThrow(
+      "Invalid --detail value. Use standard, focused, or verbose."
+    );
+
+    expect(resolveDetail({ presetName: "test-status", options: {} })).toBe("standard");
+    expect(resolveDetail({ presetName: "test-status", options: { detail: "focused" } })).toBe(
+      "focused"
+    );
+    expect(resolveDetail({ presetName: "test-status", options: { detail: "verbose" } })).toBe(
+      "verbose"
+    );
+    expect(resolveDetail({ presetName: "infra-risk", options: {} })).toBeUndefined();
+    expect(() =>
+      resolveDetail({ presetName: "infra-risk", options: { detail: "focused" } })
+    ).toThrow("--detail is supported only with --preset test-status.");
+  });
+
   it("cleans duplicate version text only for string help sections", () => {
     expect(cleanHelpSectionBody("sift/0.2.3\n\nUsage:\n", "0\\.2\\.3")).toBe(
       "\nUsage:\n"
@@ -319,6 +343,28 @@ describe("cli app unit", () => {
     );
 
     await runMatched(
+      ["exec", "--preset", "test-status", "--detail", "focused", "--", "pytest"],
+      deps
+    );
+    expect(deps.runExec).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        presetName: "test-status",
+        detail: "focused"
+      })
+    );
+
+    await runMatched(
+      ["exec", "--preset", "test-status", "--detail", "verbose", "--", "pytest"],
+      deps
+    );
+    expect(deps.runExec).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        presetName: "test-status",
+        detail: "verbose"
+      })
+    );
+
+    await runMatched(
       ["exec", "--preset", "infra-risk", "--fail-on", "--", "terraform", "plan"],
       deps
     );
@@ -334,6 +380,9 @@ describe("cli app unit", () => {
     await expect(
       runMatched(["exec", "question", "--preset", "test-status", "--", "pytest"], deps)
     ).rejects.toThrow("Use either a freeform question or --preset <name>, not both.");
+    await expect(
+      runMatched(["exec", "--preset", "test-status", "--detail", "nope", "--", "pytest"], deps)
+    ).rejects.toThrow("Invalid --detail value. Use standard, focused, or verbose.");
     await expect(runMatched(["exec"], deps)).rejects.toThrow("Missing question or preset.");
   });
 

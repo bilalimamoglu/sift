@@ -19,6 +19,7 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("SIFT_PROVIDER_API_KEY");
     expect(result.stdout).toContain("OPENAI_API_KEY");
     expect(result.stdout).toContain("--show-raw");
+    expect(result.stdout).toContain("--detail <mode>");
   });
 
   it("prints exec help with passthrough usage", () => {
@@ -280,6 +281,46 @@ describe("CLI smoke", () => {
     expect(JSON.parse(result.stdout).verdict).toBe("fail");
   });
 
+  it("supports --detail focused in preset pipe mode for test-status", async () => {
+    const result = await runCliAsync({
+      args: ["preset", "test-status", "--detail", "focused"],
+      input: [
+        "4 errors during collection",
+        "_ ERROR collecting tests/unit/test_auth.py _",
+        "ImportError while importing test module '/tmp/tests/unit/test_auth.py'.",
+        "E   ModuleNotFoundError: No module named 'pydantic'",
+        "_ ERROR collecting tests/unit/test_api.py _",
+        "ImportError while importing test module '/tmp/tests/unit/test_api.py'.",
+        "E   ModuleNotFoundError: No module named 'fastapi'"
+      ].join("\n")
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("import/dependency errors during collection");
+    expect(result.stdout).toContain("tests/unit/test_auth.py -> missing module: pydantic");
+    expect(result.stdout).toContain("tests/unit/test_api.py -> missing module: fastapi");
+  });
+
+  it("supports --detail verbose in preset pipe mode for test-status", async () => {
+    const result = await runCliAsync({
+      args: ["preset", "test-status", "--detail", "verbose"],
+      input: [
+        "2 errors during collection",
+        "_ ERROR collecting tests/unit/test_auth.py _",
+        "ImportError while importing test module '/tmp/tests/unit/test_auth.py'.",
+        "E   ModuleNotFoundError: No module named 'pydantic'",
+        "_ ERROR collecting tests/unit/test_api.py _",
+        "ImportError while importing test module '/tmp/tests/unit/test_api.py'.",
+        "E   ModuleNotFoundError: No module named 'fastapi'"
+      ].join("\n")
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("- tests/unit/test_auth.py -> missing module: pydantic");
+    expect(result.stdout).toContain("- tests/unit/test_api.py -> missing module: fastapi");
+    expect(result.stdout).not.toContain("import/dependency errors during collection");
+  });
+
   it("rejects --fail-on for unsupported preset pipe mode", async () => {
     const result = await runCliAsync({
       args: ["preset", "test-status", "--fail-on"],
@@ -290,6 +331,16 @@ describe("CLI smoke", () => {
     expect(result.stderr).toContain("supported only for built-in presets: infra-risk, audit-critical");
   });
 
+  it("rejects --detail for unsupported preset pipe mode", async () => {
+    const result = await runCliAsync({
+      args: ["preset", "infra-risk", "--detail", "focused"],
+      input: "Plan: 2 to add, 1 to destroy\n"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("--detail is supported only with --preset test-status.");
+  });
+
   it("rejects --fail-on for freeform pipe mode", async () => {
     const result = await runCliAsync({
       args: ["did the tests pass?", "--fail-on"],
@@ -298,6 +349,16 @@ describe("CLI smoke", () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("supported only for built-in presets: infra-risk, audit-critical");
+  });
+
+  it("rejects --detail for freeform pipe mode", async () => {
+    const result = await runCliAsync({
+      args: ["did the tests pass?", "--detail", "focused"],
+      input: "Ran 12 tests\n12 passed\n"
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("--detail is supported only with --preset test-status.");
   });
 
   it("reports api key presence from environment in doctor output", async () => {

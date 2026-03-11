@@ -21,6 +21,7 @@ import { readStdin } from "./core/stdin.js";
 import { getPreset } from "./prompts/presets.js";
 import { createPresentation } from "./ui/presentation.js";
 import type {
+  DetailLevel,
   JsonResponseFormatMode,
   OutputFormat,
   PartialSiftConfig,
@@ -143,6 +144,10 @@ function applySharedOptions(command: ReturnType<ReturnType<typeof cac>["command"
     )
     .option("--timeout-ms <ms>", "Request timeout in milliseconds")
     .option("--format <format>", "brief | bullets | json | verdict")
+    .option(
+      "--detail <mode>",
+      "Detail level for supported presets: standard | focused | verbose"
+    )
     .option("--max-capture-chars <n>", "Maximum raw child output chars kept in memory")
     .option("--max-input-chars <n>", "Maximum input chars sent to the model")
     .option("--head-chars <n>", "Head chars to preserve during truncation")
@@ -159,6 +164,35 @@ function applySharedOptions(command: ReturnType<ReturnType<typeof cac>["command"
     )
     .option("--config <path>", "Path to config file")
     .option("--verbose", "Enable verbose stderr logging");
+}
+
+export function normalizeDetail(value: unknown): DetailLevel | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  if (value === "standard" || value === "focused" || value === "verbose") {
+    return value;
+  }
+
+  throw new Error("Invalid --detail value. Use standard, focused, or verbose.");
+}
+
+export function resolveDetail(args: {
+  presetName?: string;
+  options: Record<string, unknown>;
+}): DetailLevel | undefined {
+  const requested = normalizeDetail(args.options.detail);
+
+  if (!requested) {
+    return args.presetName === "test-status" ? "standard" : undefined;
+  }
+
+  if (args.presetName !== "test-status") {
+    throw new Error("--detail is supported only with --preset test-status.");
+  }
+
+  return requested;
 }
 
 export function extractExecCommand(options: Record<string, unknown>): {
@@ -220,6 +254,7 @@ export function createCliApp(args: {
     question: string;
     format: OutputFormat;
     presetName?: string;
+    detail?: DetailLevel;
     policyName?: SiftConfig["presets"][string]["policy"];
     outputContract?: string;
     fallbackJson?: unknown;
@@ -254,6 +289,7 @@ export function createCliApp(args: {
       config,
       dryRun: Boolean(input.options.dryRun),
       showRaw: Boolean(input.options.showRaw),
+      detail: input.detail,
       presetName: input.presetName,
       policyName: input.policyName,
       outputContract: input.outputContract,
@@ -279,6 +315,7 @@ export function createCliApp(args: {
     question: string;
     format: OutputFormat;
     presetName?: string;
+    detail?: DetailLevel;
     policyName?: SiftConfig["presets"][string]["policy"];
     outputContract?: string;
     fallbackJson?: unknown;
@@ -305,6 +342,7 @@ export function createCliApp(args: {
       dryRun: Boolean(input.options.dryRun),
       failOn: Boolean(input.options.failOn),
       showRaw: Boolean(input.options.showRaw),
+      detail: input.detail,
       presetName: input.presetName,
       policyName: input.policyName,
       outputContract: input.outputContract,
@@ -330,6 +368,10 @@ export function createCliApp(args: {
         question: preset.question,
         format: (options.format as OutputFormat | undefined) ?? preset.format,
         presetName: name,
+        detail: resolveDetail({
+          presetName: name,
+          options
+        }),
         policyName:
           (options.format as OutputFormat | undefined) === undefined ||
           (options.format as OutputFormat | undefined) === preset.format
@@ -380,6 +422,10 @@ export function createCliApp(args: {
           question: preset.question,
           format: (options.format as OutputFormat | undefined) ?? preset.format,
           presetName,
+          detail: resolveDetail({
+            presetName,
+            options
+          }),
           policyName:
             (options.format as OutputFormat | undefined) === undefined ||
             (options.format as OutputFormat | undefined) === preset.format
@@ -400,6 +446,9 @@ export function createCliApp(args: {
       await executeExec({
         question,
         format,
+        detail: resolveDetail({
+          options
+        }),
         options
       });
     });
@@ -505,6 +554,9 @@ export function createCliApp(args: {
       await executeRun({
         question,
         format,
+        detail: resolveDetail({
+          options
+        }),
         options
       });
     }

@@ -46,6 +46,7 @@ function buildDryRunOutput(args: {
       },
       question: args.request.question,
       format: args.request.format,
+      detail: args.request.detail ?? null,
       responseMode: args.responseMode,
       policy: args.request.policyName ?? null,
       heuristicOutput: args.heuristicOutput ?? null,
@@ -127,6 +128,7 @@ export async function runSift(request: RunRequest): Promise<string> {
     question: request.question,
     format: request.format,
     input: prepared.truncated,
+    detail: request.detail,
     policyName: request.policyName,
     outputContract: request.outputContract
   });
@@ -141,7 +143,8 @@ export async function runSift(request: RunRequest): Promise<string> {
 
   const heuristicOutput = applyHeuristicPolicy(
     request.policyName,
-    prepared.truncated
+    prepared.truncated,
+    request.detail
   );
 
   if (heuristicOutput) {

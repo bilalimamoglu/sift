@@ -2,21 +2,23 @@
 
 <img src="assets/brand/sift-logo-badge-monochrome.svg" alt="sift logo" width="88" />
 
-`sift` is a small command-output reducer for agent workflows.
+`sift` is a small CLI that runs a noisy shell command, keeps the useful signal, and returns a much smaller answer.
 
-Instead of feeding a model the full output of `pytest`, `git diff`, `npm audit`, `tsc --noEmit`, `eslint .`, or `terraform plan`, you run the command through `sift`. It captures the output, trims the noise, and returns a much smaller answer.
+It is a good fit when you want an agent or CI job to understand:
+- test results
+- typecheck failures
+- lint failures
+- build logs
+- `git diff`
+- `npm audit`
+- `terraform plan`
 
-Best fit:
-- non-interactive shell commands
-- agents that need short answers instead of full logs
-- CI checks where a command may succeed but still produce a blocking result
+It is not a good fit when you need:
+- the exact raw log as the main output
+- interactive or TUI commands
+- shell behavior that depends on raw command output
 
-Not a fit:
-- exact raw log inspection
-- TUI tools
-- password/confirmation prompts
-
-## Installation
+## Install
 
 Requires Node.js 20 or later.
 
@@ -26,7 +28,7 @@ npm install -g @bilalimamoglu/sift
 
 ## One-time setup
 
-The easiest path is the guided setup:
+The easiest setup path is:
 
 ```bash
 sift config setup
@@ -38,9 +40,9 @@ That writes a machine-wide config to:
 ~/.config/sift/config.yaml
 ```
 
-After that, any terminal on the machine can use `sift` without per-project setup. A repo-local config can still override it later.
+After that, any terminal on the machine can use `sift`. A repo-local config can still override it later.
 
-If you want to set things up manually, for OpenAI-hosted models:
+If you prefer manual setup, this is the smallest useful OpenAI setup:
 
 ```bash
 export SIFT_PROVIDER=openai
@@ -49,89 +51,116 @@ export SIFT_MODEL=gpt-5-nano
 export OPENAI_API_KEY=your_openai_api_key
 ```
 
-Or write a template config file:
+Then check it:
 
 ```bash
-sift config init
+sift doctor
 ```
-
-For a manual machine-wide template:
-
-```bash
-sift config init --global
-```
-
-That writes:
-
-```text
-~/.config/sift/config.yaml
-```
-
-Then keep the API key in your shell profile so every terminal can use it:
-
-```bash
-export OPENAI_API_KEY=your_openai_api_key
-```
-
-If you use a different OpenAI-compatible endpoint, switch to `provider: openai-compatible` and use either the endpoint's native API key env var or the generic fallback:
-
-```bash
-export SIFT_PROVIDER_API_KEY=your_provider_api_key
-```
-
-Common compatible env fallbacks:
-- `OPENROUTER_API_KEY`
-- `TOGETHER_API_KEY`
-- `GROQ_API_KEY`
 
 ## Quick start
 
 ```bash
 sift exec "what changed?" -- git diff
-sift exec --preset test-status -- pytest
-sift exec --preset typecheck-summary -- tsc --noEmit
+sift exec --preset test-status -- npm test
+sift exec --preset typecheck-summary -- npm run typecheck
 sift exec --preset lint-failures -- eslint .
 sift exec --preset audit-critical -- npm audit
 sift exec --preset infra-risk -- terraform plan
-sift exec --preset audit-critical --fail-on -- npm audit
-sift exec --preset infra-risk --fail-on -- terraform plan
 ```
 
-## Main workflow
+## The main workflow
 
 `sift exec` is the default path:
 
 ```bash
-sift exec "did tests pass?" -- pytest
-sift exec --dry-run "what changed?" -- git diff
-sift exec --preset test-status --show-raw -- pytest
+sift exec "what changed?" -- git diff
+sift exec --preset test-status -- npm test
+sift exec --preset test-status --show-raw -- npm test
+sift exec --preset test-status --detail focused -- npm test
+sift exec --preset test-status --detail verbose -- npm test
 ```
 
-What it does:
-1. runs the command
+If your project uses `pytest`, `vitest`, `jest`, `bun test`, or another test runner instead of `npm test`, use the same preset with that command.
+
+What happens:
+1. `sift` runs the command
 2. captures `stdout` and `stderr`
-3. sanitizes, optionally redacts, and truncates the output
-4. sends the reduced input to a smaller model
+3. trims the noise
+4. sends a smaller input to the model
 5. prints a short answer or JSON
-6. preserves the wrapped command's exit code
+6. preserves the child command exit code in `exec` mode
 
-Use `--dry-run` to inspect the reduced input and prompt without calling the provider.
+Useful debug flags:
+- `--dry-run`: show the reduced input and prompt without calling the provider
+- `--show-raw`: print the captured raw input to `stderr`
 
-Use `--show-raw` to print the captured raw input to `stderr` while keeping the reduced answer on `stdout`.
+## `test-status` detail modes
 
-Use `--fail-on` when a built-in semantic preset should turn a technically successful command into a CI failure. Supported presets:
-- `infra-risk`
-- `audit-critical`
+If you are running `npm test` and want `sift` to check the result, use `--preset test-status`.
 
-Pipe mode still works when output already exists:
+`test-status` becomes test-aware because you chose the preset. It does **not** infer “this is a test command” from `pytest`, `vitest`, `npm test`, or any other runner name.
+
+Available detail levels:
+
+- `standard`
+  - short default summary
+  - no file list
+- `focused`
+  - groups failures by error type
+  - shows a few representative failing tests or modules
+- `verbose`
+  - flat list of visible failing tests or modules and their normalized reason
+  - useful when Codex needs to know exactly what to fix first
+
+Examples:
 
 ```bash
-git diff 2>&1 | sift "what changed?"
+sift exec --preset test-status -- npm test
+sift exec --preset test-status --detail focused -- npm test
+sift exec --preset test-status --detail verbose -- npm test
+sift exec --preset test-status --detail verbose --show-raw -- npm test
+```
+
+If you use a different runner, swap in your command:
+
+```bash
+sift exec --preset test-status -- pytest
+sift exec --preset test-status --detail focused -- vitest
+sift exec --preset test-status --detail verbose -- bun test
+```
+
+Typical shapes:
+
+`standard`
+```text
+- Tests did not complete.
+- 114 errors occurred during collection.
+- Most failures are import/dependency errors during test collection.
+- Missing modules include pydantic, fastapi, botocore, PIL, httpx, numpy.
+```
+
+`focused`
+```text
+- Tests did not complete.
+- 114 errors occurred during collection.
+- import/dependency errors during collection
+  - tests/unit/test_auth_refresh.py -> missing module: botocore
+  - tests/unit/test_cognito.py -> missing module: pydantic
+  - and 103 more failing modules
+```
+
+`verbose`
+```text
+- Tests did not complete.
+- 114 errors occurred during collection.
+- tests/unit/test_auth_refresh.py -> missing module: botocore
+- tests/unit/test_cognito.py -> missing module: pydantic
+- tests/unit/test_dataset_use_case_facade.py -> missing module: fastapi
 ```
 
 ## Built-in presets
 
-- `test-status`: summarize test results
+- `test-status`: summarize test runs
 - `typecheck-summary`: group blocking type errors by root cause
 - `lint-failures`: group repeated lint violations and highlight the files or rules that matter
 - `audit-critical`: extract only high and critical vulnerabilities
@@ -140,21 +169,25 @@ git diff 2>&1 | sift "what changed?"
 - `build-failure`: explain the most likely build failure
 - `log-errors`: extract the most relevant error signals
 
-Inspect them with:
+List or inspect them:
 
 ```bash
 sift presets list
-sift presets show audit-critical
+sift presets show test-status
 ```
 
-## Output modes
+## CI-friendly usage
 
-- `brief`
-- `bullets`
-- `json`
-- `verdict`
+Some commands succeed technically but should still block CI. `--fail-on` handles that for the built-in semantic presets that have stable machine-readable output:
 
-Built-in JSON and verdict flows return strict error objects on provider or model failure.
+```bash
+sift exec --preset audit-critical --fail-on -- npm audit
+sift exec --preset infra-risk --fail-on -- terraform plan
+```
+
+Supported presets for `--fail-on`:
+- `audit-critical`
+- `infra-risk`
 
 ## Config
 
@@ -170,16 +203,16 @@ sift doctor
 
 `sift config show` masks secrets by default. Use `--show-secrets` only when you explicitly need raw values.
 
-Resolution order:
+Config precedence:
 1. CLI flags
 2. environment variables
-3. `sift.config.yaml` or `sift.config.yml`
-4. `~/.config/sift/config.yaml` or `~/.config/sift/config.yml`
+3. repo-local `sift.config.yaml` or `sift.config.yml`
+4. machine-wide `~/.config/sift/config.yaml` or `~/.config/sift/config.yml`
 5. built-in defaults
 
 If you pass `--config <path>`, that path is strict. Missing explicit config paths are errors.
 
-Minimal example:
+Minimal config example:
 
 ```yaml
 provider:
@@ -198,16 +231,36 @@ runtime:
   rawFallback: true
 ```
 
+## OpenAI vs OpenAI-compatible
+
+Use `provider: openai` for `api.openai.com`.
+
+Use `provider: openai-compatible` for third-party compatible gateways or self-hosted endpoints.
+
+For OpenAI:
+```bash
+export OPENAI_API_KEY=your_openai_api_key
+```
+
+For third-party compatible endpoints, use either the endpoint-native env var or:
+
+```bash
+export SIFT_PROVIDER_API_KEY=your_provider_api_key
+```
+
+Known compatible env fallbacks include:
+- `OPENROUTER_API_KEY`
+- `TOGETHER_API_KEY`
+- `GROQ_API_KEY`
+
 ## Agent usage
 
-For Claude Code, add a short rule to `CLAUDE.md`.
-
-For Codex, add the same rule to `~/.codex/AGENTS.md`.
-
-The important part is simple:
-- prefer `sift exec` for noisy shell commands
+The simple rule is:
+- use `sift exec` for long, noisy, non-interactive command output
 - skip `sift` when exact raw output matters
-- keep credentials in your shell env or `sift.config.yaml`, never inline in prompts or agent instructions
+
+For Codex, put that rule in `~/.codex/AGENTS.md`.
+For Claude Code, put the same rule in `CLAUDE.md`.
 
 ## Safety and limits
 
@@ -225,13 +278,7 @@ Release flow:
 2. merge to `main`
 3. run the `release` workflow manually
 
-The workflow:
-1. installs dependencies
-2. runs typecheck, tests, and build
-3. packs and smoke-tests the tarball
-4. publishes to npm
-5. creates and pushes the `vX.Y.Z` tag
-6. creates a GitHub Release
+The workflow runs typecheck, tests, coverage, build, packaging smoke checks, npm publish, tag creation, and GitHub Release creation.
 
 ## Brand assets
 

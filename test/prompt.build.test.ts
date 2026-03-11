@@ -67,4 +67,35 @@ describe("buildPrompt", () => {
     expect(prompt.prompt).toContain("Group repeated rule violations");
     expect(prompt.prompt).toContain("Do not invent autofixability");
   });
+
+  it("builds focused test-status instructions when requested", () => {
+    const prompt = buildPrompt({
+      question: "what failed?",
+      format: "bullets",
+      policyName: "test-status",
+      detail: "focused",
+      input: "ERROR tests/unit/test_auth.py - ModuleNotFoundError: No module named 'pydantic'"
+    });
+
+    expect(prompt.responseMode).toBe("text");
+    expect(prompt.prompt).toContain("Task policy: test-status");
+    expect(prompt.prompt).toContain("Use a focused failure view.");
+    expect(prompt.prompt).toContain("test-or-module -> dominant reason");
+    expect(prompt.prompt).toContain("and N more failing modules");
+  });
+
+  it("builds verbose test-status instructions when requested", () => {
+    const prompt = buildPrompt({
+      question: "what failed?",
+      format: "bullets",
+      policyName: "test-status",
+      detail: "verbose",
+      input: "ERROR tests/unit/test_auth.py - ModuleNotFoundError: No module named 'pydantic'"
+    });
+
+    expect(prompt.responseMode).toBe("text");
+    expect(prompt.prompt).toContain("Use a verbose failure view.");
+    expect(prompt.prompt).toContain("list each visible failing test or module on its own line");
+    expect(prompt.prompt).toContain("Preserve the original file or module order");
+  });
 });

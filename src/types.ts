@@ -1,6 +1,7 @@
 export type ProviderName = "openai" | "openai-compatible";
 
 export type OutputFormat = "brief" | "bullets" | "json" | "verdict";
+export type DetailLevel = "standard" | "focused" | "verbose";
 
 export type ResponseMode = "text" | "json";
 export type JsonResponseFormatMode = "auto" | "on" | "off";
@@ -92,6 +93,7 @@ export interface RunRequest {
   config: SiftConfig;
   dryRun?: boolean;
   showRaw?: boolean;
+  detail?: DetailLevel;
   presetName?: string;
   policyName?: PromptPolicyName;
   outputContract?: string;
