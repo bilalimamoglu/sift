@@ -26,6 +26,10 @@ function createFakeIO(answers: string[]): ConfigSetupIO & {
       stdout += prompt;
       return queue.shift() ?? "";
     },
+    async secret(prompt: string) {
+      stdout += prompt;
+      return queue.shift() ?? "";
+    },
     write(message: string) {
       stdout += message;
     },
@@ -66,8 +70,11 @@ describe("config setup", () => {
     expect(written.provider.model).toBe("gpt-5-nano");
     expect(written.provider.baseUrl).toBe("https://api.openai.com/v1");
     expect(written.provider.apiKey).toBe("sk-test-key");
+    expect(io.stdout).toContain("Welcome to sift.");
     expect(io.stdout).toContain("Using OpenAI defaults.");
-    expect(io.stdout).toContain(`Wrote ${targetPath}`);
+    expect(io.stdout).toContain("Enter your OpenAI API key (input hidden):");
+    expect(io.stdout).toContain(`Wrote machine-wide config to ${targetPath}`);
+    expect(io.stdout).not.toContain("sk-test-key");
     if (process.platform !== "win32") {
       expect(mode).toBe(0o600);
     }
@@ -170,7 +177,7 @@ describe("config setup", () => {
 
       expect(status).toBe(0);
       expect(io.stdout).toContain(
-        `Note: ${expectedOverridePath} currently overrides this machine-wide config in the current directory.`
+        `Heads-up: ${expectedOverridePath} currently overrides this machine-wide config in this directory.`
       );
     } finally {
       process.chdir(previousCwd);

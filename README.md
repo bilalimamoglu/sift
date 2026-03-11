@@ -38,7 +38,7 @@ That writes a machine-wide config to:
 ~/.config/sift/config.yaml
 ```
 
-After that, any terminal can use `sift` without per-project setup. A repo-local config can still override it later.
+After that, any terminal on the machine can use `sift` without per-project setup. A repo-local config can still override it later.
 
 If you want to set things up manually, for OpenAI-hosted models:
 

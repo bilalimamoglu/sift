@@ -13,6 +13,7 @@ describe("README quick start acceptance", () => {
     expect(readme).toContain("sift config setup");
     expect(readme).toContain("~/.config/sift/config.yaml");
     expect(readme).toContain("repo-local config can still override it");
+    expect(readme).toContain("any terminal on the machine can use `sift`");
   });
 
   it("supports the documented quick-start commands", async () => {

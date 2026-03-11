@@ -1,21 +1,22 @@
 import fs from "node:fs";
 import path from "node:path";
+import { emitKeypressEvents } from "node:readline";
 import { createInterface } from "node:readline/promises";
-import { clearLine, cursorTo, emitKeypressEvents, moveCursor } from "node:readline";
-import { stdin as defaultStdin, stdout as defaultStdout, stderr as defaultStderr } from "node:process";
-import {
-  getDefaultGlobalConfigPath
-} from "../constants.js";
+import { stderr as defaultStderr, stdin as defaultStdin, stdout as defaultStdout } from "node:process";
+import { getDefaultGlobalConfigPath } from "../constants.js";
 import { defaultConfig } from "../config/defaults.js";
 import { findConfigPath } from "../config/load.js";
 import { writeConfigFile } from "../config/write.js";
 import type { SiftConfig } from "../types.js";
+import { createPresentation } from "../ui/presentation.js";
+import { promptSecret, promptSelect } from "../ui/terminal.js";
 
 export interface ConfigSetupIO {
   stdinIsTTY: boolean;
   stdoutIsTTY: boolean;
   ask(prompt: string): Promise<string>;
   select?(prompt: string, options: string[]): Promise<string>;
+  secret?(prompt: string): Promise<string>;
   write(message: string): void;
   error(message: string): void;
   close?(): void;
@@ -39,67 +40,22 @@ function createTerminalIO(): ConfigSetupIO {
   }
 
   async function select(prompt: string, options: string[]): Promise<string> {
-    const input = defaultStdin;
-    const output = defaultStdout;
-    const promptLine = `${prompt} (use ↑/↓ and Enter)`;
-    let index = 0;
-    const lineCount = options.length + 1;
+    emitKeypressEvents(defaultStdin);
+    return await promptSelect({
+      input: defaultStdin,
+      output: defaultStdout,
+      prompt,
+      options,
+      selectedLabel: "Provider"
+    });
+  }
 
-    emitKeypressEvents(input);
-    input.resume();
-    const wasRaw = input.isTTY ? input.isRaw : false;
-    input.setRawMode?.(true);
-
-    const render = () => {
-      cursorTo(output, 0);
-      clearLine(output, 0);
-      output.write(`${promptLine}\n`);
-      for (let optionIndex = 0; optionIndex < options.length; optionIndex += 1) {
-        clearLine(output, 0);
-        output.write(`${optionIndex === index ? "›" : " "} ${options[optionIndex]}\n`);
-      }
-      moveCursor(output, 0, -lineCount);
-    };
-
-    render();
-
-    return await new Promise<string>((resolve, reject) => {
-      const onKeypress = (_value: string, key: { name?: string; ctrl?: boolean }) => {
-        if (key.ctrl && key.name === "c") {
-          cleanup();
-          reject(new Error("Aborted."));
-          return;
-        }
-
-        if (key.name === "up") {
-          index = index === 0 ? options.length - 1 : index - 1;
-          render();
-          return;
-        }
-
-        if (key.name === "down") {
-          index = (index + 1) % options.length;
-          render();
-          return;
-        }
-
-        if (key.name === "return" || key.name === "enter") {
-          const selected = options[index] ?? options[0];
-          cleanup();
-          resolve(selected ?? "OpenAI");
-        }
-      };
-
-      const cleanup = () => {
-        input.off("keypress", onKeypress);
-        moveCursor(output, 0, lineCount);
-        cursorTo(output, 0);
-        clearLine(output, 0);
-        output.write("\n");
-        input.setRawMode?.(Boolean(wasRaw));
-      };
-
-      input.on("keypress", onKeypress);
+  async function secret(prompt: string): Promise<string> {
+    emitKeypressEvents(defaultStdin);
+    return await promptSecret({
+      input: defaultStdin,
+      output: defaultStdout,
+      prompt
     });
   }
 
@@ -110,6 +66,7 @@ function createTerminalIO(): ConfigSetupIO {
       return getInterface().question(prompt);
     },
     select,
+    secret,
     write(message: string) {
       defaultStdout.write(message);
     },
@@ -139,6 +96,10 @@ function buildOpenAISetupConfig(apiKey: string): SiftConfig {
   };
 }
 
+function getSetupPresenter(io: ConfigSetupIO) {
+  return createPresentation(io.stdoutIsTTY);
+}
+
 async function promptForProvider(io: ConfigSetupIO): Promise<"openai"> {
   if (io.select) {
     const choice = await io.select("Select provider", ["OpenAI"]);
@@ -160,7 +121,12 @@ async function promptForProvider(io: ConfigSetupIO): Promise<"openai"> {
 
 async function promptForApiKey(io: ConfigSetupIO): Promise<string> {
   while (true) {
-    const answer = (await io.ask("Enter your OpenAI API key: ")).trim();
+    const answer = (
+      await (io.secret
+        ? io.secret("Enter your OpenAI API key (input hidden): ")
+        : io.ask("Enter your OpenAI API key: "))
+    ).trim();
+
     if (answer.length > 0) {
       return answer;
     }
@@ -189,6 +155,32 @@ async function promptForOverwrite(io: ConfigSetupIO, targetPath: string): Promis
   }
 }
 
+function writeSetupSuccess(io: ConfigSetupIO, writtenPath: string): void {
+  const ui = getSetupPresenter(io);
+
+  io.write(`${ui.success("Setup complete.")}\n`);
+  io.write(`${ui.info(`Wrote machine-wide config to ${writtenPath}`)}\n`);
+  io.write(`${ui.note("Any terminal on this machine can use sift now.")}\n`);
+  io.write(
+    `${ui.note("This is your machine-wide default config. Repo-local sift.config.yaml can still override it later.")}\n`
+  );
+}
+
+function writeOverrideWarning(io: ConfigSetupIO, activeConfigPath: string): void {
+  const ui = getSetupPresenter(io);
+  io.write(
+    `${ui.warning(`Heads-up: ${activeConfigPath} currently overrides this machine-wide config in this directory.`)}\n`
+  );
+}
+
+function writeNextSteps(io: ConfigSetupIO): void {
+  const ui = getSetupPresenter(io);
+
+  io.write(`${ui.section("Try next")}\n`);
+  io.write(`  ${ui.command("sift doctor")}\n`);
+  io.write(`  ${ui.command("sift exec --preset test-status -- pytest")}\n`);
+}
+
 export async function configSetup(options: {
   targetPath?: string;
   global?: boolean;
@@ -196,6 +188,8 @@ export async function configSetup(options: {
 } = {}): Promise<number> {
   void options.global;
   const io = options.io ?? createTerminalIO();
+  const ui = getSetupPresenter(io);
+
   try {
     if (!io.stdinIsTTY || !io.stdoutIsTTY) {
       io.error(
@@ -204,12 +198,14 @@ export async function configSetup(options: {
       return 1;
     }
 
+    io.write(`${ui.welcome("Let's keep the expensive model for the interesting bits.")}\n`);
+
     const resolvedPath = resolveSetupPath(options.targetPath);
 
     if (fs.existsSync(resolvedPath)) {
       const shouldOverwrite = await promptForOverwrite(io, resolvedPath);
       if (!shouldOverwrite) {
-        io.write("Aborted.\n");
+        io.write(`${ui.note("Aborted.")}\n`);
         return 1;
       }
     }
@@ -220,11 +216,11 @@ export async function configSetup(options: {
       return 1;
     }
 
-    io.write("Using OpenAI defaults.\n");
-    io.write("Default model: gpt-5-nano\n");
-    io.write("Default base URL: https://api.openai.com/v1\n");
+    io.write(`${ui.info("Using OpenAI defaults.")}\n`);
+    io.write(`${ui.labelValue("Default model", "gpt-5-nano")}\n`);
+    io.write(`${ui.labelValue("Default base URL", "https://api.openai.com/v1")}\n`);
     io.write(
-      "You can change these later by editing the config file or running 'sift config show --show-secrets'.\n"
+      `${ui.note("You can change these later with 'sift config show --show-secrets' or by editing the config file.")}\n`
     );
 
     const apiKey = await promptForApiKey(io);
@@ -235,20 +231,14 @@ export async function configSetup(options: {
       overwrite: true
     });
 
-    io.write(`Wrote ${writtenPath}\n`);
-    io.write(
-      "This is your machine-wide default config. Repo-local sift.config.yaml can still override it later.\n"
-    );
+    writeSetupSuccess(io, writtenPath);
+
     const activeConfigPath = findConfigPath();
     if (activeConfigPath && path.resolve(activeConfigPath) !== path.resolve(writtenPath)) {
-      io.write(
-        `Note: ${activeConfigPath} currently overrides this machine-wide config in the current directory.\n`
-      );
+      writeOverrideWarning(io, activeConfigPath);
     }
-    io.write("Try:\n");
-    io.write("  sift doctor\n");
-    io.write("  sift exec --preset test-status -- pytest\n");
 
+    writeNextSteps(io);
     return 0;
   } finally {
     io.close?.();

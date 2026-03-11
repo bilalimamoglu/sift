@@ -14,6 +14,7 @@ describe("CLI smoke", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("  \\\\  //");
     expect(result.stdout).toContain("sift [question]");
+    expect(result.stdout).toContain("Trim the noise. Keep the signal.");
     expect(result.stdout).toContain("Provider: openai | openai-compatible");
     expect(result.stdout).toContain("SIFT_PROVIDER_API_KEY");
     expect(result.stdout).toContain("OPENAI_API_KEY");

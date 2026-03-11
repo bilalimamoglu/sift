@@ -20,6 +20,7 @@ import {
 import { readStdin } from "./core/stdin.js";
 import { runSift } from "./core/run.js";
 import { getPreset } from "./prompts/presets.js";
+import { createPresentation } from "./ui/presentation.js";
 import type {
   JsonResponseFormatMode,
   OutputFormat,
@@ -30,12 +31,6 @@ import type {
 const require = createRequire(import.meta.url);
 const pkg = require("../package.json") as { version: string };
 const cli = cac("sift");
-const HELP_BANNER = [
-  "   \\\\  //",
-  "    \\\\//",
-  "     ||",
-  "     o"
-].join("\n");
 
 function toNumber(value: unknown): number | undefined {
   if (value === undefined || value === null || value === "") {
@@ -243,7 +238,7 @@ async function executeExec(args: {
 }
 
 applySharedOptions(
-  cli.command("preset <name>", "Run a named preset against piped CLI output")
+  cli.command("preset <name>", "Run a named preset against piped output")
 )
   .usage("preset <name> [options]")
   .example("preset test-status < test-output.txt")
@@ -272,7 +267,7 @@ applySharedOptions(
 
 applySharedOptions(
   cli
-    .command("exec [question]", "Run a command and reduce its output")
+    .command("exec [question]", "Run a command and shrink its output for the model")
     .allowUnknownOptions()
 )
   .usage("exec [question] [options] -- <program> [args...]")
@@ -336,7 +331,7 @@ applySharedOptions(
 cli
   .command(
     "config <action>",
-    "Config commands: setup | init | show | validate (show/validate use resolved runtime config)"
+    "Config commands: setup | init | show | validate"
   )
   .usage("config <setup|init|show|validate> [options]")
   .example("config setup")
@@ -387,7 +382,7 @@ cli
   });
 
 cli
-  .command("doctor", "Check local runtime config completeness")
+  .command("doctor", "Check which config is active and whether local setup looks complete")
   .usage("doctor [options]")
   .option("--config <path>", "Path to config file")
   .action((options: Record<string, unknown>) => {
@@ -431,7 +426,7 @@ cli
   });
 
 applySharedOptions(
-  cli.command("[question]", "Ask a freeform question about piped CLI output")
+  cli.command("[question]", "Ask a question about piped output")
 ).action(async (question: string | undefined, options: Record<string, unknown>) => {
   if (!question) {
     throw new Error("Missing question.");
@@ -447,7 +442,7 @@ applySharedOptions(
 
 cli.help((sections) => [
   {
-    body: `${HELP_BANNER}\n`
+    body: `${createPresentation(Boolean(process.stdout.isTTY)).banner(pkg.version)}\n`
   },
   ...sections
 ]);
@@ -459,7 +454,13 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : "Unexpected error.";
+  const message = error instanceof Error ? error.message : "Unexpected error.";
+
+  if (process.stderr.isTTY) {
+    process.stderr.write(`${createPresentation(true).error(message)}\n`);
+  } else {
     process.stderr.write(`${message}\n`);
-    process.exitCode = 1;
-  });
+  }
+
+  process.exitCode = 1;
+});

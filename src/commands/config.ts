@@ -1,6 +1,7 @@
 import { findConfigPath } from "../config/load.js";
 import { resolveConfig } from "../config/resolve.js";
 import { writeExampleConfig } from "../config/write.js";
+import { createPresentation } from "../ui/presentation.js";
 export { configSetup, resolveSetupPath } from "./config-setup.js";
 
 const MASKED_SECRET = "***";
@@ -33,7 +34,16 @@ export function configInit(targetPath?: string, global = false): void {
     targetPath,
     global
   });
-  process.stdout.write(`${path}\n`);
+
+  if (!process.stdout.isTTY) {
+    process.stdout.write(`${path}\n`);
+    return;
+  }
+
+  const ui = createPresentation(true);
+  process.stdout.write(
+    `${ui.success(`${global ? "Machine-wide" : "Template"} config written to ${path}`)}\n`
+  );
 }
 
 export function configShow(configPath?: string, showSecrets = false): void {
@@ -52,7 +62,13 @@ export function configValidate(configPath?: string): void {
   });
 
   const resolvedPath = findConfigPath(configPath);
-  process.stdout.write(
-    `Resolved config is valid${resolvedPath ? ` (${resolvedPath})` : " (using defaults)" }.\n`
-  );
+  const message = `Resolved config is valid${resolvedPath ? ` (${resolvedPath})` : " (using defaults)" }.`;
+
+  if (!process.stdout.isTTY) {
+    process.stdout.write(`${message}\n`);
+    return;
+  }
+
+  const ui = createPresentation(true);
+  process.stdout.write(`${ui.success(message)}\n`);
 }

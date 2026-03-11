@@ -1,18 +1,21 @@
 import { getProviderApiKeyEnvNames } from "../config/provider-api-key.js";
 import type { SiftConfig } from "../types.js";
+import { createPresentation } from "../ui/presentation.js";
 
 export function runDoctor(config: SiftConfig, configPath?: string | null): number {
+  const ui = createPresentation(Boolean(process.stdout.isTTY));
   const lines = [
     "sift doctor",
+    "A quick check for your local setup.",
     "mode: local config completeness check",
-    `configPath: ${configPath ?? "(defaults only)"}`,
-    `provider: ${config.provider.provider}`,
-    `model: ${config.provider.model}`,
-    `baseUrl: ${config.provider.baseUrl}`,
-    `apiKey: ${config.provider.apiKey ? "set" : "not set"}`,
-    `maxCaptureChars: ${config.input.maxCaptureChars}`,
-    `maxInputChars: ${config.input.maxInputChars}`,
-    `rawFallback: ${config.runtime.rawFallback}`
+    ui.labelValue("configPath", configPath ?? "(defaults only)"),
+    ui.labelValue("provider", config.provider.provider),
+    ui.labelValue("model", config.provider.model),
+    ui.labelValue("baseUrl", config.provider.baseUrl),
+    ui.labelValue("apiKey", config.provider.apiKey ? "set" : "not set"),
+    ui.labelValue("maxCaptureChars", String(config.input.maxCaptureChars)),
+    ui.labelValue("maxInputChars", String(config.input.maxInputChars)),
+    ui.labelValue("rawFallback", String(config.runtime.rawFallback))
   ];
 
   process.stdout.write(`${lines.join("\n")}\n`);
@@ -42,7 +45,14 @@ export function runDoctor(config: SiftConfig, configPath?: string | null): numbe
   }
 
   if (problems.length > 0) {
-    process.stderr.write(`${problems.join("\n")}\n`);
+    if (process.stderr.isTTY) {
+      const errorUi = createPresentation(true);
+      process.stderr.write(
+        `${problems.map((problem) => errorUi.error(problem)).join("\n")}\n`
+      );
+    } else {
+      process.stderr.write(`${problems.join("\n")}\n`);
+    }
     return 1;
   }
 
