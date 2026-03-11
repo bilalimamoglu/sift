@@ -52,6 +52,46 @@ describe("CLI smoke", () => {
     expect(validate.stdout).toContain("Resolved config is valid");
   });
 
+  it("fails clearly for non-interactive config setup", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-setup-"));
+    const configPath = path.join(dir, "sift.config.yaml");
+
+    const result = runCli({
+      args: ["config", "setup", "--path", configPath]
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("sift config setup is interactive and requires a TTY");
+    expect(result.stderr).toContain("sift config init --global");
+  });
+
+  it("supports machine-wide config init via --global", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-home-"));
+    const expectedPath = path.join(home, ".config", "sift", "config.yaml");
+
+    const init = runCli({
+      args: ["config", "init", "--global"],
+      useDist: true,
+      env: {
+        HOME: home
+      }
+    });
+
+    const validate = runCli({
+      args: ["config", "validate"],
+      useDist: true,
+      cwd: home,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(init.status).toBe(0);
+    expect(init.stdout.trim()).toBe(expectedPath);
+    expect(validate.status).toBe(0);
+    expect(validate.stdout).toContain(expectedPath);
+  });
+
   it("masks secrets in config show by default and reveals them with --show-secrets", async () => {
     const masked = runCli({
       args: ["config", "show"],
@@ -245,6 +285,92 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("baseUrl: https://example.test/v1");
   });
 
+  it("isolates ambient provider env vars from CLI child processes", async () => {
+    const previousProvider = process.env.SIFT_PROVIDER;
+    const previousApiKey = process.env.OPENAI_API_KEY;
+
+    process.env.SIFT_PROVIDER = "openai";
+    process.env.OPENAI_API_KEY = "ambient-key";
+
+    try {
+      const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
+      const result = runCli({
+        args: ["doctor"],
+        useDist: true,
+        cwd,
+        env: {
+          SIFT_BASE_URL: "https://example.test/v1",
+          SIFT_MODEL: "env-model"
+        }
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain("configPath: (defaults only)");
+      expect(result.stdout).toContain("provider: openai");
+      expect(result.stdout).toContain("apiKey: not set");
+    } finally {
+      if (previousProvider === undefined) {
+        delete process.env.SIFT_PROVIDER;
+      } else {
+        process.env.SIFT_PROVIDER = previousProvider;
+      }
+
+      if (previousApiKey === undefined) {
+        delete process.env.OPENAI_API_KEY;
+      } else {
+        process.env.OPENAI_API_KEY = previousApiKey;
+      }
+    }
+  });
+
+  it("isolates ambient HOME-based global config from CLI child processes", async () => {
+    const previousHome = process.env.HOME;
+    const ambientHome = await fs.mkdtemp(path.join(os.tmpdir(), "sift-ambient-home-"));
+    const ambientConfigPath = path.join(
+      ambientHome,
+      ".config",
+      "sift",
+      "config.yaml"
+    );
+    await fs.mkdir(path.dirname(ambientConfigPath), { recursive: true });
+    await fs.writeFile(
+      ambientConfigPath,
+      [
+        "provider:",
+        "  provider: openai",
+        "  model: leaked-model",
+        "  baseUrl: https://api.openai.com/v1",
+        "  apiKey: leaked-key"
+      ].join("\n"),
+      "utf8"
+    );
+
+    process.env.HOME = ambientHome;
+
+    try {
+      const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
+      const result = runCli({
+        args: ["doctor"],
+        useDist: true,
+        cwd
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain("configPath: (defaults only)");
+      expect(result.stdout).toContain("provider: openai");
+      expect(result.stdout).toContain("model: gpt-5-nano");
+      expect(result.stdout).toContain("apiKey: not set");
+      expect(result.stdout).not.toContain("leaked-model");
+      expect(result.stdout).not.toContain("leaked-key");
+    } finally {
+      if (previousHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = previousHome;
+      }
+    }
+  });
+
   it("accepts OPENAI_API_KEY for the openai provider", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
     const result = runCli({
@@ -284,17 +410,20 @@ describe("CLI smoke", () => {
 
   it("fails doctor when api key is missing for openai-compatible", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-home-"));
     const result = runCli({
       args: ["doctor"],
       useDist: true,
       cwd,
       env: {
+        HOME: home,
         SIFT_BASE_URL: "https://example.test/v1",
         SIFT_MODEL: "env-model"
       }
     });
 
     expect(result.status).toBe(1);
+    expect(result.stdout).toContain("configPath: (defaults only)");
     expect(result.stdout).toContain("apiKey: not set");
     expect(result.stderr).toContain("Missing provider.apiKey");
     expect(result.stderr).toContain("SIFT_PROVIDER_API_KEY");

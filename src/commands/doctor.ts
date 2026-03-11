@@ -1,10 +1,11 @@
 import { getProviderApiKeyEnvNames } from "../config/provider-api-key.js";
 import type { SiftConfig } from "../types.js";
 
-export function runDoctor(config: SiftConfig): number {
+export function runDoctor(config: SiftConfig, configPath?: string | null): number {
   const lines = [
     "sift doctor",
     "mode: local config completeness check",
+    `configPath: ${configPath ?? "(defaults only)"}`,
     `provider: ${config.provider.provider}`,
     `model: ${config.provider.model}`,
     `baseUrl: ${config.provider.baseUrl}`,

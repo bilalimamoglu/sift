@@ -1,9 +1,20 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { spawn } from "node:child_process";
 import { repoRoot } from "./helpers/cli.js";
 import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
 
 describe("README quick start acceptance", () => {
+  it("documents guided one-time setup", async () => {
+    const readme = await fs.readFile(path.join(repoRoot(), "README.md"), "utf8");
+
+    expect(readme).toContain("sift config setup");
+    expect(readme).toContain("~/.config/sift/config.yaml");
+    expect(readme).toContain("repo-local config can still override it");
+  });
+
   it("supports the documented quick-start commands", async () => {
     const server = await createFakeOpenAIServer((_body, index, request) => {
       const payloads = [
@@ -41,8 +52,10 @@ describe("README quick start acceptance", () => {
 
     try {
       const cli = [process.execPath, "dist/cli.js"];
+      const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-docs-home-"));
       const env = {
-        ...process.env,
+        PATH: process.env.PATH,
+        HOME: home,
         SIFT_PROVIDER: "openai",
         SIFT_BASE_URL: server.baseUrl,
         OPENAI_API_KEY: "test-key",

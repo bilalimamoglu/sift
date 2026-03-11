@@ -26,7 +26,21 @@ npm install -g @bilalimamoglu/sift
 
 ## One-time setup
 
-For OpenAI-hosted models:
+The easiest path is the guided setup:
+
+```bash
+sift config setup
+```
+
+That writes a machine-wide config to:
+
+```text
+~/.config/sift/config.yaml
+```
+
+After that, any terminal can use `sift` without per-project setup. A repo-local config can still override it later.
+
+If you want to set things up manually, for OpenAI-hosted models:
 
 ```bash
 export SIFT_PROVIDER=openai
@@ -35,10 +49,28 @@ export SIFT_MODEL=gpt-5-nano
 export OPENAI_API_KEY=your_openai_api_key
 ```
 
-Or generate a config file:
+Or write a template config file:
 
 ```bash
 sift config init
+```
+
+For a manual machine-wide template:
+
+```bash
+sift config init --global
+```
+
+That writes:
+
+```text
+~/.config/sift/config.yaml
+```
+
+Then keep the API key in your shell profile so every terminal can use it:
+
+```bash
+export OPENAI_API_KEY=your_openai_api_key
 ```
 
 If you use a different OpenAI-compatible endpoint, switch to `provider: openai-compatible` and use either the endpoint's native API key env var or the generic fallback:
@@ -126,6 +158,7 @@ Built-in JSON and verdict flows return strict error objects on provider or model
 Useful commands:
 
 ```bash
+sift config setup
 sift config init
 sift config show
 sift config validate

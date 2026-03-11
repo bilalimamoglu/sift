@@ -1,6 +1,7 @@
 import { findConfigPath } from "../config/load.js";
 import { resolveConfig } from "../config/resolve.js";
 import { writeExampleConfig } from "../config/write.js";
+export { configSetup, resolveSetupPath } from "./config-setup.js";
 
 const MASKED_SECRET = "***";
 
@@ -27,8 +28,11 @@ function maskConfigSecrets(value: unknown): unknown {
   return output;
 }
 
-export function configInit(targetPath?: string): void {
-  const path = writeExampleConfig(targetPath);
+export function configInit(targetPath?: string, global = false): void {
+  const path = writeExampleConfig({
+    targetPath,
+    global
+  });
   process.stdout.write(`${path}\n`);
 }
 

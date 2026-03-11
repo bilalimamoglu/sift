@@ -28,6 +28,10 @@ describe("packaging smoke", () => {
 
     const result = spawnSync("npx", ["--no-install", "sift", "--help"], {
       cwd: dir,
+      env: {
+        ...process.env,
+        HOME: await fs.mkdtemp(path.join(os.tmpdir(), "sift-pack-home-"))
+      },
       encoding: "utf8"
     });
 

@@ -1,10 +1,16 @@
 #!/usr/bin/env node
 import { createRequire } from "node:module";
 import { cac } from "cac";
-import { configInit, configShow, configValidate } from "./commands/config.js";
+import {
+  configInit,
+  configSetup,
+  configShow,
+  configValidate
+} from "./commands/config.js";
 import { runDoctor } from "./commands/doctor.js";
 import { listPresets, showPreset } from "./commands/presets.js";
 import { resolveConfig } from "./config/resolve.js";
+import { findConfigPath } from "./config/load.js";
 import { runExec } from "./core/exec.js";
 import {
   assertSupportedFailOnFormat,
@@ -330,18 +336,37 @@ applySharedOptions(
 cli
   .command(
     "config <action>",
-    "Config commands: init | show | validate (show/validate use resolved runtime config)"
+    "Config commands: setup | init | show | validate (show/validate use resolved runtime config)"
   )
-  .usage("config <init|show|validate> [options]")
+  .usage("config <setup|init|show|validate> [options]")
+  .example("config setup")
+  .example("config setup --global")
+  .example("config setup --path ~/.config/sift/config.yaml")
   .example("config init")
+  .example("config init --global")
   .example("config show")
   .example("config validate --config ./sift.config.yaml")
-  .option("--path <path>", "Target config path for init")
+  .option("--path <path>", "Target config path for init or setup")
+  .option(
+    "--global",
+    "Use the machine-wide config path (~/.config/sift/config.yaml) for init or setup"
+  )
   .option("--config <path>", "Path to config file")
   .option("--show-secrets", "Show secret values in config show")
-  .action((action: string, options: Record<string, unknown>) => {
+  .action(async (action: string, options: Record<string, unknown>) => {
+    if (action === "setup") {
+      process.exitCode = await configSetup({
+        targetPath: options.path as string | undefined,
+        global: Boolean(options.global)
+      });
+      return;
+    }
+
     if (action === "init") {
-      configInit(options.path as string | undefined);
+      configInit(
+        options.path as string | undefined,
+        Boolean(options.global)
+      );
       return;
     }
 
@@ -366,12 +391,13 @@ cli
   .usage("doctor [options]")
   .option("--config <path>", "Path to config file")
   .action((options: Record<string, unknown>) => {
+    const configPath = findConfigPath(options.config as string | undefined);
     const config = resolveConfig({
       configPath: options.config as string | undefined,
       env: process.env
     });
 
-    process.exitCode = runDoctor(config);
+    process.exitCode = runDoctor(config, configPath);
   });
 
 cli
