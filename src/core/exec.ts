@@ -110,6 +110,22 @@ function buildCommandPreview(request: ExecRequest): string {
   return (request.command ?? []).join(" ");
 }
 
+function getExecSuccessShortcut(args: {
+  presetName?: string;
+  exitCode: number;
+  capturedOutput: string;
+}): string | null {
+  if (args.exitCode !== 0) {
+    return null;
+  }
+
+  if (args.presetName === "typecheck-summary" && args.capturedOutput.trim() === "") {
+    return "No type errors.";
+  }
+
+  return null;
+}
+
 export async function runExec(request: ExecRequest): Promise<number> {
   const hasArgvCommand = Array.isArray(request.command) && request.command.length > 0;
   const hasShellCommand = typeof request.shellCommand === "string";
@@ -192,6 +208,7 @@ export async function runExec(request: ExecRequest): Promise<number> {
   }
 
   const exitCode = normalizeChildExitCode(childStatus, childSignal);
+  const capturedOutput = capture.render();
 
   if (request.config.runtime.verbose) {
     process.stderr.write(
@@ -200,9 +217,26 @@ export async function runExec(request: ExecRequest): Promise<number> {
   }
 
   if (!bypassed) {
+    const execSuccessShortcut = getExecSuccessShortcut({
+      presetName: request.presetName,
+      exitCode,
+      capturedOutput
+    });
+
+    if (execSuccessShortcut && !request.dryRun) {
+      if (request.config.runtime.verbose) {
+        process.stderr.write(
+          `${pc.dim("sift")} exec_shortcut=${request.presetName}\n`
+        );
+      }
+
+      process.stdout.write(`${execSuccessShortcut}\n`);
+      return exitCode;
+    }
+
     const output = await runSift({
       ...request,
-      stdin: capture.render()
+      stdin: capturedOutput
     });
 
     process.stdout.write(`${output}\n`);

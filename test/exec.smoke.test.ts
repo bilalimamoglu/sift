@@ -456,6 +456,24 @@ describe("exec mode", () => {
     }
   });
 
+  it("returns a short success answer for silent typecheck success", async () => {
+    const result = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "typecheck-summary",
+        "--",
+        "node",
+        "-e",
+        "process.exit(0)"
+      ]
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("No type errors.");
+    expect(result.stderr).toBe("");
+  });
+
   it("supports lint-failures preset exec flows", async () => {
     const server = await createFakeOpenAIServer(() => ({
       body: {
