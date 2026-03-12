@@ -30,10 +30,12 @@ describe("README quick start acceptance", () => {
     expect(readme).toContain("PGTEST_POSTGRES_DSN");
     expect(readme).toContain("landing-gallery");
     expect(readme).toContain("npm run bench:test-status-ab");
+    expect(readme).toContain("npm run bench:test-status-live");
     expect(readme).toContain("Use `standard` for the full suite first.");
     expect(readme).toContain("Use `sift escalate` only when you want a deeper render of the same cached output");
     expect(readme).toContain("After fixing something, run `sift rerun` to refresh the full-suite truth");
     expect(readme).toContain("Only then use `sift rerun --remaining --detail focused`");
+    expect(readme).toContain("Decision: stop and act");
   });
 
   it("supports the documented quick-start commands", async () => {

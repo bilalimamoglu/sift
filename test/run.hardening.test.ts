@@ -47,7 +47,11 @@ describe("runSift hardening", () => {
     expect(JSON.parse(output)).toEqual({
       status: "error",
       reason: "Provider returned HTTP 429",
-      retriable: true
+      retriable: true,
+      provider_failed: true,
+      raw_needed: true,
+      why_raw_needed:
+        "Provider follow-up failed, so the reduced answer may still need exact raw evidence."
     });
   });
 
@@ -71,7 +75,11 @@ describe("runSift hardening", () => {
       reason: "Sift fallback: Provider returned HTTP 429",
       retriable: true,
       verdict: "unclear",
-      evidence: []
+      evidence: [],
+      provider_failed: true,
+      raw_needed: true,
+      why_raw_needed:
+        "Provider follow-up failed, so the reduced answer may still need exact raw evidence."
     });
   });
 
@@ -103,7 +111,11 @@ describe("runSift hardening", () => {
     expect(JSON.parse(output)).toEqual({
       status: "error",
       reason: "Model output rejected by quality gate",
-      retriable: false
+      retriable: false,
+      provider_failed: true,
+      raw_needed: true,
+      why_raw_needed:
+        "Provider follow-up failed, so the reduced answer may still need exact raw evidence."
     });
   });
 

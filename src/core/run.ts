@@ -13,9 +13,12 @@ import { isRetriableReason, looksLikeRejectedModelOutput } from "./quality.js";
 import {
   buildTestStatusAnalysisContext,
   buildTestStatusDiagnoseContract,
+  parseTestStatusProviderSupplement,
   TEST_STATUS_DIAGNOSE_JSON_CONTRACT,
+  TEST_STATUS_PROVIDER_SUPPLEMENT_JSON_CONTRACT,
   type TestStatusDiagnoseContract
 } from "./testStatusDecision.js";
+import { buildGenericRawSlice, buildTestStatusRawSlice } from "./rawSlice.js";
 
 const RETRY_DELAY_MS = 300;
 
@@ -167,52 +170,90 @@ function buildTestStatusFallbackContract(args: {
   );
 }
 
+function renderTestStatusDecisionOutput(args: {
+  request: RunRequest;
+  decision: ReturnType<typeof buildTestStatusDiagnoseContract>;
+}): string {
+  if (args.request.goal === "diagnose" && args.request.format === "json") {
+    return JSON.stringify(args.decision.contract, null, 2);
+  }
+
+  if (args.request.detail === "verbose") {
+    return args.decision.verboseText;
+  }
+
+  if (args.request.detail === "focused") {
+    return args.decision.focusedText;
+  }
+
+  return args.decision.standardText;
+}
+
+function buildTestStatusProviderFailureDecision(args: {
+  request: RunRequest;
+  baseDecision: ReturnType<typeof buildTestStatusDiagnoseContract>;
+  input: string;
+  analysis: ReturnType<typeof analyzeTestStatus>;
+  reason: string;
+  rawSliceUsed: boolean;
+  rawSliceStrategy: ReturnType<typeof buildTestStatusRawSlice>["strategy"];
+}): ReturnType<typeof buildTestStatusDiagnoseContract> {
+  const shouldZoomFirst = args.request.detail !== "verbose";
+
+  return buildTestStatusDiagnoseContract({
+    input: args.input,
+    analysis: args.analysis,
+    resolvedTests: args.baseDecision.contract.resolved_tests,
+    remainingTests: args.baseDecision.contract.remaining_tests,
+    contractOverrides: {
+      ...args.baseDecision.contract,
+      diagnosis_complete: false,
+      raw_needed: true,
+      additional_source_read_likely_low_value: false,
+      read_raw_only_if: shouldZoomFirst
+        ? "the provider follow-up failed and one deeper sift pass still is not enough"
+        : "the provider follow-up failed and you still need exact traceback lines",
+      decision: shouldZoomFirst ? "zoom" : "read_raw",
+      provider_used: true,
+      provider_confidence: null,
+      provider_failed: true,
+      raw_slice_used: args.rawSliceUsed,
+      raw_slice_strategy: args.rawSliceStrategy,
+      next_best_action: {
+        code: shouldZoomFirst ? "insufficient_signal" : "read_raw_for_exact_traceback",
+        bucket_index:
+          args.baseDecision.contract.dominant_blocker_bucket_index ??
+          args.baseDecision.contract.main_buckets[0]?.bucket_index ??
+          null,
+        note: shouldZoomFirst
+          ? `Provider follow-up failed (${args.reason}). Use one deeper sift pass on the same cached output before reading raw traceback lines.`
+          : `Provider follow-up failed (${args.reason}). Read raw traceback only if exact stack lines are still needed.`
+      }
+    }
+  });
+}
+
 export async function runSift(request: RunRequest): Promise<string> {
   const prepared = prepareInput(request.stdin, request.config.input);
+  const provider = createProvider(request.config);
   const hasTestStatusSignal =
     request.policyName === "test-status" && hasRecognizableTestStatusSignal(prepared.truncated);
+  const testStatusAnalysis = hasTestStatusSignal ? analyzeTestStatus(prepared.truncated) : null;
   const testStatusDecision =
-    hasTestStatusSignal && request.policyName === "test-status"
+    hasTestStatusSignal && testStatusAnalysis
       ? buildTestStatusDiagnoseContract({
           input: prepared.truncated,
-          analysis: analyzeTestStatus(prepared.truncated),
+          analysis: testStatusAnalysis,
           resolvedTests: request.testStatusContext?.resolvedTests,
           remainingTests: request.testStatusContext?.remainingTests
         })
       : null;
-  const testStatusHeuristicOutput =
-    testStatusDecision === null
-      ? null
-      : request.goal === "diagnose" && request.format === "json"
-        ? JSON.stringify(testStatusDecision.contract, null, 2)
-        : request.detail === "verbose"
-          ? testStatusDecision.verboseText
-          : request.detail === "focused"
-            ? testStatusDecision.focusedText
-            : testStatusDecision.standardText;
-  const prompt = buildPrompt({
-    question: request.question,
-    format: request.format,
-    goal: request.goal,
-    input: prepared.truncated,
-    detail: request.detail,
-    policyName: request.policyName,
-    outputContract:
-      request.policyName === "test-status" &&
-      request.goal === "diagnose" &&
-      request.format === "json"
-        ? request.outputContract ?? TEST_STATUS_DIAGNOSE_JSON_CONTRACT
-        : request.outputContract,
-    analysisContext: [
-      request.analysisContext,
-      testStatusDecision ? buildTestStatusAnalysisContext(testStatusDecision.contract) : undefined
-    ]
-      .filter((value): value is string => Boolean(value))
-      .join("\n\n")
-  });
-  const { responseMode } = prompt;
-
-  const provider = createProvider(request.config);
+  const testStatusHeuristicOutput = testStatusDecision
+    ? renderTestStatusDecisionOutput({
+        request,
+        decision: testStatusDecision
+      })
+    : null;
 
   if (request.config.runtime.verbose) {
     process.stderr.write(
@@ -232,12 +273,33 @@ export async function runSift(request: RunRequest): Promise<string> {
       process.stderr.write(`${pc.dim("sift")} heuristic=${request.policyName}\n`);
     }
 
+    const heuristicPrompt = buildPrompt({
+      question: request.question,
+      format: request.format,
+      goal: request.goal,
+      input: prepared.truncated,
+      detail: request.detail,
+      policyName: request.policyName,
+      outputContract:
+        request.policyName === "test-status" &&
+        request.goal === "diagnose" &&
+        request.format === "json"
+          ? request.outputContract ?? TEST_STATUS_DIAGNOSE_JSON_CONTRACT
+          : request.outputContract,
+      analysisContext: [
+        request.analysisContext,
+        testStatusDecision ? buildTestStatusAnalysisContext(testStatusDecision.contract) : undefined
+      ]
+        .filter((value): value is string => Boolean(value))
+        .join("\n\n")
+    });
+
     if (request.dryRun) {
       return buildDryRunOutput({
         request,
         providerName: provider.name,
-        prompt: prompt.prompt,
-        responseMode,
+        prompt: heuristicPrompt.prompt,
+        responseMode: heuristicPrompt.responseMode,
         prepared,
         heuristicOutput,
         strategy: "heuristic"
@@ -251,13 +313,143 @@ export async function runSift(request: RunRequest): Promise<string> {
     });
   }
 
+  if (testStatusDecision && testStatusAnalysis) {
+    const rawSlice = buildTestStatusRawSlice({
+      input: prepared.redacted,
+      config: request.config.input,
+      contract: testStatusDecision.contract
+    });
+    const prompt = buildPrompt({
+      question:
+        "Complete the diagnosis. Use the heuristic extract as the bucket truth and only change the decision when the sliced command output proves it.",
+      format: "json",
+      goal: "diagnose",
+      input: rawSlice.text,
+      detail: request.detail,
+      policyName: "test-status",
+      outputContract: TEST_STATUS_PROVIDER_SUPPLEMENT_JSON_CONTRACT,
+      analysisContext: [
+        request.analysisContext,
+        buildTestStatusAnalysisContext({
+          ...testStatusDecision.contract,
+          provider_used: true,
+          provider_failed: false,
+          raw_slice_used: rawSlice.used,
+          raw_slice_strategy: rawSlice.strategy
+        })
+      ]
+        .filter((value): value is string => Boolean(value))
+        .join("\n\n")
+    });
+    const providerPrepared = {
+      ...prepared,
+      truncated: rawSlice.text,
+      meta: {
+        ...prepared.meta,
+        finalLength: rawSlice.text.length,
+        truncatedApplied: rawSlice.used || prepared.meta.truncatedApplied
+      }
+    };
+
+    if (request.dryRun) {
+      return buildDryRunOutput({
+        request,
+        providerName: provider.name,
+        prompt: prompt.prompt,
+        responseMode: prompt.responseMode,
+        prepared: providerPrepared,
+        heuristicOutput: testStatusHeuristicOutput,
+        strategy: "hybrid"
+      });
+    }
+
+    try {
+      const result = await generateWithRetry({
+        provider,
+        request,
+        prompt: prompt.prompt,
+        responseMode: prompt.responseMode
+      });
+      const supplement = parseTestStatusProviderSupplement(result.text);
+      const mergedDecision = buildTestStatusDiagnoseContract({
+        input: prepared.truncated,
+        analysis: testStatusAnalysis,
+        resolvedTests: request.testStatusContext?.resolvedTests,
+        remainingTests: request.testStatusContext?.remainingTests,
+        contractOverrides: {
+          diagnosis_complete: supplement.diagnosis_complete,
+          raw_needed: supplement.raw_needed,
+          additional_source_read_likely_low_value:
+            supplement.additional_source_read_likely_low_value,
+          read_raw_only_if: supplement.read_raw_only_if,
+          decision: supplement.decision,
+          provider_used: true,
+          provider_confidence: supplement.provider_confidence,
+          provider_failed: false,
+          raw_slice_used: rawSlice.used,
+          raw_slice_strategy: rawSlice.strategy,
+          next_best_action: supplement.next_best_action
+        }
+      });
+
+      return renderTestStatusDecisionOutput({
+        request,
+        decision: mergedDecision
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "unknown_error";
+      const failureDecision = buildTestStatusProviderFailureDecision({
+        request,
+        baseDecision: testStatusDecision,
+        input: prepared.truncated,
+        analysis: testStatusAnalysis,
+        reason,
+        rawSliceUsed: rawSlice.used,
+        rawSliceStrategy: rawSlice.strategy
+      });
+
+      if (request.goal === "diagnose" && request.format === "json") {
+        return JSON.stringify(failureDecision.contract, null, 2);
+      }
+
+      return renderTestStatusDecisionOutput({
+        request,
+        decision: failureDecision
+      });
+    }
+  }
+
+  const genericRawSlice = buildGenericRawSlice({
+    input: prepared.redacted,
+    config: request.config.input
+  });
+  const providerPrompt = buildPrompt({
+    question: request.question,
+    format: request.format,
+    goal: request.goal,
+    input: genericRawSlice.text,
+    detail: request.detail,
+    policyName: request.policyName,
+    outputContract: request.outputContract,
+    analysisContext: request.analysisContext
+  });
+  const providerPrepared = {
+    ...prepared,
+    truncated: genericRawSlice.text,
+    meta: {
+      ...prepared.meta,
+      finalLength: genericRawSlice.text.length,
+      truncatedApplied: genericRawSlice.used || prepared.meta.truncatedApplied
+    }
+  };
+
   if (request.dryRun) {
     return buildDryRunOutput({
       request,
       providerName: provider.name,
-      prompt: prompt.prompt,
-      responseMode,
-      prepared,
+      prompt: providerPrompt.prompt,
+      responseMode: providerPrompt.responseMode,
+      prepared: providerPrepared,
       heuristicOutput: testStatusDecision ? testStatusHeuristicOutput : null,
       strategy: testStatusDecision ? "hybrid" : "provider"
     });
@@ -267,49 +459,38 @@ export async function runSift(request: RunRequest): Promise<string> {
     const result = await generateWithRetry({
       provider,
       request,
-      prompt: prompt.prompt,
-      responseMode
+      prompt: providerPrompt.prompt,
+      responseMode: providerPrompt.responseMode
     });
 
     if (
       looksLikeRejectedModelOutput({
-        source: prepared.truncated,
+        source: genericRawSlice.text,
         candidate: result.text,
-        responseMode
+        responseMode: providerPrompt.responseMode
       })
     ) {
       throw new Error("Model output rejected by quality gate");
     }
 
     return withInsufficientHint({
-      output: normalizeOutput(result.text, responseMode),
+      output: normalizeOutput(result.text, providerPrompt.responseMode),
       request,
-      prepared
+      prepared: providerPrepared
     });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "unknown_error";
-
-     if (testStatusDecision) {
-      if (request.goal === "diagnose" && request.format === "json") {
-        return buildTestStatusFallbackContract({
-          contract: testStatusDecision.contract,
-          reason
-        });
-      }
-
-      return `${testStatusHeuristicOutput}\n- Provider follow-up failed: ${reason}. Use focused or verbose detail, then raw only if exact traceback lines are still needed.`;
-    }
 
     return withInsufficientHint({
       output: buildFallbackOutput({
         format: request.format,
         reason,
-        rawInput: prepared.truncated,
+        rawInput: providerPrepared.truncated,
         rawFallback: request.config.runtime.rawFallback,
         jsonFallback: request.fallbackJson
       }),
       request,
-      prepared
+      prepared: providerPrepared
     });
   }
 }

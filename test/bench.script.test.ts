@@ -47,6 +47,28 @@ type BenchmarkReport = {
       rawFirst: { stepCount: number; chars: number; tokens: number };
     };
   };
+  liveSessions?: Array<{
+    name: string;
+    delta: {
+      tokensSaved: number;
+      charsSaved: number;
+      internalToolUseDelta: number;
+    };
+    acceptance: {
+      outputBudgetBetter: boolean;
+      standardSurfacedDominantBlocker: boolean;
+      standardSurfacedSecondaryBucket: boolean;
+      stopBudgetSatisfied: boolean;
+    };
+  }>;
+  liveAggregate?: {
+    comparisons: {
+      sessions: number;
+      outputBudgetBetterCount: number;
+      internalToolUsesImprovedCount: number;
+      stopBudgetSatisfiedCount: number;
+    };
+  };
 };
 
 function runBenchmark(args: string[]): BenchmarkReport {
@@ -139,5 +161,33 @@ describe("benchmark harness", () => {
     assertBudgetInvariants(report);
     assertMixedFixtureHasBothBuckets(report, "mixed-full-suite");
     assertMixedFixtureHasBothBuckets(report, "mixed-full-suite-real");
+  });
+
+  it("reports live-session scorecards for captured agent transcripts", () => {
+    const report = runBenchmark(["--live"]);
+
+    expect(report.liveSessions).toHaveLength(1);
+    expect(report.liveSessions?.[0]).toMatchObject({
+      name: "mixed-full-suite-live",
+      delta: {
+        tokensSaved: 28926,
+        charsSaved: 70000,
+        internalToolUseDelta: 40
+      },
+      acceptance: {
+        outputBudgetBetter: true,
+        standardSurfacedDominantBlocker: false,
+        standardSurfacedSecondaryBucket: true,
+        stopBudgetSatisfied: false
+      }
+    });
+    expect(report.liveAggregate).toMatchObject({
+      comparisons: {
+        sessions: 1,
+        outputBudgetBetterCount: 1,
+        internalToolUsesImprovedCount: 0,
+        stopBudgetSatisfiedCount: 0
+      }
+    });
   });
 });

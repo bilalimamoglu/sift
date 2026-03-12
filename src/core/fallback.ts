@@ -7,7 +7,10 @@ function buildStructuredError(reason: string) {
   return {
     status: "error" as const,
     reason,
-    retriable: isRetriableReason(reason)
+    retriable: isRetriableReason(reason),
+    provider_failed: true,
+    raw_needed: true,
+    why_raw_needed: "Provider follow-up failed, so the reduced answer may still need exact raw evidence."
   };
 }
 
@@ -36,10 +39,11 @@ export function buildFallbackOutput(args: {
   }
 
   const prefix = `Sift fallback triggered (${args.reason}).`;
+  const rawHint = "Raw may still be needed because provider follow-up failed.";
 
   if (!args.rawFallback) {
-    return prefix;
+    return `${prefix} ${rawHint}`;
   }
 
-  return [prefix, "", args.rawInput.slice(-RAW_FALLBACK_SLICE)].join("\n");
+  return [prefix, rawHint, "", args.rawInput.slice(-RAW_FALLBACK_SLICE)].join("\n");
 }

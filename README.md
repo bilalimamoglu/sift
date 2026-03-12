@@ -117,6 +117,9 @@ Mental model:
 - `sift rerun` = rerun the cached full command at `standard` and prepend what resolved, remained, or changed
 - `sift rerun --remaining` = rerun only the remaining failing pytest node IDs for a zoomed-in view
 - `sift watch` / `sift exec --watch` = treat redraw-style output as cycles and summarize what changed
+- `Decision: stop and act` = trust the current diagnosis and go read or fix code
+- `Decision: zoom` = one deeper sift pass is justified before raw
+- `Decision: raw only if exact traceback is required` = raw is last resort, not the next default step
 
 If you need a machine-readable diagnosis for tests, use:
 
@@ -129,6 +132,12 @@ sift watch --preset test-status --goal diagnose --format json < pytest-watch.txt
 `--goal diagnose --format json` is currently supported only for `test-status`, `rerun`, and `test-status` watch flows.
 
 If you want the older explicit compare shape, `sift exec --preset test-status --diff -- <test command>` still works. `sift rerun` is the shorter normal path for the same idea.
+
+Use `standard` for the full suite first.
+Use `sift escalate` only when you want a deeper render of the same cached output.
+After fixing something, run `sift rerun` to refresh the full-suite truth.
+Only then use `sift rerun --remaining --detail focused`.
+The normal stop budget is `standard` first, then at most one zoom step before raw.
 
 ## Watch mode
 
@@ -195,6 +204,7 @@ Typical shapes:
 - Import/dependency blocker: 114 errors are caused by missing dependencies during test collection.
 - Missing modules include pydantic, fastapi, botocore, PIL, httpx, numpy.
 - Hint: Install the missing dependencies and rerun the affected tests.
+- Decision: stop and act. Do not escalate unless you need exact traceback lines.
 - Next: Fix bucket 1 first, then rerun the full suite at standard.
 - Stop signal: diagnosis complete; raw not needed.
 ```
@@ -208,6 +218,7 @@ Typical shapes:
 - OpenAPI drift includes 4 added landing-gallery paths.
 - Hint: set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-backed tests.
 - Hint: review and regenerate the contract snapshots if these API/model changes are intentional.
+- Decision: stop and act. Do not escalate unless you need exact traceback lines.
 - Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.
 - Stop signal: diagnosis complete; raw not needed.
 ```
@@ -355,11 +366,13 @@ To compare raw pytest output against the `test-status` reduction ladder on fixed
 
 ```bash
 npm run bench:test-status-ab
+npm run bench:test-status-live
 ```
 
 This uses the real `o200k_base` tokenizer and reports both:
 - command-output budget as the primary benchmark
 - deterministic recipe-budget comparisons as supporting evidence only
+- live-session scorecards for captured mixed full-suite agent transcripts
 
 The benchmark is meant to show context-window and command-output reduction first. In normal debugging flows, `test-status` should usually stop at `standard`; `focused` and `verbose` are escalation tools, and raw pytest is the last resort when exact traceback evidence is still needed.
 

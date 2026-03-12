@@ -342,4 +342,146 @@ describe("runSift unit", () => {
       ].join("\n")
     );
   });
+
+  it("uses provider follow-up for incomplete test-status diagnosis and merges the supplement contract", async () => {
+    const incompleteTestStatus = [
+      "=========================== short test summary info ============================",
+      "FAILED tests/unit/test_auth.py::test_refresh",
+      "============================== 1 failed in 0.10s =============================="
+    ].join("\n");
+
+    prepareInputMock.mockReturnValue({
+      raw: incompleteTestStatus,
+      sanitized: incompleteTestStatus,
+      redacted: incompleteTestStatus,
+      truncated: incompleteTestStatus,
+      meta: {
+        originalLength: incompleteTestStatus.length,
+        finalLength: incompleteTestStatus.length,
+        redactionApplied: false,
+        truncatedApplied: false
+      }
+    });
+    buildPromptMock.mockReturnValue({
+      prompt: "PROMPT",
+      responseMode: "json"
+    });
+    createProviderMock.mockReturnValue({
+      name: "openai",
+      generate: vi.fn().mockResolvedValue({
+        text: JSON.stringify({
+          diagnosis_complete: false,
+          raw_needed: false,
+          additional_source_read_likely_low_value: false,
+          read_raw_only_if: null,
+          decision: "zoom",
+          provider_confidence: 0.58,
+          next_best_action: {
+            code: "insufficient_signal",
+            bucket_index: null,
+            note: "Take one deeper sift zoom step before raw."
+          }
+        })
+      })
+    });
+    const { runSift } = await import("../src/core/run.js");
+
+    const output = await runSift(
+      makeRequest({
+        policyName: "test-status",
+        presetName: "test-status",
+        goal: "diagnose",
+        format: "json",
+        config: {
+          ...defaultConfig,
+          input: {
+            ...defaultConfig.input,
+            maxInputChars: 80,
+            headChars: 40,
+            tailChars: 20
+          }
+        }
+      })
+    );
+    const parsed = JSON.parse(output) as {
+      diagnosis_complete: boolean;
+      decision: string;
+      provider_used: boolean;
+      provider_confidence: number;
+      provider_failed: boolean;
+      raw_slice_used: boolean;
+      raw_slice_strategy: string;
+      next_best_action: { note: string };
+    };
+
+    expect(parsed.diagnosis_complete).toBe(false);
+    expect(parsed.decision).toBe("zoom");
+    expect(parsed.provider_used).toBe(true);
+    expect(parsed.provider_confidence).toBe(0.58);
+    expect(parsed.provider_failed).toBe(false);
+    expect(parsed.raw_slice_used).toBe(true);
+    expect(parsed.raw_slice_strategy).toBe("bucket_evidence");
+    expect(parsed.next_best_action.note).toContain("deeper sift zoom");
+    expect(buildPromptMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outputContract: expect.stringContaining('"provider_confidence":number|null')
+      })
+    );
+  });
+
+  it("returns a structured provider failure decision for incomplete test-status runs", async () => {
+    const incompleteTestStatus = [
+      "=========================== short test summary info ============================",
+      "FAILED tests/unit/test_auth.py::test_refresh",
+      "============================== 1 failed in 0.10s =============================="
+    ].join("\n");
+
+    prepareInputMock.mockReturnValue({
+      raw: incompleteTestStatus,
+      sanitized: incompleteTestStatus,
+      redacted: incompleteTestStatus,
+      truncated: incompleteTestStatus,
+      meta: {
+        originalLength: incompleteTestStatus.length,
+        finalLength: incompleteTestStatus.length,
+        redactionApplied: false,
+        truncatedApplied: false
+      }
+    });
+    buildPromptMock.mockReturnValue({
+      prompt: "PROMPT",
+      responseMode: "json"
+    });
+    createProviderMock.mockReturnValue({
+      name: "openai",
+      generate: vi.fn().mockRejectedValue(new Error("HTTP 503"))
+    });
+    const { runSift } = await import("../src/core/run.js");
+
+    const output = await runSift(
+      makeRequest({
+        policyName: "test-status",
+        presetName: "test-status",
+        goal: "diagnose",
+        format: "json"
+      })
+    );
+    const parsed = JSON.parse(output) as {
+      diagnosis_complete: boolean;
+      raw_needed: boolean;
+      decision: string;
+      provider_used: boolean;
+      provider_failed: boolean;
+      provider_confidence: number | null;
+      next_best_action: { note: string };
+    };
+
+    expect(parsed.diagnosis_complete).toBe(false);
+    expect(parsed.raw_needed).toBe(true);
+    expect(parsed.decision).toBe("zoom");
+    expect(parsed.provider_used).toBe(true);
+    expect(parsed.provider_failed).toBe(true);
+    expect(parsed.provider_confidence).toBeNull();
+    expect(parsed.next_best_action.note).toContain("Provider follow-up failed (HTTP 503)");
+  });
 });

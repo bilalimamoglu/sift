@@ -1,6 +1,7 @@
 import pc from "picocolors";
-import { applyHeuristicPolicy } from "./heuristics.js";
+import type { Goal, OutputFormat, PromptPolicyName, SiftConfig } from "../types.js";
 import { buildInsufficientSignalOutput, isInsufficientSignalOutput } from "./insufficient.js";
+import { runSift } from "./run.js";
 import {
   getNextEscalationDetail,
   readCachedTestStatusRun,
@@ -9,6 +10,14 @@ import {
 } from "./testStatusState.js";
 
 export interface EscalateRequest {
+  config: SiftConfig;
+  question: string;
+  format: OutputFormat;
+  goal?: Goal;
+  policyName?: PromptPolicyName;
+  outputContract?: string;
+  fallbackJson?: unknown;
+  dryRun?: boolean;
   detail?: "focused" | "verbose";
   showRaw?: boolean;
   verbose?: boolean;
@@ -37,7 +46,7 @@ function resolveEscalationDetail(
   return nextDetail;
 }
 
-export async function runEscalate(request: EscalateRequest = {}): Promise<number> {
+export async function runEscalate(request: EscalateRequest): Promise<number> {
   const state = readCachedTestStatusRun();
   const detail = resolveEscalationDetail(state, request.detail, request.showRaw);
 
@@ -54,14 +63,19 @@ export async function runEscalate(request: EscalateRequest = {}): Promise<number
     }
   }
 
-  let output =
-    applyHeuristicPolicy("test-status", state.rawOutput, detail) ??
-    buildInsufficientSignalOutput({
-      presetName: "test-status",
-      originalLength: state.capture.originalChars,
-      truncatedApplied: state.capture.truncatedApplied,
-      exitCode: state.exitCode
-    });
+  let output = await runSift({
+    question: request.question,
+    format: request.format,
+    goal: request.goal,
+    stdin: state.rawOutput,
+    config: request.config,
+    dryRun: request.dryRun,
+    detail,
+    presetName: "test-status",
+    policyName: request.policyName ?? "test-status",
+    outputContract: request.outputContract,
+    fallbackJson: request.fallbackJson
+  });
 
   if (isInsufficientSignalOutput(output)) {
     output = buildInsufficientSignalOutput({

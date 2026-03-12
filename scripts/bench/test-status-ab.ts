@@ -11,6 +11,11 @@ import {
   type BenchFixture,
   type BenchCompletionExpectation
 } from "../../test/fixtures/bench/test-status/fixtures.js";
+import {
+  buildLiveSessionFixtures,
+  type LiveSessionFixture,
+  type LiveStopDepth
+} from "../../test/fixtures/bench/test-status/live-fixtures.js";
 import { buildRealFixtures } from "../../test/fixtures/bench/test-status/real-fixtures.js";
 
 type SiftMode = "standard" | "focused" | "verbose" | "verboseShowRaw";
@@ -89,6 +94,56 @@ interface BenchmarkReport {
         stepCount: number;
       };
     };
+  };
+  liveSessions?: LiveSessionReport[];
+  liveAggregate?: LiveAggregateReport;
+}
+
+interface LiveSessionFlowReport {
+  totalTokens: number;
+  consumedChars: number;
+  externalToolCalls: number;
+  internalToolUses: number;
+  wallClockSeconds: number;
+  providerInvocations: number | null;
+  stopDepth: LiveStopDepth;
+  diagnosisCorrect: boolean;
+}
+
+interface LiveSessionReport {
+  name: string;
+  description: string;
+  rawFirst: LiveSessionFlowReport;
+  siftFirst: LiveSessionFlowReport & {
+    standardSurfacedDominantBlocker: boolean;
+    standardSurfacedSecondaryBucket: boolean;
+    sourceReadAfterZoomSteps: number | null;
+  };
+  delta: {
+    tokensSaved: number;
+    charsSaved: number;
+    externalToolCallDelta: number;
+    internalToolUseDelta: number;
+    durationDeltaSeconds: number;
+  };
+  acceptance: {
+    outputBudgetBetter: boolean;
+    internalToolUsesImproved: boolean;
+    standardSurfacedDominantBlocker: boolean;
+    standardSurfacedSecondaryBucket: boolean;
+    sourceReadAfterZoomSteps: number | null;
+    stopBudgetSatisfied: boolean;
+  };
+}
+
+interface LiveAggregateReport {
+  rawFirst: LiveSessionFlowReport;
+  siftFirst: LiveSessionFlowReport;
+  comparisons: {
+    sessions: number;
+    outputBudgetBetterCount: number;
+    internalToolUsesImprovedCount: number;
+    stopBudgetSatisfiedCount: number;
   };
 }
 
@@ -279,6 +334,84 @@ function buildAggregate(fixtures: FixtureReport[]): BenchmarkReport["aggregate"]
   };
 }
 
+function sumNullable(values: Array<number | null>): number | null {
+  const numericValues = values.filter((value): value is number => typeof value === "number");
+  if (numericValues.length === 0) {
+    return null;
+  }
+
+  return numericValues.reduce((total, value) => total + value, 0);
+}
+
+function buildLiveSessionReport(fixture: LiveSessionFixture): LiveSessionReport {
+  return {
+    name: fixture.name,
+    description: fixture.description,
+    rawFirst: fixture.rawFirst,
+    siftFirst: fixture.siftFirst,
+    delta: {
+      tokensSaved: fixture.rawFirst.totalTokens - fixture.siftFirst.totalTokens,
+      charsSaved: fixture.rawFirst.consumedChars - fixture.siftFirst.consumedChars,
+      externalToolCallDelta:
+        fixture.siftFirst.externalToolCalls - fixture.rawFirst.externalToolCalls,
+      internalToolUseDelta: fixture.siftFirst.internalToolUses - fixture.rawFirst.internalToolUses,
+      durationDeltaSeconds: fixture.siftFirst.wallClockSeconds - fixture.rawFirst.wallClockSeconds
+    },
+    acceptance: {
+      outputBudgetBetter:
+        fixture.rawFirst.totalTokens > fixture.siftFirst.totalTokens &&
+        fixture.rawFirst.consumedChars > fixture.siftFirst.consumedChars,
+      internalToolUsesImproved:
+        fixture.siftFirst.internalToolUses < fixture.rawFirst.internalToolUses,
+      standardSurfacedDominantBlocker: fixture.siftFirst.standardSurfacedDominantBlocker,
+      standardSurfacedSecondaryBucket: fixture.siftFirst.standardSurfacedSecondaryBucket,
+      sourceReadAfterZoomSteps: fixture.siftFirst.sourceReadAfterZoomSteps,
+      stopBudgetSatisfied:
+        fixture.siftFirst.sourceReadAfterZoomSteps !== null &&
+        fixture.siftFirst.sourceReadAfterZoomSteps <= 1
+    }
+  };
+}
+
+function buildLiveAggregate(reports: LiveSessionReport[]): LiveAggregateReport {
+  return {
+    rawFirst: {
+      totalTokens: reports.reduce((total, report) => total + report.rawFirst.totalTokens, 0),
+      consumedChars: reports.reduce((total, report) => total + report.rawFirst.consumedChars, 0),
+      externalToolCalls: reports.reduce(
+        (total, report) => total + report.rawFirst.externalToolCalls,
+        0
+      ),
+      internalToolUses: reports.reduce((total, report) => total + report.rawFirst.internalToolUses, 0),
+      wallClockSeconds: reports.reduce((total, report) => total + report.rawFirst.wallClockSeconds, 0),
+      providerInvocations: sumNullable(reports.map((report) => report.rawFirst.providerInvocations)),
+      stopDepth: reports.at(-1)?.rawFirst.stopDepth ?? "raw",
+      diagnosisCorrect: reports.every((report) => report.rawFirst.diagnosisCorrect)
+    },
+    siftFirst: {
+      totalTokens: reports.reduce((total, report) => total + report.siftFirst.totalTokens, 0),
+      consumedChars: reports.reduce((total, report) => total + report.siftFirst.consumedChars, 0),
+      externalToolCalls: reports.reduce(
+        (total, report) => total + report.siftFirst.externalToolCalls,
+        0
+      ),
+      internalToolUses: reports.reduce((total, report) => total + report.siftFirst.internalToolUses, 0),
+      wallClockSeconds: reports.reduce((total, report) => total + report.siftFirst.wallClockSeconds, 0),
+      providerInvocations: sumNullable(reports.map((report) => report.siftFirst.providerInvocations)),
+      stopDepth: reports.at(-1)?.siftFirst.stopDepth ?? "raw",
+      diagnosisCorrect: reports.every((report) => report.siftFirst.diagnosisCorrect)
+    },
+    comparisons: {
+      sessions: reports.length,
+      outputBudgetBetterCount: reports.filter((report) => report.acceptance.outputBudgetBetter).length,
+      internalToolUsesImprovedCount: reports.filter(
+        (report) => report.acceptance.internalToolUsesImproved
+      ).length,
+      stopBudgetSatisfiedCount: reports.filter((report) => report.acceptance.stopBudgetSatisfied).length
+    }
+  };
+}
+
 function formatBudget(label: string, budget: OutputBudget): string {
   return `${label}: ${budget.chars} chars / ${budget.tokens} tokens`;
 }
@@ -353,6 +486,53 @@ function renderHumanReport(report: BenchmarkReport): string {
     `  raw-first recipe: ${report.aggregate.recipe.rawFirst.stepCount} total steps, ${report.aggregate.recipe.rawFirst.tokens} tokens`
   );
 
+  if (report.liveSessions && report.liveSessions.length > 0) {
+    lines.push("");
+    lines.push("Live session scorecard");
+
+    for (const session of report.liveSessions) {
+      lines.push(`${session.name}`);
+      lines.push(`  ${session.description}`);
+      lines.push(
+        `  raw-first: ${session.rawFirst.consumedChars} chars / ${session.rawFirst.totalTokens} tokens / ${session.rawFirst.externalToolCalls} external calls / ${session.rawFirst.internalToolUses} internal uses / ${session.rawFirst.wallClockSeconds}s / stop=${session.rawFirst.stopDepth}`
+      );
+      lines.push(
+        `  sift-first: ${session.siftFirst.consumedChars} chars / ${session.siftFirst.totalTokens} tokens / ${session.siftFirst.externalToolCalls} external calls / ${session.siftFirst.internalToolUses} internal uses / ${session.siftFirst.wallClockSeconds}s / stop=${session.siftFirst.stopDepth}`
+      );
+      lines.push(
+        `  delta: saved ${session.delta.charsSaved} chars and ${session.delta.tokensSaved} tokens; tool-call delta=${session.delta.externalToolCallDelta}; internal-use delta=${session.delta.internalToolUseDelta}; duration delta=${session.delta.durationDeltaSeconds}s`
+      );
+      lines.push(
+        `  acceptance: outputBudgetBetter=${session.acceptance.outputBudgetBetter}, dominantBlockerVisibleAtStandard=${session.acceptance.standardSurfacedDominantBlocker}, secondaryBucketVisibleAtStandard=${session.acceptance.standardSurfacedSecondaryBucket}, stopBudgetSatisfied=${session.acceptance.stopBudgetSatisfied}`
+      );
+      if (session.acceptance.sourceReadAfterZoomSteps !== null) {
+        lines.push(
+          `  source-read depth: after ${session.acceptance.sourceReadAfterZoomSteps} zoom step(s)`
+        );
+      }
+      lines.push("");
+    }
+
+    if (report.liveAggregate) {
+      lines.push("Live aggregate");
+      lines.push(
+        `  raw-first: ${report.liveAggregate.rawFirst.consumedChars} chars / ${report.liveAggregate.rawFirst.totalTokens} tokens`
+      );
+      lines.push(
+        `  sift-first: ${report.liveAggregate.siftFirst.consumedChars} chars / ${report.liveAggregate.siftFirst.totalTokens} tokens`
+      );
+      lines.push(
+        `  output-budget wins: ${report.liveAggregate.comparisons.outputBudgetBetterCount}/${report.liveAggregate.comparisons.sessions}`
+      );
+      lines.push(
+        `  internal-tool-use wins: ${report.liveAggregate.comparisons.internalToolUsesImprovedCount}/${report.liveAggregate.comparisons.sessions}`
+      );
+      lines.push(
+        `  stop-budget wins: ${report.liveAggregate.comparisons.stopBudgetSatisfiedCount}/${report.liveAggregate.comparisons.sessions}`
+      );
+    }
+  }
+
   return `${lines.join("\n")}\n`;
 }
 
@@ -360,18 +540,28 @@ function main(): void {
   const asJson = process.argv.includes("--json");
   const includeReal = process.argv.includes("--real");
   const onlyReal = process.argv.includes("--only-real");
+  const includeLive = process.argv.includes("--live");
+  const onlyLive = process.argv.includes("--only-live");
   const encoding = getEncoding("o200k_base");
   const encode = (value: string) => encoding.encode(value).length;
 
   try {
-    const syntheticFixtures = onlyReal ? [] : benchFixtures;
-    const realFixtures = includeReal || onlyReal ? buildRealFixtures() : [];
+    const syntheticFixtures = onlyReal || onlyLive ? [] : benchFixtures;
+    const realFixtures = onlyLive ? [] : includeReal || onlyReal ? buildRealFixtures() : [];
+    const liveFixtures = includeLive || onlyLive ? buildLiveSessionFixtures() : [];
     const allFixtures = [...syntheticFixtures, ...realFixtures];
     const fixtures = allFixtures.map((fixture) => buildFixtureReport(fixture, encode));
+    const liveSessions = liveFixtures.map((fixture) => buildLiveSessionReport(fixture));
     const report: BenchmarkReport = {
       tokenizer: "o200k_base",
       fixtures,
-      aggregate: buildAggregate(fixtures)
+      aggregate: buildAggregate(fixtures),
+      ...(liveSessions.length > 0
+        ? {
+            liveSessions,
+            liveAggregate: buildLiveAggregate(liveSessions)
+          }
+        : {})
     };
 
     if (asJson) {

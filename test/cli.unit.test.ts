@@ -562,11 +562,17 @@ describe("cli app unit", () => {
     expect(deps.statusAgents).toHaveBeenCalled();
 
     await runMatched(["escalate", "--detail", "verbose", "--show-raw"], deps);
-    expect(deps.runEscalate).toHaveBeenCalledWith({
-      detail: "verbose",
-      showRaw: true,
-      verbose: false
-    });
+    expect(deps.runEscalate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        question: "Did the tests pass?",
+        format: "bullets",
+        goal: "summarize",
+        policyName: "test-status",
+        detail: "verbose",
+        showRaw: true,
+        verbose: false
+      })
+    );
 
     await runMatched(["rerun"], deps);
     expect(deps.runRerun).toHaveBeenCalledWith(

@@ -157,13 +157,15 @@ export function resolvePromptPolicy(args: {
               "Return only valid JSON.",
               `Use this exact contract: ${args.outputContract ?? TEST_STATUS_DIAGNOSE_JSON_CONTRACT}.`,
               "Treat the heuristic context as extraction guidance, but do not invent hidden failures.",
-              "Identify the dominant blocker, remaining visible failure buckets, and the next best action.",
+              "Use the heuristic extract as the bucket truth unless the visible command output clearly disproves it.",
+              "Identify the dominant blocker, remaining visible failure buckets, the decision, and the next best action.",
               "Set diagnosis_complete to true only when the visible output is already sufficient to stop and act.",
-              "Set raw_needed to true only when exact traceback lines are still required."
+              "Set raw_needed to true only when exact traceback lines are still required.",
+              "Set provider_confidence to a number between 0 and 1, or null only when confidence cannot be estimated."
             ]
           : [
               "Produce a decision-complete diagnosis.",
-              "Name the main failure buckets, include counts and dominant root cause, and end with an explicit stop signal.",
+              "Name the main failure buckets, include counts and dominant root cause, and end with an explicit Decision line plus an explicit stop signal.",
               "Prefer blocker-first ordering and keep evidence budget small.",
               "Do not ask for more context."
             ]

@@ -20,6 +20,7 @@
   "scripts": {
     "build": "tsup",
     "bench:test-status-ab": "node --import tsx scripts/bench/test-status-ab.ts",
+    "bench:test-status-live": "node --import tsx scripts/bench/test-status-ab.ts --live",
     "dev": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

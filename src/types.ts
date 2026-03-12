@@ -3,6 +3,7 @@ export type ProviderName = "openai" | "openai-compatible";
 export type OutputFormat = "brief" | "bullets" | "json" | "verdict";
 export type DetailLevel = "standard" | "focused" | "verbose";
 export type Goal = "summarize" | "diagnose";
+export type RawSliceStrategy = "none" | "bucket_evidence" | "traceback_window" | "head_tail";
 
 export type ResponseMode = "text" | "json";
 export type JsonResponseFormatMode = "auto" | "on" | "off";

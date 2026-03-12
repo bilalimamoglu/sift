@@ -222,7 +222,7 @@ function applySharedOptions(command: ReturnType<ReturnType<typeof cac>["command"
     .option("--goal <goal>", "summarize | diagnose")
     .option(
       "--detail <mode>",
-      "Detail level for supported presets: standard | focused | verbose"
+      "Detail level for supported presets: standard | focused | verbose. Escalation detail level: focused | verbose."
     )
     .option("--max-capture-chars <n>", "Maximum raw child output chars kept in memory")
     .option("--max-input-chars <n>", "Maximum input chars sent to the model")
@@ -636,17 +636,46 @@ export function createCliApp(args: {
       });
     });
 
-  cli
-    .command("escalate", "Re-render the last cached test-status run without rerunning the test command")
+  applySharedOptions(
+    cli.command("escalate", "Re-render the last cached test-status run without rerunning the test command")
+  )
     .usage("escalate [options]")
     .example("escalate")
     .example("escalate --detail verbose")
     .example("escalate --show-raw")
-    .option("--detail <mode>", "Escalation detail level: focused | verbose")
     .option("--show-raw", "Print the cached raw input to stderr for debugging")
-    .option("--verbose", "Enable verbose stderr logging")
     .action(async (options: Record<string, unknown>) => {
+      const config = deps.resolveConfig({
+        configPath: options.config as string | undefined,
+        env,
+        cliOverrides: buildCliOverrides(options)
+      });
+      const preset = deps.getPreset(config, "test-status");
+      const goal = normalizeGoal(options.goal) ?? "summarize";
+      const format = (options.format as OutputFormat | undefined) ?? preset.format;
+      assertSupportedGoal({
+        goal,
+        format,
+        presetName: "test-status"
+      });
+
       process.exitCode = await deps.runEscalate({
+        config,
+        question: preset.question,
+        format,
+        goal,
+        dryRun: Boolean(options.dryRun),
+        policyName:
+          shouldKeepPresetPolicy({
+            requestedFormat: options.format as OutputFormat | undefined,
+            presetFormat: preset.format,
+            goal,
+            presetName: "test-status"
+          })
+            ? preset.policy
+            : undefined,
+        outputContract: preset.outputContract,
+        fallbackJson: preset.fallbackJson,
         detail: normalizeEscalateDetail(options.detail),
         showRaw: Boolean(options.showRaw),
         verbose: Boolean(options.verbose)

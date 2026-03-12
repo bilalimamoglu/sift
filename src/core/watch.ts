@@ -169,6 +169,17 @@ async function runTestStatusWatch(request: RunRequest, cycles: string[]): Promis
     const output = await runSift({
       ...request,
       stdin: cycle,
+      analysisContext: [
+        request.analysisContext,
+        "Watch context:",
+        "- Treat this as a redraw/change cycle, not a fresh full-suite baseline.",
+        ...(previousRun === null
+          ? []
+          : [
+              "- Prefer what changed, what resolved, and what still remains.",
+              "- Keep the current blocker and remaining failures in focus."
+            ])
+      ].join("\n"),
       testStatusContext: {
         resolvedTests: targetDelta?.resolved,
         remainingTests: targetDelta?.remaining ?? currentRun.pytest?.failingNodeIds

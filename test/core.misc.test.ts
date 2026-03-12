@@ -19,7 +19,9 @@ describe("misc core and UI helpers", () => {
         rawInput: "x".repeat(1300),
         rawFallback: false
       })
-    ).toBe("Sift fallback triggered (boom).");
+    ).toBe(
+      "Sift fallback triggered (boom). Raw may still be needed because provider follow-up failed."
+    );
 
     expect(JSON.parse(buildFallbackOutput({
       format: "json",

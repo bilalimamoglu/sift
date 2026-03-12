@@ -13,10 +13,12 @@ Start with:
 When debugging test failures, default to `sift` first and treat `standard` as the usual stop point:
 - Run the full suite first: `sift exec --preset test-status -- <test command>`
 - Think of `standard` as the map, `rerun --remaining` as the zoom lens, and raw traceback as the last resort.
+- If `standard` ends with `Decision: stop and act`, stop there unless you truly need exact traceback lines.
 - If `standard` already shows the main failure buckets, counts, and actionable hints, stop there and go read source or inspect the relevant tests or app code.
 - Use `sift escalate` when you want a deeper render of the same cached output without rerunning the command.
 - `sift escalate` and `sift rerun` require a cached `sift exec --preset test-status -- <test command>` run first.
 - After making or planning a fix, refresh the truth with `sift rerun` so the same full suite runs again at `standard` and shows what is resolved or still remaining.
+- The normal stop budget is `standard` first, then at most one zoom step before raw.
 - Only if more detail is still needed after `sift rerun`, use `sift rerun --remaining --detail focused`, then `sift rerun --remaining --detail verbose`, then `sift rerun --remaining --detail verbose --show-raw`.
 - `sift rerun --remaining` currently supports only argv-mode `pytest ...` or `python -m pytest ...` runs; otherwise rerun a narrowed command manually with `sift exec --preset test-status -- <narrowed pytest command>`.
 - If you need a machine-readable diagnosis, use `sift exec --preset test-status --goal diagnose --format json -- <test command>` or the same shape with `sift rerun` / `sift watch --preset test-status`.

@@ -323,6 +323,18 @@ export async function runExec(request: ExecRequest): Promise<number> {
     let output = await runSift({
       ...request,
       stdin: capturedOutput,
+      analysisContext:
+        request.skipCacheWrite && request.presetName === "test-status"
+          ? [
+              request.analysisContext,
+              "Zoom context:",
+              "- This pass is remaining-only.",
+              "- The full-suite truth already exists from the cached full run.",
+              "- Do not reintroduce resolved tests into the diagnosis."
+            ]
+              .filter((value): value is string => Boolean(value))
+              .join("\n")
+          : request.analysisContext,
       testStatusContext:
         shouldCacheTestStatus && analysis
           ? {

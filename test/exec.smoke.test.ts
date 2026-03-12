@@ -312,7 +312,15 @@ describe("exec mode", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe("- Tests passed.\n- 12 tests, 1 skip.");
+    expect(result.stdout.trim()).toBe(
+      [
+        "- Tests passed.",
+        "- 12 tests, 1 skip.",
+        "- Decision: stop and act. Do not escalate unless you need exact traceback lines.",
+        "- Next: No failing buckets remain.",
+        "- Stop signal: diagnosis complete; raw not needed."
+      ].join("\n")
+    );
     expect(result.stderr).toBe("");
   });
 
@@ -328,7 +336,15 @@ describe("exec mode", () => {
     });
 
     expect(result.status).toBe(2);
-    expect(result.stdout.trim()).toBe("- Tests did not complete.\n- 134 errors occurred during collection.");
+    expect(result.stdout.trim()).toBe(
+      [
+        "- Tests did not complete.",
+        "- 134 errors occurred during collection.",
+        "- Decision: read source next. Do not escalate unless exact traceback lines are still needed.",
+        "- Next: Inspect the collection traceback or setup code next; the run failed before tests executed.",
+        "- Stop signal: diagnosis complete; raw not needed."
+      ].join("\n")
+    );
     expect(result.stderr).toBe("");
   });
 
@@ -370,6 +386,7 @@ describe("exec mode", () => {
         "- Import/dependency blocker: 114 errors are caused by missing dependencies during test collection.",
         "- Missing modules include pydantic, fastapi, botocore.",
         "- Hint: Install the missing dependencies and rerun the affected tests.",
+        "- Decision: stop and act. Do not escalate unless you need exact traceback lines.",
         "- Next: Fix bucket 1 first, then rerun the full suite at standard.",
         "- Stop signal: diagnosis complete; raw not needed."
       ].join("\n")
@@ -416,6 +433,7 @@ describe("exec mode", () => {
         "  - tests/unit/test_auth.py -> missing module: pydantic",
         "  - tests/unit/test_api.py -> missing module: fastapi",
         "  - Hint: Install the missing dependencies and rerun the affected tests.",
+        "- Decision: stop and act. Do not escalate unless you need exact traceback lines.",
         "- Next: Fix bucket 1 first, then rerun the full suite at standard.",
         "- Stop signal: diagnosis complete; raw not needed."
       ].join("\n")
@@ -461,6 +479,7 @@ describe("exec mode", () => {
         "  - tests/unit/test_auth.py -> missing module: pydantic",
         "  - tests/unit/test_api.py -> missing module: fastapi",
         "  - Hint: Install the missing dependencies and rerun the affected tests.",
+        "- Decision: stop and act. Do not escalate unless you need exact traceback lines.",
         "- Next: Fix bucket 1 first, then rerun the full suite at standard.",
         "- Stop signal: diagnosis complete; raw not needed."
       ].join("\n")

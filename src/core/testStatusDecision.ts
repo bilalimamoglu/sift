@@ -1,14 +1,17 @@
+import { z } from "zod";
 import type {
   FailureBucket,
   FailureBucketType,
   TestStatusAnalysis
 } from "./heuristics.js";
+import type { RawSliceStrategy } from "../types.js";
 
 export type DiagnoseActionCode =
   | "fix_dominant_blocker"
   | "read_source_for_bucket"
   | "read_raw_for_exact_traceback"
   | "insufficient_signal";
+export type TestStatusDecisionKind = "stop" | "zoom" | "read_source" | "read_raw";
 
 export interface TestStatusMiniDiff {
   added_paths?: number;
@@ -35,7 +38,13 @@ export interface TestStatusDiagnoseContract {
   raw_needed: boolean;
   additional_source_read_likely_low_value: boolean;
   read_raw_only_if: string | null;
+  decision: TestStatusDecisionKind;
   dominant_blocker_bucket_index: number | null;
+  provider_used: boolean;
+  provider_confidence: number | null;
+  provider_failed: boolean;
+  raw_slice_used: boolean;
+  raw_slice_strategy: RawSliceStrategy;
   resolved_tests: string[];
   remaining_tests: string[];
   main_buckets: TestStatusDiagnoseBucket[];
@@ -53,8 +62,101 @@ export interface TestStatusDecision {
   verboseText: string;
 }
 
+export interface TestStatusProviderSupplement {
+  diagnosis_complete: boolean;
+  raw_needed: boolean;
+  additional_source_read_likely_low_value: boolean;
+  read_raw_only_if: string | null;
+  decision: TestStatusDecisionKind;
+  provider_confidence: number | null;
+  next_best_action: {
+    code: DiagnoseActionCode;
+    bucket_index: number | null;
+    note: string;
+  };
+}
+
+export interface TestStatusContractOverrides {
+  diagnosis_complete?: boolean;
+  raw_needed?: boolean;
+  additional_source_read_likely_low_value?: boolean;
+  read_raw_only_if?: string | null;
+  decision?: TestStatusDecisionKind;
+  provider_used?: boolean;
+  provider_confidence?: number | null;
+  provider_failed?: boolean;
+  raw_slice_used?: boolean;
+  raw_slice_strategy?: RawSliceStrategy;
+  next_best_action?: TestStatusDiagnoseContract["next_best_action"];
+}
+
 export const TEST_STATUS_DIAGNOSE_JSON_CONTRACT =
-  '{"status":"ok|insufficient","diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"dominant_blocker_bucket_index":number|null,"resolved_tests":string[],"remaining_tests":string[],"main_buckets":[{"bucket_index":number,"label":string,"count":number,"root_cause":string,"evidence":string[],"bucket_confidence":number,"root_cause_confidence":number,"dominant":boolean,"secondary_visible_despite_blocker":boolean,"mini_diff":{"added_paths"?:number,"removed_models"?:number,"changed_task_mappings"?:number}|null}],"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string}}';
+  '{"status":"ok|insufficient","diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","dominant_blocker_bucket_index":number|null,"provider_used":boolean,"provider_confidence":number|null,"provider_failed":boolean,"raw_slice_used":boolean,"raw_slice_strategy":"none|bucket_evidence|traceback_window|head_tail","resolved_tests":string[],"remaining_tests":string[],"main_buckets":[{"bucket_index":number,"label":string,"count":number,"root_cause":string,"evidence":string[],"bucket_confidence":number,"root_cause_confidence":number,"dominant":boolean,"secondary_visible_despite_blocker":boolean,"mini_diff":{"added_paths"?:number,"removed_models"?:number,"changed_task_mappings"?:number}|null}],"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string}}';
+export const TEST_STATUS_PROVIDER_SUPPLEMENT_JSON_CONTRACT =
+  '{"diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","provider_confidence":number|null,"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string}}';
+
+const nextBestActionSchema = z.object({
+  code: z.enum([
+    "fix_dominant_blocker",
+    "read_source_for_bucket",
+    "read_raw_for_exact_traceback",
+    "insufficient_signal"
+  ]),
+  bucket_index: z.number().int().nullable(),
+  note: z.string().min(1)
+});
+
+export const testStatusProviderSupplementSchema = z.object({
+  diagnosis_complete: z.boolean(),
+  raw_needed: z.boolean(),
+  additional_source_read_likely_low_value: z.boolean(),
+  read_raw_only_if: z.string().nullable(),
+  decision: z.enum(["stop", "zoom", "read_source", "read_raw"]),
+  provider_confidence: z.number().min(0).max(1).nullable(),
+  next_best_action: nextBestActionSchema
+});
+
+export const testStatusDiagnoseContractSchema = z.object({
+  status: z.enum(["ok", "insufficient"]),
+  diagnosis_complete: z.boolean(),
+  raw_needed: z.boolean(),
+  additional_source_read_likely_low_value: z.boolean(),
+  read_raw_only_if: z.string().nullable(),
+  decision: z.enum(["stop", "zoom", "read_source", "read_raw"]),
+  dominant_blocker_bucket_index: z.number().int().nullable(),
+  provider_used: z.boolean(),
+  provider_confidence: z.number().min(0).max(1).nullable(),
+  provider_failed: z.boolean(),
+  raw_slice_used: z.boolean(),
+  raw_slice_strategy: z.enum(["none", "bucket_evidence", "traceback_window", "head_tail"]),
+  resolved_tests: z.array(z.string()),
+  remaining_tests: z.array(z.string()),
+  main_buckets: z.array(
+    z.object({
+      bucket_index: z.number().int(),
+      label: z.string(),
+      count: z.number().int(),
+      root_cause: z.string(),
+      evidence: z.array(z.string()).max(2),
+      bucket_confidence: z.number(),
+      root_cause_confidence: z.number(),
+      dominant: z.boolean(),
+      secondary_visible_despite_blocker: z.boolean(),
+      mini_diff: z
+        .object({
+          added_paths: z.number().int().optional(),
+          removed_models: z.number().int().optional(),
+          changed_task_mappings: z.number().int().optional()
+        })
+        .nullable()
+    })
+  ),
+  next_best_action: nextBestActionSchema
+});
+
+export function parseTestStatusProviderSupplement(input: string): TestStatusProviderSupplement {
+  return testStatusProviderSupplementSchema.parse(JSON.parse(input));
+}
 
 interface GenericBucket {
   type: FailureBucketType;
@@ -214,6 +316,44 @@ function mergeBuckets(analysis: TestStatusAnalysis): GenericBucket[] {
   return merged.slice(0, 3);
 }
 
+function dominantBucketPriority(bucket: GenericBucket): number {
+  if (bucket.reason.startsWith("missing test env:")) {
+    return 5;
+  }
+  if (bucket.type === "shared_environment_blocker") {
+    return 4;
+  }
+  if (bucket.type === "import_dependency_failure") {
+    return 3;
+  }
+  if (bucket.type === "collection_failure") {
+    return 2;
+  }
+  if (bucket.type === "contract_snapshot_drift") {
+    return 1;
+  }
+  return 0;
+}
+
+function prioritizeBuckets(buckets: GenericBucket[]): GenericBucket[] {
+  return [...buckets].sort((left, right) => {
+    const priorityDelta = dominantBucketPriority(right) - dominantBucketPriority(left);
+    if (priorityDelta !== 0) {
+      return priorityDelta;
+    }
+
+    if (right.count !== left.count) {
+      return right.count - left.count;
+    }
+
+    if (right.confidence !== left.confidence) {
+      return right.confidence - left.confidence;
+    }
+
+    return left.reason.localeCompare(right.reason);
+  });
+}
+
 function isDominantBlockerType(type: FailureBucketType): boolean {
   return (
     type === "shared_environment_blocker" ||
@@ -368,6 +508,45 @@ function buildStopSignal(contract: TestStatusDiagnoseContract): string {
   return "- Stop signal: diagnosis incomplete; provider or raw traceback may still help.";
 }
 
+function deriveDecision(contract: Omit<TestStatusDiagnoseContract, "decision">): TestStatusDecisionKind {
+  if (contract.raw_needed || contract.provider_failed) {
+    return "read_raw";
+  }
+
+  if (!contract.diagnosis_complete) {
+    return "zoom";
+  }
+
+  if (
+    contract.main_buckets.length === 0 &&
+    contract.next_best_action.note === "No failing buckets remain."
+  ) {
+    return "stop";
+  }
+
+  if (contract.next_best_action.code === "read_source_for_bucket") {
+    return "read_source";
+  }
+
+  return "stop";
+}
+
+function buildDecisionLine(contract: TestStatusDiagnoseContract): string {
+  if (contract.decision === "stop") {
+    return "- Decision: stop and act. Do not escalate unless you need exact traceback lines.";
+  }
+
+  if (contract.decision === "read_source") {
+    return "- Decision: read source next. Do not escalate unless exact traceback lines are still needed.";
+  }
+
+  if (contract.decision === "zoom") {
+    return "- Decision: zoom. One deeper sift pass is justified before raw.";
+  }
+
+  return "- Decision: raw only if exact traceback is required.";
+}
+
 function buildComparisonLines(contract: TestStatusDiagnoseContract): string[] {
   const lines: string[] = [];
 
@@ -395,40 +574,36 @@ function renderStandard(args: {
   contract: TestStatusDiagnoseContract;
   buckets: GenericBucket[];
 }): string {
-  if (
-    args.contract.main_buckets.length === 0 &&
-    (args.analysis.noTestsCollected ||
-      args.analysis.collectionErrorCount !== undefined ||
-      (args.analysis.failed === 0 && args.analysis.errors === 0 && args.analysis.passed > 0))
-  ) {
-    return buildOutcomeLines(args.analysis).join("\n");
+  const lines = [...buildOutcomeLines(args.analysis), ...buildComparisonLines(args.contract)];
+  if (args.contract.main_buckets.length > 0) {
+    for (const bucket of args.contract.main_buckets.slice(0, 3)) {
+      const rawBucket = args.buckets[bucket.bucket_index - 1];
+      lines.push(
+        ...(rawBucket?.summaryLines.length
+          ? rawBucket.summaryLines.map((line) => `- ${line}`)
+          : [renderBucketHeadline(bucket)])
+      );
+    }
   }
 
-  const lines = [...buildOutcomeLines(args.analysis), ...buildComparisonLines(args.contract)];
-  for (const bucket of args.contract.main_buckets.slice(0, 3)) {
-    const rawBucket = args.buckets[bucket.bucket_index - 1];
+  if (args.contract.main_buckets.length > 0) {
+    const evidence = args.contract.main_buckets.flatMap((bucket) => {
+      const rawBucket = args.buckets[bucket.bucket_index - 1];
+      if (rawBucket?.summaryLines.length && rawBucket.summaryLines.length > 1) {
+        return [];
+      }
+      return bucket.evidence.map((value) => `- Evidence: ${value}`);
+    });
+    lines.push(...evidence.slice(0, 2));
     lines.push(
-      ...(rawBucket?.summaryLines.length
-        ? rawBucket.summaryLines.map((line) => `- ${line}`)
-        : [renderBucketHeadline(bucket)])
+      ...args.buckets
+        .map((bucket) => bucket.hint)
+        .filter((value): value is string => Boolean(value))
+        .slice(0, 2)
+        .map((hint) => `- Hint: ${hint}`)
     );
   }
-
-  const evidence = args.contract.main_buckets.flatMap((bucket) => {
-    const rawBucket = args.buckets[bucket.bucket_index - 1];
-    if (rawBucket?.summaryLines.length && rawBucket.summaryLines.length > 1) {
-      return [];
-    }
-    return bucket.evidence.map((value) => `- Evidence: ${value}`);
-  });
-  lines.push(...evidence.slice(0, 2));
-  lines.push(
-    ...args.buckets
-      .map((bucket) => bucket.hint)
-      .filter((value): value is string => Boolean(value))
-      .slice(0, 2)
-      .map((hint) => `- Hint: ${hint}`)
-  );
+  lines.push(buildDecisionLine(args.contract));
   lines.push(`- Next: ${args.contract.next_best_action.note}`);
   lines.push(buildStopSignal(args.contract));
 
@@ -440,15 +615,6 @@ function renderFocused(args: {
   contract: TestStatusDiagnoseContract;
   buckets: GenericBucket[];
 }): string {
-  if (
-    args.contract.main_buckets.length === 0 &&
-    (args.analysis.noTestsCollected ||
-      args.analysis.collectionErrorCount !== undefined ||
-      (args.analysis.failed === 0 && args.analysis.errors === 0 && args.analysis.passed > 0))
-  ) {
-    return buildOutcomeLines(args.analysis).join("\n");
-  }
-
   const lines = [...buildOutcomeLines(args.analysis), ...buildComparisonLines(args.contract)];
 
   for (const bucket of args.contract.main_buckets) {
@@ -466,6 +632,7 @@ function renderFocused(args: {
     }
   }
 
+  lines.push(buildDecisionLine(args.contract));
   lines.push(`- Next: ${args.contract.next_best_action.note}`);
   lines.push(buildStopSignal(args.contract));
   return lines.join("\n");
@@ -476,15 +643,6 @@ function renderVerbose(args: {
   contract: TestStatusDiagnoseContract;
   buckets: GenericBucket[];
 }): string {
-  if (
-    args.contract.main_buckets.length === 0 &&
-    (args.analysis.noTestsCollected ||
-      args.analysis.collectionErrorCount !== undefined ||
-      (args.analysis.failed === 0 && args.analysis.errors === 0 && args.analysis.passed > 0))
-  ) {
-    return buildOutcomeLines(args.analysis).join("\n");
-  }
-
   const lines = [...buildOutcomeLines(args.analysis), ...buildComparisonLines(args.contract)];
 
   for (const bucket of args.contract.main_buckets) {
@@ -505,6 +663,7 @@ function renderVerbose(args: {
     }
   }
 
+  lines.push(buildDecisionLine(args.contract));
   lines.push(`- Next: ${args.contract.next_best_action.note}`);
   lines.push(buildStopSignal(args.contract));
   return lines.join("\n");
@@ -515,8 +674,9 @@ export function buildTestStatusDiagnoseContract(args: {
   analysis: TestStatusAnalysis;
   resolvedTests?: string[];
   remainingTests?: string[];
+  contractOverrides?: TestStatusContractOverrides;
 }): TestStatusDecision {
-  const buckets = mergeBuckets(args.analysis);
+  const buckets = prioritizeBuckets(mergeBuckets(args.analysis));
   const simpleCollectionFailure =
     args.analysis.collectionErrorCount !== undefined &&
     args.analysis.collectionItems.length === 0 &&
@@ -608,7 +768,7 @@ export function buildTestStatusDiagnoseContract(args: {
     };
   }
 
-  const contract: TestStatusDiagnoseContract = {
+  const baseContract = {
     status: diagnosisComplete ? "ok" : "insufficient",
     diagnosis_complete: diagnosisComplete,
     raw_needed: rawNeeded,
@@ -617,11 +777,27 @@ export function buildTestStatusDiagnoseContract(args: {
       ? "you still need exact traceback lines after focused or verbose detail"
       : null,
     dominant_blocker_bucket_index: dominantBlockerBucketIndex,
+    provider_used: false,
+    provider_confidence: null,
+    provider_failed: false,
+    raw_slice_used: false,
+    raw_slice_strategy: "none" as const,
     resolved_tests: resolvedTests,
     remaining_tests: remainingTests,
     main_buckets: mainBuckets,
     next_best_action: nextBestAction
   };
+  const mergedContractWithoutDecision: Omit<TestStatusDiagnoseContract, "decision"> = {
+    ...baseContract,
+    ...args.contractOverrides,
+    status:
+      (args.contractOverrides?.diagnosis_complete ?? diagnosisComplete) ? "ok" : "insufficient",
+    next_best_action: args.contractOverrides?.next_best_action ?? baseContract.next_best_action
+  };
+  const contract = testStatusDiagnoseContractSchema.parse({
+    ...mergedContractWithoutDecision,
+    decision: args.contractOverrides?.decision ?? deriveDecision(mergedContractWithoutDecision)
+  }) as TestStatusDiagnoseContract;
 
   return {
     contract,
@@ -658,6 +834,10 @@ export function buildTestStatusAnalysisContext(
     "Heuristic extract:",
     `- diagnosis_complete=${contract.diagnosis_complete}`,
     `- raw_needed=${contract.raw_needed}`,
+    `- decision=${contract.decision}`,
+    `- provider_used=${contract.provider_used}`,
+    `- provider_failed=${contract.provider_failed}`,
+    `- raw_slice_strategy=${contract.raw_slice_strategy}`,
     ...(contract.resolved_tests.length > 0
       ? [`- resolved_tests=${contract.resolved_tests.join(", ")}`]
       : []),
