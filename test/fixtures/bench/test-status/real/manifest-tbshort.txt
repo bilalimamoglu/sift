@@ -1,0 +1,629 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.4, pytest-9.0.2, pluggy-1.6.0 -- /Users/bilalimamoglu/miniconda3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/bilalimamoglu/repos/modela-app/modela-backend
+configfile: pytest.ini
+plugins: anyio-4.12.1, cov-6.2.1, asyncio-1.3.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/contracts/test_feature_manifest_freeze.py::test_feature_manifest_is_frozen <- ../../modela-backend/tests/contracts/test_feature_manifest_freeze.py FAILED [100%]
+
+=================================== FAILURES ===================================
+_______________________ test_feature_manifest_is_frozen ________________________
+/Users/bilalimamoglu/repos/modela-backend/tests/contracts/test_feature_manifest_freeze.py:57: in test_feature_manifest_is_frozen
+    ???
+E   AssertionError: assert {'enabled_models': [{'name': 'fal-ai', 'model': 'starsfriday/Qwen-Image-NSFW', 'tasks': ['text_to_image']}, {'name': 'fal-ai-editorial', 'model': 'olesheva/Photorealistic_Fashion_Magazine_Editorial_LoRA', 'tasks': ['text_to_image']}, {'name': 'fal-ai-firered-image-edit-1', 'model': 'FireRedTeam/FireRed-Image-Edit-1.0', 'tasks': ['image_to_image', 'multi_image_instruction', 'reference_conditioning']}, {'name': 'fal-ai-flux-2-dev', 'model': 'black-forest-labs/FLUX.2-dev', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'name': 'fal-ai-flux-dev', 'model': 'black-forest-labs/FLUX.1-dev', 'tasks': ['text_to_image']}, {'name': 'fal-ai-flux-klein-4b', 'model': 'black-forest-labs/FLUX.2-klein-4B', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'name': 'fal-ai-flux-klein-base-9b', 'model': 'black-forest-labs/FLUX.2-klein-base-9B', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'name': 'fal-ai-glm-image', 'model': 'zai-org/GLM-Image', 'tasks': ['text_to_image']}, {'name': 'fal-ai-hunyuan-3-instruct', 'model': 'tencent/HunyuanImage-3.0-Instruct', 'tasks': ['image_to_image', 'multi_image_instruction', 'pose_transfer', 'reference_conditioning', 'text_to_image']}, {'name': 'fal-ai-hunyuan-image-3', 'model': 'tencent/HunyuanImage-3.0', 'tasks': ['text_to_image']}, {'name': 'fal-ai-pornmaster-v1-z-image-turbo', 'model': 'RomixERR/Pornmaster_v1-Z-Images-Turbo', 'tasks': ['text_to_image']}, {'name': 'fal-ai-qwen-image-2512', 'model': 'Qwen/Qwen-Image-2512', 'tasks': ['text_to_image']}, {'name': 'fal-ai-sd35-large', 'model': 'stabilityai/stable-diffusion-3.5-large', 'tasks': ['text_to_image']}, {'name': 'fal-ai-smnth-v1-nsfw1', 'model': 'ReCodePlus/Smnth_v1_NSFW1', 'tasks': ['text_to_image']}, {'name': 'fal-ai-z-image', 'model': 'Tongyi-MAI/Z-Image', 'tasks': ['text_to_image']}, {'name': 'fal-ai-z-image-turbo', 'model': 'Tongyi-MAI/Z-Image-Turbo', 'tasks': ['text_to_image']}, {'name': 'google-banana-flash', 'model': 'gemini-3.1-flash-image-preview', 'tasks': ['image_to_image', 'image_to_text', 'multi_image_instruction', 'pose_transfer', 'reference_conditioning', 'text_to_image']}, {'name': 'google-banana-pro', 'model': 'gemini-3-pro-image-preview', 'tasks': ['image_to_image', 'image_to_text', 'multi_image_instruction', 'pose_transfer', 'reference_conditioning', 'text_to_image']}, {'name': 'ltx-2', 'model': 'Lightricks/LTX-2', 'tasks': ['image_to_video']}, {'name': 'mock', 'model': 'mock', 'tasks': ['text_to_image']}, {'name': 'qwen-image-edit-2511', 'model': 'Qwen/Qwen-Image-Edit-2511', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'name': 'wan-2-2-distill-loras', 'model': 'lightx2v/Wan2.2-Distill-Loras', 'tasks': ['image_to_video']}, {'name': 'wan-2-2-i2v-a14b', 'model': 'Wan-AI/Wan2.2-I2V-A14B', 'tasks': ['image_to_video']}], 'task_to_models': {'image_to_image': ['fal-ai-firered-image-edit-1', 'fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fal-ai-flux-klein-base-9b', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro', 'qwen-image-edit-2511'], 'image_to_text': ['google-banana-flash', 'google-banana-pro'], 'image_to_video': ['ltx-2', 'wan-2-2-distill-loras', 'wan-2-2-i2v-a14b'], 'multi_image_instruction': ['fal-ai-firered-image-edit-1', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro'], 'pose_transfer': ['fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fal-ai-flux-klein-base-9b', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro', 'qwen-image-edit-2511'], 'reference_conditioning': ['fal-ai-firered-image-edit-1', 'fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fal-ai-flux-klein-base-9b', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro', 'qwen-image-edit-2511'], 'text_to_image': ['fal-ai', 'fal-ai-editorial', 'fal-ai-flux-dev', 'fal-ai-glm-image', 'fal-ai-hunyuan-3-instruct', 'fal-ai-hunyuan-image-3', 'fal-ai-pornmaster-v1-z-image-turbo', 'fal-ai-qwen-image-2512', 'fal-ai-sd35-large', 'fal-ai-smnth-v1-nsfw1', 'fal-ai-z-image', 'fal-ai-z-image-turbo', 'google-banana-flash', 'google-banana-pro', 'mock']}, 'api_families': ['/api/v1/admin', '/api/v1/analytics', '/api/v1/auth', '/api/v1/characters', '/api/v1/costume-assets', '/api/v1/costume_presets', '/api/v1/costumes', '/api/v1/garment-types', '/api/v1/generation-jobs', '/api/v1/meta', '/api/v1/outputs', '/api/v1/presence', '/api/v1/providers', '/api/v1/scene-references', '/api/v1/video']} == {'api_families': ['/api/v1/admin', '/api/v1/analytics', '/api/v1/auth', '/api/v1/characters', '/api/v1/costume-assets', '/api/v1/costume_presets', '/api/v1/costumes', '/api/v1/garment-types', '/api/v1/generation-jobs', '/api/v1/meta', '/api/v1/outputs', '/api/v1/presence', '/api/v1/providers', '/api/v1/scene-references', '/api/v1/video'], 'enabled_models': [{'model': 'starsfriday/Qwen-Image-NSFW', 'name': 'fal-ai', 'tasks': ['text_to_image']}, {'model': 'olesheva/Photorealistic_Fashion_Magazine_Editorial_LoRA', 'name': 'fal-ai-editorial', 'tasks': ['text_to_image']}, {'model': 'FireRedTeam/FireRed-Image-Edit-1.0', 'name': 'fal-ai-firered-image-edit-1', 'tasks': ['image_to_image', 'multi_image_instruction', 'reference_conditioning']}, {'model': 'black-forest-labs/FLUX.2-dev', 'name': 'fal-ai-flux-2-dev', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'model': 'black-forest-labs/FLUX.1-dev', 'name': 'fal-ai-flux-dev', 'tasks': ['text_to_image']}, {'model': 'black-forest-labs/FLUX.2-klein-4B', 'name': 'fal-ai-flux-klein-4b', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'model': 'black-forest-labs/FLUX.2-klein-base-9B', 'name': 'fal-ai-flux-klein-base-9b', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'model': 'zai-org/GLM-Image', 'name': 'fal-ai-glm-image', 'tasks': ['text_to_image']}, {'model': 'tencent/HunyuanImage-3.0-Instruct', 'name': 'fal-ai-hunyuan-3-instruct', 'tasks': ['image_to_image', 'multi_image_instruction', 'pose_transfer', 'reference_conditioning', 'text_to_image']}, {'model': 'tencent/HunyuanImage-3.0', 'name': 'fal-ai-hunyuan-image-3', 'tasks': ['text_to_image']}, {'model': 'RomixERR/Pornmaster_v1-Z-Images-Turbo', 'name': 'fal-ai-pornmaster-v1-z-image-turbo', 'tasks': ['text_to_image']}, {'model': 'Qwen/Qwen-Image-2512', 'name': 'fal-ai-qwen-image-2512', 'tasks': ['text_to_image']}, {'model': 'stabilityai/stable-diffusion-3.5-large', 'name': 'fal-ai-sd35-large', 'tasks': ['text_to_image']}, {'model': 'ReCodePlus/Smnth_v1_NSFW1', 'name': 'fal-ai-smnth-v1-nsfw1', 'tasks': ['text_to_image']}, {'model': 'Tongyi-MAI/Z-Image', 'name': 'fal-ai-z-image', 'tasks': ['text_to_image']}, {'model': 'Tongyi-MAI/Z-Image-Turbo', 'name': 'fal-ai-z-image-turbo', 'tasks': ['text_to_image']}, {'model': 'gemini-3.1-flash-image-preview', 'name': 'google-banana-flash', 'tasks': ['image_to_image', 'image_to_text', 'multi_image_instruction', 'pose_transfer', 'reference_conditioning', 'text_to_image']}, {'model': 'gemini-3-pro-image-preview', 'name': 'google-banana-pro', 'tasks': ['image_to_image', 'image_to_text', 'multi_image_instruction', 'pose_transfer', 'reference_conditioning', 'text_to_image']}, {'model': 'Lightricks/LTX-2', 'name': 'ltx-2', 'tasks': ['image_to_video']}, {'model': 'mock', 'name': 'mock', 'tasks': ['text_to_image']}, {'model': 'gpt-image-1.5', 'name': 'openai-gpt-image-1.5', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning', 'text_to_image']}, {'model': 'Qwen/Qwen-Image-Edit-2511', 'name': 'qwen-image-edit-2511', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'model': 'lightx2v/Wan2.2-Distill-Loras', 'name': 'wan-2-2-distill-loras', 'tasks': ['image_to_video']}, {'model': 'Wan-AI/Wan2.2-I2V-A14B', 'name': 'wan-2-2-i2v-a14b', 'tasks': ['image_to_video']}], 'task_to_models': {'image_to_image': ['fal-ai-firered-image-edit-1', 'fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fal-ai-flux-klein-base-9b', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro', 'openai-gpt-image-1.5', 'qwen-image-edit-2511'], 'image_to_text': ['google-banana-flash', 'google-banana-pro'], 'image_to_video': ['ltx-2', 'wan-2-2-distill-loras', 'wan-2-2-i2v-a14b'], 'multi_image_instruction': ['fal-ai-firered-image-edit-1', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro'], 'pose_transfer': ['fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fal-ai-flux-klein-base-9b', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro', 'openai-gpt-image-1.5', 'qwen-image-edit-2511'], 'reference_conditioning': ['fal-ai-firered-image-edit-1', 'fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fal-ai-flux-klein-base-9b', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro', 'openai-gpt-image-1.5', 'qwen-image-edit-2511'], 'text_to_image': ['fal-ai', 'fal-ai-editorial', 'fal-ai-flux-dev', 'fal-ai-glm-image', 'fal-ai-hunyuan-3-instruct', 'fal-ai-hunyuan-image-3', 'fal-ai-pornmaster-v1-z-image-turbo', 'fal-ai-qwen-image-2512', 'fal-ai-sd35-large', 'fal-ai-smnth-v1-nsfw1', 'fal-ai-z-image', 'fal-ai-z-image-turbo', 'google-banana-flash', 'google-banana-pro', 'mock', 'openai-gpt-image-1.5']}}
+E     
+E     Common items:
+E     {'api_families': ['/api/v1/admin',
+E                       '/api/v1/analytics',
+E                       '/api/v1/auth',
+E                       '/api/v1/characters',
+E                       '/api/v1/costume-assets',
+E                       '/api/v1/costume_presets',
+E                       '/api/v1/costumes',
+E                       '/api/v1/garment-types',
+E                       '/api/v1/generation-jobs',
+E                       '/api/v1/meta',
+E                       '/api/v1/outputs',
+E                       '/api/v1/presence',
+E                       '/api/v1/providers',
+E                       '/api/v1/scene-references',
+E                       '/api/v1/video']}
+E     Differing items:
+E     {'enabled_models': [{'model': 'starsfriday/Qwen-Image-NSFW', 'name': 'fal-ai', 'tasks': ['text_to_image']}, {'model': ...ein-4B', 'name': 'fal-ai-flux-klein-4b', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, ...]} != {'enabled_models': [{'model': 'starsfriday/Qwen-Image-NSFW', 'name': 'fal-ai', 'tasks': ['text_to_image']}, {'model': ...ein-4B', 'name': 'fal-ai-flux-klein-4b', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, ...]}
+E     {'task_to_models': {'image_to_image': ['fal-ai-firered-image-edit-1', 'fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fa...ction': ['fal-ai-firered-image-edit-1', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro'], ...}} != {'task_to_models': {'image_to_image': ['fal-ai-firered-image-edit-1', 'fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fa...ction': ['fal-ai-firered-image-edit-1', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro'], ...}}
+E     
+E     Full diff:
+E       {
+E           'api_families': [
+E               '/api/v1/admin',
+E               '/api/v1/analytics',
+E               '/api/v1/auth',
+E               '/api/v1/characters',
+E               '/api/v1/costume-assets',
+E               '/api/v1/costume_presets',
+E               '/api/v1/costumes',
+E               '/api/v1/garment-types',
+E               '/api/v1/generation-jobs',
+E               '/api/v1/meta',
+E               '/api/v1/outputs',
+E               '/api/v1/presence',
+E               '/api/v1/providers',
+E               '/api/v1/scene-references',
+E               '/api/v1/video',
+E           ],
+E           'enabled_models': [
+E               {
+E                   'model': 'starsfriday/Qwen-Image-NSFW',
+E                   'name': 'fal-ai',
+E                   'tasks': [
+E                       'text_to_image',
+E                   ],
+E               },
+E               {
+E                   'model': 'olesheva/Photorealistic_Fashion_Magazine_Editorial_LoRA',
+E                   'name': 'fal-ai-editorial',
+E                   'tasks': [
+E                       'text_to_image',
+E                   ],
+E               },
+E               {
+E                   'model': 'FireRedTeam/FireRed-Image-Edit-1.0',
+E                   'name': 'fal-ai-firered-image-edit-1',
+E                   'tasks': [
+E                       'image_to_image',
+E                       'multi_image_instruction',
+E                       'reference_conditioning',
+E                   ],
+E               },
+E               {
+E                   'model': 'black-forest-labs/FLUX.2-dev',
+E                   'name': 'fal-ai-flux-2-dev',
+E                   'tasks': [
+E                       'image_to_image',
+E                       'pose_transfer',
+E                       'reference_conditioning',
+E                   ],
+E               },
+E               {
+E                   'model': 'black-forest-labs/FLUX.1-dev',
+E                   'name': 'fal-ai-flux-dev',
+E                   'tasks': [
+E                       'text_to_image',
+E                   ],
+E               },
+E               {
+E                   'model': 'black-forest-labs/FLUX.2-klein-4B',
+E                   'name': 'fal-ai-flux-klein-4b',
+E                   'tasks': [
+E                       'image_to_image',
+E                       'pose_transfer',
+E                       'reference_conditioning',
+E                   ],
+E               },
+E               {
+E                   'model': 'black-forest-labs/FLUX.2-klein-base-9B',
+E                   'name': 'fal-ai-flux-klein-base-9b',
+E                   'tasks': [
+E                       'image_to_image',
+E                       'pose_transfer',
+E                       'reference_conditioning',
+E                   ],
+E               },
+E               {
+E                   'model': 'zai-org/GLM-Image',
+E                   'name': 'fal-ai-glm-image',
+E                   'tasks': [
+E                       'text_to_image',
+E                   ],
+E               },
+E               {
+E                   'model': 'tencent/HunyuanImage-3.0-Instruct',
+E                   'name': 'fal-ai-hunyuan-3-instruct',
+E                   'tasks': [
+E                       'image_to_image',
+E                       'multi_image_instruction',
+E                       'pose_transfer',
+E                       'reference_conditioning',
+E                       'text_to_image',
+E                   ],
+E               },
+E               {
+E                   'model': 'tencent/HunyuanImage-3.0',
+E                   'name': 'fal-ai-hunyuan-image-3',
+E                   'tasks': [
+E                       'text_to_image',
+E                   ],
+E               },
+E               {
+E                   'model': 'RomixERR/Pornmaster_v1-Z-Images-Turbo',
+E                   'name': 'fal-ai-pornmaster-v1-z-image-turbo',
+E                   'tasks': [
+E                       'text_to_image',
+E                   ],
+E               },
+E               {
+E                   'model': 'Qwen/Qwen-Image-2512',
+E                   'name': 'fal-ai-qwen-image-2512',
+E                   'tasks': [
+E                       'text_to_image',
+E                   ],
+E               },
+E               {
+E                   'model': 'stabilityai/stable-diffusion-3.5-large',
+E                   'name': 'fal-ai-sd35-large',
+E                   'tasks': [
+E                       'text_to_image',
+E                   ],
+E               },
+E               {
+E                   'model': 'ReCodePlus/Smnth_v1_NSFW1',
+E                   'name': 'fal-ai-smnth-v1-nsfw1',
+E                   'tasks': [
+E                       'text_to_image',
+E                   ],
+E               },
+E               {
+E                   'model': 'Tongyi-MAI/Z-Image',
+E                   'name': 'fal-ai-z-image',
+E                   'tasks': [
+E                       'text_to_image',
+E                   ],
+E               },
+E               {
+E                   'model': 'Tongyi-MAI/Z-Image-Turbo',
+E                   'name': 'fal-ai-z-image-turbo',
+E                   'tasks': [
+E                       'text_to_image',
+E                   ],
+E               },
+E               {
+E                   'model': 'gemini-3.1-flash-image-preview',
+E                   'name': 'google-banana-flash',
+E                   'tasks': [
+E                       'image_to_image',
+E                       'image_to_text',
+E                       'multi_image_instruction',
+E                       'pose_transfer',
+E                       'reference_conditioning',
+E                       'text_to_image',
+E                   ],
+E               },
+E               {
+E                   'model': 'gemini-3-pro-image-preview',
+E                   'name': 'google-banana-pro',
+E                   'tasks': [
+E                       'image_to_image',
+E                       'image_to_text',
+E                       'multi_image_instruction',
+E                       'pose_transfer',
+E                       'reference_conditioning',
+E                       'text_to_image',
+E                   ],
+E               },
+E               {
+E                   'model': 'Lightricks/LTX-2',
+E                   'name': 'ltx-2',
+E                   'tasks': [
+E                       'image_to_video',
+E                   ],
+E               },
+E               {
+E                   'model': 'mock',
+E                   'name': 'mock',
+E                   'tasks': [
+E                       'text_to_image',
+E                   ],
+E               },
+E               {
+E     -             'model': 'gpt-image-1.5',
+E     -             'name': 'openai-gpt-image-1.5',
+E     -             'tasks': [
+E     -                 'image_to_image',
+E     -                 'pose_transfer',
+E     -                 'reference_conditioning',
+E     -                 'text_to_image',
+E     -             ],
+E     -         },
+E     -         {
+E                   'model': 'Qwen/Qwen-Image-Edit-2511',
+E                   'name': 'qwen-image-edit-2511',
+E                   'tasks': [
+E                       'image_to_image',
+E                       'pose_transfer',
+E                       'reference_conditioning',
+E                   ],
+E               },
+E               {
+E                   'model': 'lightx2v/Wan2.2-Distill-Loras',
+E                   'name': 'wan-2-2-distill-loras',
+E                   'tasks': [
+E                       'image_to_video',
+E                   ],
+E               },
+E               {
+E                   'model': 'Wan-AI/Wan2.2-I2V-A14B',
+E                   'name': 'wan-2-2-i2v-a14b',
+E                   'tasks': [
+E                       'image_to_video',
+E                   ],
+E               },
+E           ],
+E           'task_to_models': {
+E               'image_to_image': [
+E                   'fal-ai-firered-image-edit-1',
+E                   'fal-ai-flux-2-dev',
+E                   'fal-ai-flux-klein-4b',
+E                   'fal-ai-flux-klein-base-9b',
+E                   'fal-ai-hunyuan-3-instruct',
+E                   'google-banana-flash',
+E                   'google-banana-pro',
+E     -             'openai-gpt-image-1.5',
+E                   'qwen-image-edit-2511',
+E               ],
+E               'image_to_text': [
+E                   'google-banana-flash',
+E                   'google-banana-pro',
+E               ],
+E               'image_to_video': [
+E                   'ltx-2',
+E                   'wan-2-2-distill-loras',
+E                   'wan-2-2-i2v-a14b',
+E               ],
+E               'multi_image_instruction': [
+E                   'fal-ai-firered-image-edit-1',
+E                   'fal-ai-hunyuan-3-instruct',
+E                   'google-banana-flash',
+E                   'google-banana-pro',
+E               ],
+E               'pose_transfer': [
+E                   'fal-ai-flux-2-dev',
+E                   'fal-ai-flux-klein-4b',
+E                   'fal-ai-flux-klein-base-9b',
+E                   'fal-ai-hunyuan-3-instruct',
+E                   'google-banana-flash',
+E                   'google-banana-pro',
+E     -             'openai-gpt-image-1.5',
+E                   'qwen-image-edit-2511',
+E               ],
+E               'reference_conditioning': [
+E                   'fal-ai-firered-image-edit-1',
+E                   'fal-ai-flux-2-dev',
+E                   'fal-ai-flux-klein-4b',
+E                   'fal-ai-flux-klein-base-9b',
+E                   'fal-ai-hunyuan-3-instruct',
+E                   'google-banana-flash',
+E                   'google-banana-pro',
+E     -             'openai-gpt-image-1.5',
+E                   'qwen-image-edit-2511',
+E               ],
+E               'text_to_image': [
+E                   'fal-ai',
+E                   'fal-ai-editorial',
+E                   'fal-ai-flux-dev',
+E                   'fal-ai-glm-image',
+E                   'fal-ai-hunyuan-3-instruct',
+E                   'fal-ai-hunyuan-image-3',
+E                   'fal-ai-pornmaster-v1-z-image-turbo',
+E                   'fal-ai-qwen-image-2512',
+E                   'fal-ai-sd35-large',
+E                   'fal-ai-smnth-v1-nsfw1',
+E                   'fal-ai-z-image',
+E                   'fal-ai-z-image-turbo',
+E                   'google-banana-flash',
+E                   'google-banana-pro',
+E                   'mock',
+E     -             'openai-gpt-image-1.5',
+E               ],
+E           },
+E       }
+=========================== short test summary info ============================
+FAILED tests/contracts/test_feature_manifest_freeze.py::test_feature_manifest_is_frozen - AssertionError: assert {'enabled_models': [{'name': 'fal-ai', 'model': 'starsfriday/Qwen-Image-NSFW', 'tasks': ['text_to_image']}, {'name': 'fal-ai-editorial', 'model': 'olesheva/Photorealistic_Fashion_Magazine_Editorial_LoRA', 'tasks': ['text_to_image']}, {'name': 'fal-ai-firered-image-edit-1', 'model': 'FireRedTeam/FireRed-Image-Edit-1.0', 'tasks': ['image_to_image', 'multi_image_instruction', 'reference_conditioning']}, {'name': 'fal-ai-flux-2-dev', 'model': 'black-forest-labs/FLUX.2-dev', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'name': 'fal-ai-flux-dev', 'model': 'black-forest-labs/FLUX.1-dev', 'tasks': ['text_to_image']}, {'name': 'fal-ai-flux-klein-4b', 'model': 'black-forest-labs/FLUX.2-klein-4B', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'name': 'fal-ai-flux-klein-base-9b', 'model': 'black-forest-labs/FLUX.2-klein-base-9B', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'name': 'fal-ai-glm-image', 'model': 'zai-org/GLM-Image', 'tasks': ['text_to_image']}, {'name': 'fal-ai-hunyuan-3-instruct', 'model': 'tencent/HunyuanImage-3.0-Instruct', 'tasks': ['image_to_image', 'multi_image_instruction', 'pose_transfer', 'reference_conditioning', 'text_to_image']}, {'name': 'fal-ai-hunyuan-image-3', 'model': 'tencent/HunyuanImage-3.0', 'tasks': ['text_to_image']}, {'name': 'fal-ai-pornmaster-v1-z-image-turbo', 'model': 'RomixERR/Pornmaster_v1-Z-Images-Turbo', 'tasks': ['text_to_image']}, {'name': 'fal-ai-qwen-image-2512', 'model': 'Qwen/Qwen-Image-2512', 'tasks': ['text_to_image']}, {'name': 'fal-ai-sd35-large', 'model': 'stabilityai/stable-diffusion-3.5-large', 'tasks': ['text_to_image']}, {'name': 'fal-ai-smnth-v1-nsfw1', 'model': 'ReCodePlus/Smnth_v1_NSFW1', 'tasks': ['text_to_image']}, {'name': 'fal-ai-z-image', 'model': 'Tongyi-MAI/Z-Image', 'tasks': ['text_to_image']}, {'name': 'fal-ai-z-image-turbo', 'model': 'Tongyi-MAI/Z-Image-Turbo', 'tasks': ['text_to_image']}, {'name': 'google-banana-flash', 'model': 'gemini-3.1-flash-image-preview', 'tasks': ['image_to_image', 'image_to_text', 'multi_image_instruction', 'pose_transfer', 'reference_conditioning', 'text_to_image']}, {'name': 'google-banana-pro', 'model': 'gemini-3-pro-image-preview', 'tasks': ['image_to_image', 'image_to_text', 'multi_image_instruction', 'pose_transfer', 'reference_conditioning', 'text_to_image']}, {'name': 'ltx-2', 'model': 'Lightricks/LTX-2', 'tasks': ['image_to_video']}, {'name': 'mock', 'model': 'mock', 'tasks': ['text_to_image']}, {'name': 'qwen-image-edit-2511', 'model': 'Qwen/Qwen-Image-Edit-2511', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'name': 'wan-2-2-distill-loras', 'model': 'lightx2v/Wan2.2-Distill-Loras', 'tasks': ['image_to_video']}, {'name': 'wan-2-2-i2v-a14b', 'model': 'Wan-AI/Wan2.2-I2V-A14B', 'tasks': ['image_to_video']}], 'task_to_models': {'image_to_image': ['fal-ai-firered-image-edit-1', 'fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fal-ai-flux-klein-base-9b', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro', 'qwen-image-edit-2511'], 'image_to_text': ['google-banana-flash', 'google-banana-pro'], 'image_to_video': ['ltx-2', 'wan-2-2-distill-loras', 'wan-2-2-i2v-a14b'], 'multi_image_instruction': ['fal-ai-firered-image-edit-1', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro'], 'pose_transfer': ['fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fal-ai-flux-klein-base-9b', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro', 'qwen-image-edit-2511'], 'reference_conditioning': ['fal-ai-firered-image-edit-1', 'fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fal-ai-flux-klein-base-9b', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro', 'qwen-image-edit-2511'], 'text_to_image': ['fal-ai', 'fal-ai-editorial', 'fal-ai-flux-dev', 'fal-ai-glm-image', 'fal-ai-hunyuan-3-instruct', 'fal-ai-hunyuan-image-3', 'fal-ai-pornmaster-v1-z-image-turbo', 'fal-ai-qwen-image-2512', 'fal-ai-sd35-large', 'fal-ai-smnth-v1-nsfw1', 'fal-ai-z-image', 'fal-ai-z-image-turbo', 'google-banana-flash', 'google-banana-pro', 'mock']}, 'api_families': ['/api/v1/admin', '/api/v1/analytics', '/api/v1/auth', '/api/v1/characters', '/api/v1/costume-assets', '/api/v1/costume_presets', '/api/v1/costumes', '/api/v1/garment-types', '/api/v1/generation-jobs', '/api/v1/meta', '/api/v1/outputs', '/api/v1/presence', '/api/v1/providers', '/api/v1/scene-references', '/api/v1/video']} == {'api_families': ['/api/v1/admin', '/api/v1/analytics', '/api/v1/auth', '/api/v1/characters', '/api/v1/costume-assets', '/api/v1/costume_presets', '/api/v1/costumes', '/api/v1/garment-types', '/api/v1/generation-jobs', '/api/v1/meta', '/api/v1/outputs', '/api/v1/presence', '/api/v1/providers', '/api/v1/scene-references', '/api/v1/video'], 'enabled_models': [{'model': 'starsfriday/Qwen-Image-NSFW', 'name': 'fal-ai', 'tasks': ['text_to_image']}, {'model': 'olesheva/Photorealistic_Fashion_Magazine_Editorial_LoRA', 'name': 'fal-ai-editorial', 'tasks': ['text_to_image']}, {'model': 'FireRedTeam/FireRed-Image-Edit-1.0', 'name': 'fal-ai-firered-image-edit-1', 'tasks': ['image_to_image', 'multi_image_instruction', 'reference_conditioning']}, {'model': 'black-forest-labs/FLUX.2-dev', 'name': 'fal-ai-flux-2-dev', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'model': 'black-forest-labs/FLUX.1-dev', 'name': 'fal-ai-flux-dev', 'tasks': ['text_to_image']}, {'model': 'black-forest-labs/FLUX.2-klein-4B', 'name': 'fal-ai-flux-klein-4b', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'model': 'black-forest-labs/FLUX.2-klein-base-9B', 'name': 'fal-ai-flux-klein-base-9b', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'model': 'zai-org/GLM-Image', 'name': 'fal-ai-glm-image', 'tasks': ['text_to_image']}, {'model': 'tencent/HunyuanImage-3.0-Instruct', 'name': 'fal-ai-hunyuan-3-instruct', 'tasks': ['image_to_image', 'multi_image_instruction', 'pose_transfer', 'reference_conditioning', 'text_to_image']}, {'model': 'tencent/HunyuanImage-3.0', 'name': 'fal-ai-hunyuan-image-3', 'tasks': ['text_to_image']}, {'model': 'RomixERR/Pornmaster_v1-Z-Images-Turbo', 'name': 'fal-ai-pornmaster-v1-z-image-turbo', 'tasks': ['text_to_image']}, {'model': 'Qwen/Qwen-Image-2512', 'name': 'fal-ai-qwen-image-2512', 'tasks': ['text_to_image']}, {'model': 'stabilityai/stable-diffusion-3.5-large', 'name': 'fal-ai-sd35-large', 'tasks': ['text_to_image']}, {'model': 'ReCodePlus/Smnth_v1_NSFW1', 'name': 'fal-ai-smnth-v1-nsfw1', 'tasks': ['text_to_image']}, {'model': 'Tongyi-MAI/Z-Image', 'name': 'fal-ai-z-image', 'tasks': ['text_to_image']}, {'model': 'Tongyi-MAI/Z-Image-Turbo', 'name': 'fal-ai-z-image-turbo', 'tasks': ['text_to_image']}, {'model': 'gemini-3.1-flash-image-preview', 'name': 'google-banana-flash', 'tasks': ['image_to_image', 'image_to_text', 'multi_image_instruction', 'pose_transfer', 'reference_conditioning', 'text_to_image']}, {'model': 'gemini-3-pro-image-preview', 'name': 'google-banana-pro', 'tasks': ['image_to_image', 'image_to_text', 'multi_image_instruction', 'pose_transfer', 'reference_conditioning', 'text_to_image']}, {'model': 'Lightricks/LTX-2', 'name': 'ltx-2', 'tasks': ['image_to_video']}, {'model': 'mock', 'name': 'mock', 'tasks': ['text_to_image']}, {'model': 'gpt-image-1.5', 'name': 'openai-gpt-image-1.5', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning', 'text_to_image']}, {'model': 'Qwen/Qwen-Image-Edit-2511', 'name': 'qwen-image-edit-2511', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, {'model': 'lightx2v/Wan2.2-Distill-Loras', 'name': 'wan-2-2-distill-loras', 'tasks': ['image_to_video']}, {'model': 'Wan-AI/Wan2.2-I2V-A14B', 'name': 'wan-2-2-i2v-a14b', 'tasks': ['image_to_video']}], 'task_to_models': {'image_to_image': ['fal-ai-firered-image-edit-1', 'fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fal-ai-flux-klein-base-9b', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro', 'openai-gpt-image-1.5', 'qwen-image-edit-2511'], 'image_to_text': ['google-banana-flash', 'google-banana-pro'], 'image_to_video': ['ltx-2', 'wan-2-2-distill-loras', 'wan-2-2-i2v-a14b'], 'multi_image_instruction': ['fal-ai-firered-image-edit-1', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro'], 'pose_transfer': ['fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fal-ai-flux-klein-base-9b', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro', 'openai-gpt-image-1.5', 'qwen-image-edit-2511'], 'reference_conditioning': ['fal-ai-firered-image-edit-1', 'fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fal-ai-flux-klein-base-9b', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro', 'openai-gpt-image-1.5', 'qwen-image-edit-2511'], 'text_to_image': ['fal-ai', 'fal-ai-editorial', 'fal-ai-flux-dev', 'fal-ai-glm-image', 'fal-ai-hunyuan-3-instruct', 'fal-ai-hunyuan-image-3', 'fal-ai-pornmaster-v1-z-image-turbo', 'fal-ai-qwen-image-2512', 'fal-ai-sd35-large', 'fal-ai-smnth-v1-nsfw1', 'fal-ai-z-image', 'fal-ai-z-image-turbo', 'google-banana-flash', 'google-banana-pro', 'mock', 'openai-gpt-image-1.5']}}
+  
+  Common items:
+  {'api_families': ['/api/v1/admin',
+                    '/api/v1/analytics',
+                    '/api/v1/auth',
+                    '/api/v1/characters',
+                    '/api/v1/costume-assets',
+                    '/api/v1/costume_presets',
+                    '/api/v1/costumes',
+                    '/api/v1/garment-types',
+                    '/api/v1/generation-jobs',
+                    '/api/v1/meta',
+                    '/api/v1/outputs',
+                    '/api/v1/presence',
+                    '/api/v1/providers',
+                    '/api/v1/scene-references',
+                    '/api/v1/video']}
+  Differing items:
+  {'enabled_models': [{'model': 'starsfriday/Qwen-Image-NSFW', 'name': 'fal-ai', 'tasks': ['text_to_image']}, {'model': ...ein-4B', 'name': 'fal-ai-flux-klein-4b', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, ...]} != {'enabled_models': [{'model': 'starsfriday/Qwen-Image-NSFW', 'name': 'fal-ai', 'tasks': ['text_to_image']}, {'model': ...ein-4B', 'name': 'fal-ai-flux-klein-4b', 'tasks': ['image_to_image', 'pose_transfer', 'reference_conditioning']}, ...]}
+  {'task_to_models': {'image_to_image': ['fal-ai-firered-image-edit-1', 'fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fa...ction': ['fal-ai-firered-image-edit-1', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro'], ...}} != {'task_to_models': {'image_to_image': ['fal-ai-firered-image-edit-1', 'fal-ai-flux-2-dev', 'fal-ai-flux-klein-4b', 'fa...ction': ['fal-ai-firered-image-edit-1', 'fal-ai-hunyuan-3-instruct', 'google-banana-flash', 'google-banana-pro'], ...}}
+  
+  Full diff:
+    {
+        'api_families': [
+            '/api/v1/admin',
+            '/api/v1/analytics',
+            '/api/v1/auth',
+            '/api/v1/characters',
+            '/api/v1/costume-assets',
+            '/api/v1/costume_presets',
+            '/api/v1/costumes',
+            '/api/v1/garment-types',
+            '/api/v1/generation-jobs',
+            '/api/v1/meta',
+            '/api/v1/outputs',
+            '/api/v1/presence',
+            '/api/v1/providers',
+            '/api/v1/scene-references',
+            '/api/v1/video',
+        ],
+        'enabled_models': [
+            {
+                'model': 'starsfriday/Qwen-Image-NSFW',
+                'name': 'fal-ai',
+                'tasks': [
+                    'text_to_image',
+                ],
+            },
+            {
+                'model': 'olesheva/Photorealistic_Fashion_Magazine_Editorial_LoRA',
+                'name': 'fal-ai-editorial',
+                'tasks': [
+                    'text_to_image',
+                ],
+            },
+            {
+                'model': 'FireRedTeam/FireRed-Image-Edit-1.0',
+                'name': 'fal-ai-firered-image-edit-1',
+                'tasks': [
+                    'image_to_image',
+                    'multi_image_instruction',
+                    'reference_conditioning',
+                ],
+            },
+            {
+                'model': 'black-forest-labs/FLUX.2-dev',
+                'name': 'fal-ai-flux-2-dev',
+                'tasks': [
+                    'image_to_image',
+                    'pose_transfer',
+                    'reference_conditioning',
+                ],
+            },
+            {
+                'model': 'black-forest-labs/FLUX.1-dev',
+                'name': 'fal-ai-flux-dev',
+                'tasks': [
+                    'text_to_image',
+                ],
+            },
+            {
+                'model': 'black-forest-labs/FLUX.2-klein-4B',
+                'name': 'fal-ai-flux-klein-4b',
+                'tasks': [
+                    'image_to_image',
+                    'pose_transfer',
+                    'reference_conditioning',
+                ],
+            },
+            {
+                'model': 'black-forest-labs/FLUX.2-klein-base-9B',
+                'name': 'fal-ai-flux-klein-base-9b',
+                'tasks': [
+                    'image_to_image',
+                    'pose_transfer',
+                    'reference_conditioning',
+                ],
+            },
+            {
+                'model': 'zai-org/GLM-Image',
+                'name': 'fal-ai-glm-image',
+                'tasks': [
+                    'text_to_image',
+                ],
+            },
+            {
+                'model': 'tencent/HunyuanImage-3.0-Instruct',
+                'name': 'fal-ai-hunyuan-3-instruct',
+                'tasks': [
+                    'image_to_image',
+                    'multi_image_instruction',
+                    'pose_transfer',
+                    'reference_conditioning',
+                    'text_to_image',
+                ],
+            },
+            {
+                'model': 'tencent/HunyuanImage-3.0',
+                'name': 'fal-ai-hunyuan-image-3',
+                'tasks': [
+                    'text_to_image',
+                ],
+            },
+            {
+                'model': 'RomixERR/Pornmaster_v1-Z-Images-Turbo',
+                'name': 'fal-ai-pornmaster-v1-z-image-turbo',
+                'tasks': [
+                    'text_to_image',
+                ],
+            },
+            {
+                'model': 'Qwen/Qwen-Image-2512',
+                'name': 'fal-ai-qwen-image-2512',
+                'tasks': [
+                    'text_to_image',
+                ],
+            },
+            {
+                'model': 'stabilityai/stable-diffusion-3.5-large',
+                'name': 'fal-ai-sd35-large',
+                'tasks': [
+                    'text_to_image',
+                ],
+            },
+            {
+                'model': 'ReCodePlus/Smnth_v1_NSFW1',
+                'name': 'fal-ai-smnth-v1-nsfw1',
+                'tasks': [
+                    'text_to_image',
+                ],
+            },
+            {
+                'model': 'Tongyi-MAI/Z-Image',
+                'name': 'fal-ai-z-image',
+                'tasks': [
+                    'text_to_image',
+                ],
+            },
+            {
+                'model': 'Tongyi-MAI/Z-Image-Turbo',
+                'name': 'fal-ai-z-image-turbo',
+                'tasks': [
+                    'text_to_image',
+                ],
+            },
+            {
+                'model': 'gemini-3.1-flash-image-preview',
+                'name': 'google-banana-flash',
+                'tasks': [
+                    'image_to_image',
+                    'image_to_text',
+                    'multi_image_instruction',
+                    'pose_transfer',
+                    'reference_conditioning',
+                    'text_to_image',
+                ],
+            },
+            {
+                'model': 'gemini-3-pro-image-preview',
+                'name': 'google-banana-pro',
+                'tasks': [
+                    'image_to_image',
+                    'image_to_text',
+                    'multi_image_instruction',
+                    'pose_transfer',
+                    'reference_conditioning',
+                    'text_to_image',
+                ],
+            },
+            {
+                'model': 'Lightricks/LTX-2',
+                'name': 'ltx-2',
+                'tasks': [
+                    'image_to_video',
+                ],
+            },
+            {
+                'model': 'mock',
+                'name': 'mock',
+                'tasks': [
+                    'text_to_image',
+                ],
+            },
+            {
+  -             'model': 'gpt-image-1.5',
+  -             'name': 'openai-gpt-image-1.5',
+  -             'tasks': [
+  -                 'image_to_image',
+  -                 'pose_transfer',
+  -                 'reference_conditioning',
+  -                 'text_to_image',
+  -             ],
+  -         },
+  -         {
+                'model': 'Qwen/Qwen-Image-Edit-2511',
+                'name': 'qwen-image-edit-2511',
+                'tasks': [
+                    'image_to_image',
+                    'pose_transfer',
+                    'reference_conditioning',
+                ],
+            },
+            {
+                'model': 'lightx2v/Wan2.2-Distill-Loras',
+                'name': 'wan-2-2-distill-loras',
+                'tasks': [
+                    'image_to_video',
+                ],
+            },
+            {
+                'model': 'Wan-AI/Wan2.2-I2V-A14B',
+                'name': 'wan-2-2-i2v-a14b',
+                'tasks': [
+                    'image_to_video',
+                ],
+            },
+        ],
+        'task_to_models': {
+            'image_to_image': [
+                'fal-ai-firered-image-edit-1',
+                'fal-ai-flux-2-dev',
+                'fal-ai-flux-klein-4b',
+                'fal-ai-flux-klein-base-9b',
+                'fal-ai-hunyuan-3-instruct',
+                'google-banana-flash',
+                'google-banana-pro',
+  -             'openai-gpt-image-1.5',
+                'qwen-image-edit-2511',
+            ],
+            'image_to_text': [
+                'google-banana-flash',
+                'google-banana-pro',
+            ],
+            'image_to_video': [
+                'ltx-2',
+                'wan-2-2-distill-loras',
+                'wan-2-2-i2v-a14b',
+            ],
+            'multi_image_instruction': [
+                'fal-ai-firered-image-edit-1',
+                'fal-ai-hunyuan-3-instruct',
+                'google-banana-flash',
+                'google-banana-pro',
+            ],
+            'pose_transfer': [
+                'fal-ai-flux-2-dev',
+                'fal-ai-flux-klein-4b',
+                'fal-ai-flux-klein-base-9b',
+                'fal-ai-hunyuan-3-instruct',
+                'google-banana-flash',
+                'google-banana-pro',
+  -             'openai-gpt-image-1.5',
+                'qwen-image-edit-2511',
+            ],
+            'reference_conditioning': [
+                'fal-ai-firered-image-edit-1',
+                'fal-ai-flux-2-dev',
+                'fal-ai-flux-klein-4b',
+                'fal-ai-flux-klein-base-9b',
+                'fal-ai-hunyuan-3-instruct',
+                'google-banana-flash',
+                'google-banana-pro',
+  -             'openai-gpt-image-1.5',
+                'qwen-image-edit-2511',
+            ],
+            'text_to_image': [
+                'fal-ai',
+                'fal-ai-editorial',
+                'fal-ai-flux-dev',
+                'fal-ai-glm-image',
+                'fal-ai-hunyuan-3-instruct',
+                'fal-ai-hunyuan-image-3',
+                'fal-ai-pornmaster-v1-z-image-turbo',
+                'fal-ai-qwen-image-2512',
+                'fal-ai-sd35-large',
+                'fal-ai-smnth-v1-nsfw1',
+                'fal-ai-z-image',
+                'fal-ai-z-image-turbo',
+                'google-banana-flash',
+                'google-banana-pro',
+                'mock',
+  -             'openai-gpt-image-1.5',
+            ],
+        },
+    }
+============================== 1 failed in 0.94s ===============================

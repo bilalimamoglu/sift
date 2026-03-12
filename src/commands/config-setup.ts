@@ -178,7 +178,7 @@ function writeNextSteps(io: ConfigSetupIO): void {
 
   io.write(`\n${ui.section("Try next")}\n`);
   io.write(`  ${ui.command("sift doctor")}\n`);
-  io.write(`  ${ui.command("sift exec --preset test-status -- pytest")}\n`);
+  io.write(`  ${ui.command("sift exec --preset test-status -- npm test")}\n`);
 }
 
 export async function configSetup(options: {

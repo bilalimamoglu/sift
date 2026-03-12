@@ -2,6 +2,7 @@ export type ProviderName = "openai" | "openai-compatible";
 
 export type OutputFormat = "brief" | "bullets" | "json" | "verdict";
 export type DetailLevel = "standard" | "focused" | "verbose";
+export type Goal = "summarize" | "diagnose";
 
 export type ResponseMode = "text" | "json";
 export type JsonResponseFormatMode = "auto" | "on" | "off";
@@ -91,12 +92,18 @@ export interface RunRequest {
   format: OutputFormat;
   stdin: string;
   config: SiftConfig;
+  goal?: Goal;
   dryRun?: boolean;
   showRaw?: boolean;
   detail?: DetailLevel;
   presetName?: string;
   policyName?: PromptPolicyName;
   outputContract?: string;
+  analysisContext?: string;
+  testStatusContext?: {
+    resolvedTests?: string[];
+    remainingTests?: string[];
+  };
   fallbackJson?: unknown;
 }
 

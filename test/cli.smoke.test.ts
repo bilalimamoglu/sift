@@ -20,6 +20,9 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("OPENAI_API_KEY");
     expect(result.stdout).toContain("--show-raw");
     expect(result.stdout).toContain("--detail <mode>");
+    expect(result.stdout).toContain("escalate");
+    expect(result.stdout).toContain("rerun");
+    expect(result.stdout).toContain("agent <action> [name]");
   });
 
   it("prints exec help with passthrough usage", () => {
@@ -30,7 +33,56 @@ describe("CLI smoke", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("  \\\\  //");
     expect(result.stdout).toContain("sift exec [question] [options] -- <program> [args...]");
-    expect(result.stdout).toContain("exec --preset test-status -- pytest");
+    expect(result.stdout).toContain("exec --preset test-status -- npm test");
+    expect(result.stdout).toContain("--diff");
+  });
+
+  it("prints escalate help", () => {
+    const result = runCli({
+      args: ["escalate", "--help"]
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("sift escalate [options]");
+    expect(result.stdout).toContain("Escalation detail level: focused | verbose");
+    expect(result.stdout).toContain("--show-raw");
+  });
+
+  it("prints rerun help", () => {
+    const result = runCli({
+      args: ["rerun", "--help"]
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("sift rerun [options]");
+    expect(result.stdout).toContain("rerun --remaining --detail focused");
+    expect(result.stdout).toContain("--remaining");
+    expect(result.stdout).toContain("--show-raw");
+  });
+
+  it("prints watch help", () => {
+    const result = runCli({
+      args: ["watch", "--help"]
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("sift watch [question] [options]");
+    expect(result.stdout).toContain("watch --preset test-status < pytest-watch.txt");
+    expect(result.stdout).toContain("--goal <goal>");
+  });
+
+  it("prints agent help with scope and dry-run examples", () => {
+    const result = runCli({
+      args: ["agent", "--help"]
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("agent <show|install|remove|status> [name] [options]");
+    expect(result.stdout).toContain("agent install codex --dry-run");
+    expect(result.stdout).toContain("agent show codex --raw");
+    expect(result.stdout).toContain("agent install codex --dry-run --raw");
+    expect(result.stdout).toContain("--scope <scope>");
+    expect(result.stdout).toContain("--raw");
   });
 
   it("supports config init, show, and validate", async () => {
@@ -296,7 +348,9 @@ describe("CLI smoke", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("import/dependency errors during collection");
+    expect(result.stdout).toContain(
+      "Import/dependency blocker: at least 2 visible errors are caused by missing dependencies during test collection."
+    );
     expect(result.stdout).toContain("tests/unit/test_auth.py -> missing module: pydantic");
     expect(result.stdout).toContain("tests/unit/test_api.py -> missing module: fastapi");
   });

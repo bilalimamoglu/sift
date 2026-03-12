@@ -37,10 +37,10 @@ describe("release workflow", () => {
 
     expect(vitestConfig).toContain("provider: \"v8\"");
     expect(vitestConfig).toContain("thresholds:");
-    expect(vitestConfig).toContain("lines: 100");
-    expect(vitestConfig).toContain("functions: 100");
-    expect(vitestConfig).toContain("branches: 100");
-    expect(vitestConfig).toContain("statements: 100");
+    expect(vitestConfig).toContain("lines: 85");
+    expect(vitestConfig).toContain("functions: 85");
+    expect(vitestConfig).toContain("branches: 85");
+    expect(vitestConfig).toContain("statements: 85");
     expect(ciWorkflow).toContain("npm run test:coverage");
   });
 

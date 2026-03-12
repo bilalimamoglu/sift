@@ -19,9 +19,13 @@ vi.mock("../src/prompts/buildPrompt.js", () => ({
 vi.mock("../src/core/fallback.js", () => ({
   buildFallbackOutput: buildFallbackOutputMock
 }));
-vi.mock("../src/core/heuristics.js", () => ({
-  applyHeuristicPolicy: applyHeuristicPolicyMock
-}));
+vi.mock("../src/core/heuristics.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/core/heuristics.js")>();
+  return {
+    ...actual,
+    applyHeuristicPolicy: applyHeuristicPolicyMock
+  };
+});
 vi.mock("../src/core/pipeline.js", () => ({
   prepareInput: prepareInputMock
 }));
@@ -81,7 +85,18 @@ describe("runSift unit", () => {
   });
 
   it("returns heuristic dry-run payloads", async () => {
-    applyHeuristicPolicyMock.mockReturnValue("- Tests passed.");
+    prepareInputMock.mockReturnValue({
+      raw: "12 passed",
+      sanitized: "12 passed",
+      redacted: "12 passed",
+      truncated: "12 passed",
+      meta: {
+        originalLength: 9,
+        finalLength: 9,
+        redactionApplied: false,
+        truncatedApplied: false
+      }
+    });
     const { runSift } = await import("../src/core/run.js");
 
     const output = await runSift(makeRequest({ dryRun: true, policyName: "test-status" }));
@@ -89,11 +104,22 @@ describe("runSift unit", () => {
 
     expect(parsed.status).toBe("dry-run");
     expect(parsed.strategy).toBe("heuristic");
-    expect(parsed.heuristicOutput).toBe("- Tests passed.");
+    expect(parsed.heuristicOutput).toContain("Tests passed.");
   });
 
   it("logs heuristic usage in verbose mode", async () => {
-    applyHeuristicPolicyMock.mockReturnValue("- Tests passed.");
+    prepareInputMock.mockReturnValue({
+      raw: "12 passed",
+      sanitized: "12 passed",
+      redacted: "12 passed",
+      truncated: "12 passed",
+      meta: {
+        originalLength: 9,
+        finalLength: 9,
+        redactionApplied: false,
+        truncatedApplied: false
+      }
+    });
     const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const { runSift } = await import("../src/core/run.js");
 
@@ -110,7 +136,7 @@ describe("runSift unit", () => {
           }
         })
       )
-    ).resolves.toBe("- Tests passed.");
+    ).resolves.toContain("Tests passed.");
 
     expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("heuristic=test-status"));
   });

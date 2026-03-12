@@ -3,13 +3,19 @@ import type { RunRequest } from "../types.js";
 import { createProvider } from "../providers/factory.js";
 import { buildPrompt } from "../prompts/buildPrompt.js";
 import { buildFallbackOutput } from "./fallback.js";
-import { applyHeuristicPolicy } from "./heuristics.js";
+import { analyzeTestStatus, applyHeuristicPolicy } from "./heuristics.js";
 import {
   buildInsufficientSignalOutput,
   isInsufficientSignalOutput
 } from "./insufficient.js";
 import { prepareInput } from "./pipeline.js";
 import { isRetriableReason, looksLikeRejectedModelOutput } from "./quality.js";
+import {
+  buildTestStatusAnalysisContext,
+  buildTestStatusDiagnoseContract,
+  TEST_STATUS_DIAGNOSE_JSON_CONTRACT,
+  type TestStatusDiagnoseContract
+} from "./testStatusDecision.js";
 
 const RETRY_DELAY_MS = 300;
 
@@ -33,11 +39,12 @@ function buildDryRunOutput(args: {
   responseMode: "text" | "json";
   prepared: ReturnType<typeof prepareInput>;
   heuristicOutput: string | null;
+  strategy?: "heuristic" | "provider" | "hybrid";
 }): string {
   return JSON.stringify(
     {
       status: "dry-run",
-      strategy: args.heuristicOutput ? "heuristic" : "provider",
+      strategy: args.strategy ?? (args.heuristicOutput ? "heuristic" : "provider"),
       provider: {
         name: args.providerName,
         model: args.request.config.provider.model,
@@ -122,16 +129,88 @@ async function generateWithRetry(args: {
   return generate();
 }
 
+function hasRecognizableTestStatusSignal(input: string): boolean {
+  const analysis = analyzeTestStatus(input);
+  return (
+    analysis.collectionErrorCount !== undefined ||
+    analysis.noTestsCollected ||
+    analysis.interrupted ||
+    analysis.failed > 0 ||
+    analysis.errors > 0 ||
+    analysis.passed > 0 ||
+    analysis.inlineItems.length > 0 ||
+    analysis.buckets.length > 0
+  );
+}
+
+function buildTestStatusFallbackContract(args: {
+  contract: TestStatusDiagnoseContract;
+  reason: string;
+}): string {
+  return JSON.stringify(
+    {
+      ...args.contract,
+      status: "insufficient",
+      diagnosis_complete: false,
+      raw_needed: true,
+      additional_source_read_likely_low_value: false,
+      read_raw_only_if: "you still need exact traceback lines after the provider follow-up failed",
+      next_best_action: {
+        code: "read_raw_for_exact_traceback",
+        bucket_index:
+          args.contract.dominant_blocker_bucket_index ?? args.contract.main_buckets[0]?.bucket_index ?? null,
+        note: `Provider follow-up failed (${args.reason}). Use focused or verbose detail, then raw only if exact traceback lines are still needed.`
+      }
+    },
+    null,
+    2
+  );
+}
+
 export async function runSift(request: RunRequest): Promise<string> {
   const prepared = prepareInput(request.stdin, request.config.input);
-  const { prompt, responseMode } = buildPrompt({
+  const hasTestStatusSignal =
+    request.policyName === "test-status" && hasRecognizableTestStatusSignal(prepared.truncated);
+  const testStatusDecision =
+    hasTestStatusSignal && request.policyName === "test-status"
+      ? buildTestStatusDiagnoseContract({
+          input: prepared.truncated,
+          analysis: analyzeTestStatus(prepared.truncated),
+          resolvedTests: request.testStatusContext?.resolvedTests,
+          remainingTests: request.testStatusContext?.remainingTests
+        })
+      : null;
+  const testStatusHeuristicOutput =
+    testStatusDecision === null
+      ? null
+      : request.goal === "diagnose" && request.format === "json"
+        ? JSON.stringify(testStatusDecision.contract, null, 2)
+        : request.detail === "verbose"
+          ? testStatusDecision.verboseText
+          : request.detail === "focused"
+            ? testStatusDecision.focusedText
+            : testStatusDecision.standardText;
+  const prompt = buildPrompt({
     question: request.question,
     format: request.format,
+    goal: request.goal,
     input: prepared.truncated,
     detail: request.detail,
     policyName: request.policyName,
-    outputContract: request.outputContract
+    outputContract:
+      request.policyName === "test-status" &&
+      request.goal === "diagnose" &&
+      request.format === "json"
+        ? request.outputContract ?? TEST_STATUS_DIAGNOSE_JSON_CONTRACT
+        : request.outputContract,
+    analysisContext: [
+      request.analysisContext,
+      testStatusDecision ? buildTestStatusAnalysisContext(testStatusDecision.contract) : undefined
+    ]
+      .filter((value): value is string => Boolean(value))
+      .join("\n\n")
   });
+  const { responseMode } = prompt;
 
   const provider = createProvider(request.config);
 
@@ -141,11 +220,12 @@ export async function runSift(request: RunRequest): Promise<string> {
     );
   }
 
-  const heuristicOutput = applyHeuristicPolicy(
-    request.policyName,
-    prepared.truncated,
-    request.detail
-  );
+  const heuristicOutput =
+    request.policyName === "test-status"
+      ? testStatusDecision?.contract.diagnosis_complete
+        ? testStatusHeuristicOutput
+        : null
+      : applyHeuristicPolicy(request.policyName, prepared.truncated, request.detail);
 
   if (heuristicOutput) {
     if (request.config.runtime.verbose) {
@@ -156,10 +236,11 @@ export async function runSift(request: RunRequest): Promise<string> {
       return buildDryRunOutput({
         request,
         providerName: provider.name,
-        prompt,
+        prompt: prompt.prompt,
         responseMode,
         prepared,
-        heuristicOutput
+        heuristicOutput,
+        strategy: "heuristic"
       });
     }
 
@@ -174,10 +255,11 @@ export async function runSift(request: RunRequest): Promise<string> {
     return buildDryRunOutput({
       request,
       providerName: provider.name,
-      prompt,
+      prompt: prompt.prompt,
       responseMode,
       prepared,
-      heuristicOutput: null
+      heuristicOutput: testStatusDecision ? testStatusHeuristicOutput : null,
+      strategy: testStatusDecision ? "hybrid" : "provider"
     });
   }
 
@@ -185,7 +267,7 @@ export async function runSift(request: RunRequest): Promise<string> {
     const result = await generateWithRetry({
       provider,
       request,
-      prompt,
+      prompt: prompt.prompt,
       responseMode
     });
 
@@ -206,6 +288,17 @@ export async function runSift(request: RunRequest): Promise<string> {
     });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "unknown_error";
+
+     if (testStatusDecision) {
+      if (request.goal === "diagnose" && request.format === "json") {
+        return buildTestStatusFallbackContract({
+          contract: testStatusDecision.contract,
+          reason
+        });
+      }
+
+      return `${testStatusHeuristicOutput}\n- Provider follow-up failed: ${reason}. Use focused or verbose detail, then raw only if exact traceback lines are still needed.`;
+    }
 
     return withInsufficientHint({
       output: buildFallbackOutput({

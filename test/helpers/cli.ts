@@ -6,6 +6,7 @@ import path from "node:path";
 const root = path.resolve(import.meta.dirname, "..", "..");
 const srcCli = path.join(root, "src", "cli.ts");
 const distCli = path.join(root, "dist", "cli.js");
+const tsxLoader = path.join(root, "node_modules", "tsx", "dist", "loader.mjs");
 const ISOLATED_ENV_KEYS = [
   "SIFT_PROVIDER",
   "SIFT_MODEL",
@@ -51,7 +52,7 @@ function createBaseChildEnv(overrides?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 export function runCli(options: RunCliOptions = {}) {
   const args = options.useDist
     ? [distCli, ...(options.args ?? [])]
-    : ["--import", "tsx", srcCli, ...(options.args ?? [])];
+    : ["--import", tsxLoader, srcCli, ...(options.args ?? [])];
 
   return spawnSync(process.execPath, args, {
     cwd: options.cwd ?? root,
@@ -64,7 +65,7 @@ export function runCli(options: RunCliOptions = {}) {
 export async function runCliAsync(options: RunCliOptions = {}) {
   const args = options.useDist
     ? [distCli, ...(options.args ?? [])]
-    : ["--import", "tsx", srcCli, ...(options.args ?? [])];
+    : ["--import", tsxLoader, srcCli, ...(options.args ?? [])];
 
   const child = spawn(process.execPath, args, {
     cwd: options.cwd ?? root,

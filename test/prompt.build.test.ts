@@ -98,4 +98,20 @@ describe("buildPrompt", () => {
     expect(prompt.prompt).toContain("list each visible failing test or module on its own line");
     expect(prompt.prompt).toContain("Preserve the original file or module order");
   });
+
+  it("builds a diagnose JSON contract for test-status", () => {
+    const prompt = buildPrompt({
+      question: "diagnose the failures",
+      goal: "diagnose",
+      format: "json",
+      policyName: "test-status",
+      input: "FAILED tests/unit/test_auth.py::test_refresh - AssertionError: expected token"
+    });
+
+    expect(prompt.responseMode).toBe("json");
+    expect(prompt.prompt).toContain("Goal: diagnose");
+    expect(prompt.prompt).toContain("diagnosis_complete");
+    expect(prompt.prompt).toContain("dominant_blocker_bucket_index");
+    expect(prompt.prompt).toContain("Use this exact contract");
+  });
 });

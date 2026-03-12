@@ -1,6 +1,6 @@
 {
   "name": "@bilalimamoglu/sift",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Agent-first command-output reduction layer for agents, CI, and automation.",
   "type": "module",
   "bin": {
@@ -19,6 +19,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "bench:test-status-ab": "node --import tsx scripts/bench/test-status-ab.ts",
     "dev": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -56,6 +57,7 @@
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "^3.2.4",
+    "js-tiktoken": "^1.0.21",
     "tsup": "^8.5.0",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",

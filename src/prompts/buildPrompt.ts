@@ -1,16 +1,19 @@
-import type { DetailLevel, OutputFormat, PromptPolicyName } from "../types.js";
+import type { DetailLevel, Goal, OutputFormat, PromptPolicyName } from "../types.js";
 import { resolvePromptPolicy } from "./policies.js";
 
 export function buildPrompt(args: {
   question: string;
   format: OutputFormat;
+  goal?: Goal;
   input: string;
   detail?: DetailLevel;
   policyName?: PromptPolicyName;
   outputContract?: string;
+  analysisContext?: string;
 }): { prompt: string; responseMode: "text" | "json" } {
   const policy = resolvePromptPolicy({
     format: args.format,
+    goal: args.goal,
     policyName: args.policyName,
     outputContract: args.outputContract
   });
@@ -37,11 +40,16 @@ export function buildPrompt(args: {
     "Hard rules:",
     ...policy.sharedRules.map((rule) => `- ${rule}`),
     "",
+    `Goal: ${args.goal ?? "summarize"}`,
+    "",
     `Task policy: ${policy.name}`,
     ...policy.taskRules.map((rule) => `- ${rule}`),
     ...detailRules.map((rule) => `- ${rule}`),
     ...(policy.outputContract
       ? ["", `Output contract: ${policy.outputContract}`]
+      : []),
+    ...(args.analysisContext
+      ? ["", "Visible heuristic context:", '"""', args.analysisContext, '"""']
       : []),
     "",
     `Question: ${args.question}`,

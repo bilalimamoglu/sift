@@ -1,0 +1,23 @@
+E     Left contains 4 more items:
+E     {'/api/v1/admin/landing-gallery': ['GET'],
+E      '/api/v1/admin/landing-gallery/drafts/{draft_id}/discard': ['POST'],
+E      '/api/v1/admin/landing-gallery/publish': ['PUT'],
+E      '/api/v1/admin/landing-gallery/uploads/stream': ['POST']}
+E     
+E     Full diff:
+E       {
+E     +     '/api/v1/admin/landing-gallery': [
+E     +         'GET',
+E     +     ],
+--
+  Left contains 4 more items:
+  {'/api/v1/admin/landing-gallery': ['GET'],
+   '/api/v1/admin/landing-gallery/drafts/{draft_id}/discard': ['POST'],
+   '/api/v1/admin/landing-gallery/publish': ['PUT'],
+   '/api/v1/admin/landing-gallery/uploads/stream': ['POST']}
+  
+  Full diff:
+    {
+  +     '/api/v1/admin/landing-gallery': [
+  +         'GET',
+  +     ],

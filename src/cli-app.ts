@@ -6,11 +6,21 @@ import {
   configShow,
   configValidate
 } from "./commands/config.js";
+import {
+  installAgent,
+  normalizeAgentScope,
+  removeAgent,
+  showAgent,
+  statusAgents
+} from "./commands/agent.js";
 import { runDoctor } from "./commands/doctor.js";
 import { listPresets, showPreset } from "./commands/presets.js";
 import { findConfigPath } from "./config/load.js";
 import { resolveConfig } from "./config/resolve.js";
+import { runEscalate } from "./core/escalate.js";
 import { runExec } from "./core/exec.js";
+import { runRerun } from "./core/rerun.js";
+import { looksLikeWatchStream, runWatch } from "./core/watch.js";
 import {
   assertSupportedFailOnFormat,
   assertSupportedFailOnPreset,
@@ -22,6 +32,7 @@ import { getPreset } from "./prompts/presets.js";
 import { createPresentation } from "./ui/presentation.js";
 import type {
   DetailLevel,
+  Goal,
   JsonResponseFormatMode,
   OutputFormat,
   PartialSiftConfig,
@@ -32,6 +43,10 @@ const require = createRequire(import.meta.url);
 const pkg = require("../package.json") as { version: string };
 
 export interface CliDeps {
+  readonly installAgent: typeof installAgent;
+  readonly removeAgent: typeof removeAgent;
+  readonly showAgent: typeof showAgent;
+  readonly statusAgents: typeof statusAgents;
   readonly configInit: typeof configInit;
   readonly configSetup: typeof configSetup;
   readonly configShow: typeof configShow;
@@ -41,16 +56,24 @@ export interface CliDeps {
   readonly showPreset: typeof showPreset;
   readonly resolveConfig: typeof resolveConfig;
   readonly findConfigPath: typeof findConfigPath;
+  readonly runEscalate: typeof runEscalate;
   readonly runExec: typeof runExec;
+  readonly runRerun: typeof runRerun;
   readonly assertSupportedFailOnFormat: typeof assertSupportedFailOnFormat;
   readonly assertSupportedFailOnPreset: typeof assertSupportedFailOnPreset;
   readonly evaluateGate: typeof evaluateGate;
   readonly readStdin: typeof readStdin;
   readonly runSift: typeof runSift;
+  readonly runWatch: typeof runWatch;
+  readonly looksLikeWatchStream: typeof looksLikeWatchStream;
   readonly getPreset: typeof getPreset;
 }
 
 const defaultCliDeps: CliDeps = {
+  installAgent,
+  removeAgent,
+  showAgent,
+  statusAgents,
   configInit,
   configSetup,
   configShow,
@@ -60,12 +83,16 @@ const defaultCliDeps: CliDeps = {
   showPreset,
   resolveConfig,
   findConfigPath,
+  runEscalate,
   runExec,
+  runRerun,
   assertSupportedFailOnFormat,
   assertSupportedFailOnPreset,
   evaluateGate,
   readStdin,
   runSift,
+  runWatch,
+  looksLikeWatchStream,
   getPreset
 };
 
@@ -129,6 +156,54 @@ export function buildCliOverrides(options: Record<string, unknown>): PartialSift
   return overrides;
 }
 
+export function normalizeGoal(value: unknown): Goal | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  if (value === "summarize" || value === "diagnose") {
+    return value;
+  }
+
+  throw new Error("Invalid --goal value. Use summarize or diagnose.");
+}
+
+export function assertSupportedGoal(args: {
+  goal: Goal;
+  format: OutputFormat;
+  presetName?: string;
+  watch?: boolean;
+}): void {
+  if (args.goal !== "diagnose" || args.format !== "json") {
+    return;
+  }
+
+  if (args.presetName === "test-status") {
+    return;
+  }
+
+  if (args.watch && args.presetName === "test-status") {
+    return;
+  }
+
+  throw new Error(
+    "`--goal diagnose --format json` is currently supported only for `--preset test-status`, `sift rerun`, and `test-status` watch flows."
+  );
+}
+
+function shouldKeepPresetPolicy(args: {
+  requestedFormat?: OutputFormat;
+  presetFormat: OutputFormat;
+  goal: Goal;
+  presetName: string;
+}): boolean {
+  if (args.goal === "diagnose" && args.presetName === "test-status") {
+    return true;
+  }
+
+  return args.requestedFormat === undefined || args.requestedFormat === args.presetFormat;
+}
+
 function applySharedOptions(command: ReturnType<ReturnType<typeof cac>["command"]>) {
   return command
     .option("--provider <provider>", "Provider: openai | openai-compatible")
@@ -144,6 +219,7 @@ function applySharedOptions(command: ReturnType<ReturnType<typeof cac>["command"
     )
     .option("--timeout-ms <ms>", "Request timeout in milliseconds")
     .option("--format <format>", "brief | bullets | json | verdict")
+    .option("--goal <goal>", "summarize | diagnose")
     .option(
       "--detail <mode>",
       "Detail level for supported presets: standard | focused | verbose"
@@ -193,6 +269,47 @@ export function resolveDetail(args: {
   }
 
   return requested;
+}
+
+export function normalizeEscalateDetail(value: unknown): "focused" | "verbose" | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  if (value === "focused" || value === "verbose") {
+    return value;
+  }
+
+  throw new Error("Invalid --detail value. Use focused or verbose.");
+}
+
+export function resolveRerunDetail(args: {
+  remaining: boolean;
+  options: Record<string, unknown>;
+}): DetailLevel {
+  const requested = normalizeDetail(args.options.detail);
+
+  if (!args.remaining && requested) {
+    throw new Error("--detail is supported only with `sift rerun --remaining`.");
+  }
+
+  return requested ?? "standard";
+}
+
+export function resolveExecDiff(args: {
+  presetName?: string;
+  options: Record<string, unknown>;
+}): boolean {
+  const requested = Boolean(args.options.diff);
+  if (!requested) {
+    return false;
+  }
+
+  if (args.presetName !== "test-status") {
+    throw new Error("--diff is supported only with --preset test-status.");
+  }
+
+  return true;
 }
 
 export function extractExecCommand(options: Record<string, unknown>): {
@@ -253,6 +370,7 @@ export function createCliApp(args: {
   async function executeRun(input: {
     question: string;
     format: OutputFormat;
+    goal: Goal;
     presetName?: string;
     detail?: DetailLevel;
     policyName?: SiftConfig["presets"][string]["policy"];
@@ -282,19 +400,36 @@ export function createCliApp(args: {
       }
     }
 
-    const output = await deps.runSift({
-      question: input.question,
-      format: input.format,
-      stdin,
-      config,
-      dryRun: Boolean(input.options.dryRun),
-      showRaw: Boolean(input.options.showRaw),
-      detail: input.detail,
-      presetName: input.presetName,
-      policyName: input.policyName,
-      outputContract: input.outputContract,
-      fallbackJson: input.fallbackJson
-    });
+    const output =
+      deps.looksLikeWatchStream(stdin)
+        ? await deps.runWatch({
+            question: input.question,
+            format: input.format,
+            goal: input.goal,
+            stdin,
+            config,
+            dryRun: Boolean(input.options.dryRun),
+            showRaw: Boolean(input.options.showRaw),
+            detail: input.detail,
+            presetName: input.presetName,
+            policyName: input.policyName,
+            outputContract: input.outputContract,
+            fallbackJson: input.fallbackJson
+          })
+        : await deps.runSift({
+            question: input.question,
+            format: input.format,
+            goal: input.goal,
+            stdin,
+            config,
+            dryRun: Boolean(input.options.dryRun),
+            showRaw: Boolean(input.options.showRaw),
+            detail: input.detail,
+            presetName: input.presetName,
+            policyName: input.policyName,
+            outputContract: input.outputContract,
+            fallbackJson: input.fallbackJson
+          });
 
     stdout.write(`${output}\n`);
 
@@ -314,8 +449,10 @@ export function createCliApp(args: {
   async function executeExec(input: {
     question: string;
     format: OutputFormat;
+    goal: Goal;
     presetName?: string;
     detail?: DetailLevel;
+    diff?: boolean;
     policyName?: SiftConfig["presets"][string]["policy"];
     outputContract?: string;
     fallbackJson?: unknown;
@@ -338,10 +475,13 @@ export function createCliApp(args: {
     process.exitCode = await deps.runExec({
       question: input.question,
       format: input.format,
+      goal: input.goal,
       config,
       dryRun: Boolean(input.options.dryRun),
+      diff: input.diff,
       failOn: Boolean(input.options.failOn),
       showRaw: Boolean(input.options.showRaw),
+      watch: Boolean(input.options.watch),
       detail: input.detail,
       presetName: input.presetName,
       policyName: input.policyName,
@@ -363,18 +503,30 @@ export function createCliApp(args: {
         cliOverrides: buildCliOverrides(options)
       });
       const preset = deps.getPreset(config, name);
+      const goal = normalizeGoal(options.goal) ?? "summarize";
+      const format = (options.format as OutputFormat | undefined) ?? preset.format;
+      assertSupportedGoal({
+        goal,
+        format,
+        presetName: name
+      });
 
       await executeRun({
         question: preset.question,
-        format: (options.format as OutputFormat | undefined) ?? preset.format,
+        format,
+        goal,
         presetName: name,
         detail: resolveDetail({
           presetName: name,
           options
         }),
         policyName:
-          (options.format as OutputFormat | undefined) === undefined ||
-          (options.format as OutputFormat | undefined) === preset.format
+          shouldKeepPresetPolicy({
+            requestedFormat: options.format as OutputFormat | undefined,
+            presetFormat: preset.format,
+            goal,
+            presetName: name
+          })
             ? preset.policy
             : undefined,
         options,
@@ -390,10 +542,14 @@ export function createCliApp(args: {
   )
     .usage("exec [question] [options] -- <program> [args...]")
     .example('exec "what changed?" -- git diff')
-    .example("exec --preset test-status -- pytest")
+    .example("exec --preset test-status -- npm test")
+    .example("exec --preset test-status --diff -- npm test")
+    .example("exec --watch \"summarize the stream\" -- node watcher.js")
     .example('exec --preset infra-risk --shell "terraform plan"')
     .option("--shell <command>", "Execute a shell command string instead of argv mode")
     .option("--preset <name>", "Run a named preset in exec mode")
+    .option("--watch", "Treat the command output as a watch/change-summary stream")
+    .option("--diff", "Prepend material changes versus the previous matching test-status run")
     .action(async (question: string | undefined, options: Record<string, unknown>) => {
       if (question === "preset") {
         throw new Error("Use 'sift exec --preset <name> -- <program> ...' instead.");
@@ -417,18 +573,35 @@ export function createCliApp(args: {
           }),
           presetName
         );
+        const goal = normalizeGoal(options.goal) ?? "summarize";
+        const format = (options.format as OutputFormat | undefined) ?? preset.format;
+        assertSupportedGoal({
+          goal,
+          format,
+          presetName,
+          watch: Boolean(options.watch)
+        });
 
         await executeExec({
           question: preset.question,
-          format: (options.format as OutputFormat | undefined) ?? preset.format,
+          format,
+          goal,
           presetName,
           detail: resolveDetail({
             presetName,
             options
           }),
+          diff: resolveExecDiff({
+            presetName,
+            options
+          }),
           policyName:
-            (options.format as OutputFormat | undefined) === undefined ||
-            (options.format as OutputFormat | undefined) === preset.format
+            shouldKeepPresetPolicy({
+              requestedFormat: options.format as OutputFormat | undefined,
+              presetFormat: preset.format,
+              goal,
+              presetName
+            })
               ? preset.policy
               : undefined,
           options,
@@ -443,14 +616,262 @@ export function createCliApp(args: {
       }
 
       const format = (options.format as OutputFormat | undefined) ?? "brief";
+      const goal = normalizeGoal(options.goal) ?? "summarize";
+      assertSupportedGoal({
+        goal,
+        format,
+        watch: Boolean(options.watch)
+      });
       await executeExec({
         question,
         format,
+        goal,
         detail: resolveDetail({
+          options
+        }),
+        diff: resolveExecDiff({
           options
         }),
         options
       });
+    });
+
+  cli
+    .command("escalate", "Re-render the last cached test-status run without rerunning the test command")
+    .usage("escalate [options]")
+    .example("escalate")
+    .example("escalate --detail verbose")
+    .example("escalate --show-raw")
+    .option("--detail <mode>", "Escalation detail level: focused | verbose")
+    .option("--show-raw", "Print the cached raw input to stderr for debugging")
+    .option("--verbose", "Enable verbose stderr logging")
+    .action(async (options: Record<string, unknown>) => {
+      process.exitCode = await deps.runEscalate({
+        detail: normalizeEscalateDetail(options.detail),
+        showRaw: Boolean(options.showRaw),
+        verbose: Boolean(options.verbose)
+      });
+    });
+
+  applySharedOptions(
+    cli.command("rerun", "Rerun the cached test-status command or only the remaining pytest subset")
+  )
+    .usage("rerun [options]")
+    .example("rerun")
+    .example("rerun --remaining")
+    .example("rerun --remaining --detail focused")
+    .example("rerun --remaining --detail verbose --show-raw")
+    .option("--remaining", "Rerun only the remaining failing pytest node IDs from the cached full run")
+    .action(async (options: Record<string, unknown>) => {
+      const remaining = Boolean(options.remaining);
+      if (!remaining && Boolean(options.showRaw)) {
+        throw new Error("--show-raw is supported only with `sift rerun --remaining`.");
+      }
+
+      const config = deps.resolveConfig({
+        configPath: options.config as string | undefined,
+        env,
+        cliOverrides: buildCliOverrides(options)
+      });
+      const preset = deps.getPreset(config, "test-status");
+      const goal = normalizeGoal(options.goal) ?? "summarize";
+      const format = (options.format as OutputFormat | undefined) ?? preset.format;
+      assertSupportedGoal({
+        goal,
+        format,
+        presetName: "test-status"
+      });
+
+      process.exitCode = await deps.runRerun({
+        question: preset.question,
+        format,
+        config,
+        dryRun: Boolean(options.dryRun),
+        goal,
+        remaining,
+        detail: resolveRerunDetail({
+          remaining,
+          options
+        }),
+        showRaw: Boolean(options.showRaw),
+        policyName:
+          shouldKeepPresetPolicy({
+            requestedFormat: options.format as OutputFormat | undefined,
+            presetFormat: preset.format,
+            goal,
+            presetName: "test-status"
+          })
+            ? preset.policy
+            : undefined,
+        outputContract: preset.outputContract,
+        fallbackJson: preset.fallbackJson
+      });
+    });
+
+  applySharedOptions(
+    cli.command("watch [question]", "Summarize repeating or redraw-style piped output as cycles")
+  )
+    .usage("watch [question] [options]")
+    .example('watch "what changed between cycles?" < watcher-output.txt')
+    .example("watch --preset test-status < pytest-watch.txt")
+    .option("--preset <name>", "Run a named preset in watch mode")
+    .action(async (question: string | undefined, options: Record<string, unknown>) => {
+      const presetName =
+        typeof options.preset === "string" && options.preset.length > 0
+          ? options.preset
+          : undefined;
+      const goal = normalizeGoal(options.goal) ?? "summarize";
+
+      if (presetName) {
+        if (question) {
+          throw new Error("Use either a freeform question or --preset <name>, not both.");
+        }
+
+        const config = deps.resolveConfig({
+          configPath: options.config as string | undefined,
+          env,
+          cliOverrides: buildCliOverrides(options)
+        });
+        const preset = deps.getPreset(config, presetName);
+        const format = (options.format as OutputFormat | undefined) ?? preset.format;
+        assertSupportedGoal({
+          goal,
+          format,
+          presetName,
+          watch: true
+        });
+
+        const stdin = await deps.readStdin();
+        const output = await deps.runWatch({
+          question: preset.question,
+          format,
+          goal,
+          stdin,
+          config,
+          dryRun: Boolean(options.dryRun),
+          showRaw: Boolean(options.showRaw),
+          detail: resolveDetail({
+            presetName,
+            options
+          }),
+          presetName,
+          policyName:
+            shouldKeepPresetPolicy({
+              requestedFormat: options.format as OutputFormat | undefined,
+              presetFormat: preset.format,
+              goal,
+              presetName
+            })
+              ? preset.policy
+              : undefined,
+          outputContract: preset.outputContract,
+          fallbackJson: preset.fallbackJson
+        });
+        stdout.write(`${output}\n`);
+        return;
+      }
+
+      if (!question) {
+        throw new Error("Missing question or preset.");
+      }
+
+      const format = (options.format as OutputFormat | undefined) ?? "brief";
+      assertSupportedGoal({
+        goal,
+        format,
+        watch: true
+      });
+      const config = deps.resolveConfig({
+        configPath: options.config as string | undefined,
+        env,
+        cliOverrides: buildCliOverrides(options)
+      });
+      const stdin = await deps.readStdin();
+      const output = await deps.runWatch({
+        question,
+        format,
+        goal,
+        stdin,
+        config,
+        dryRun: Boolean(options.dryRun),
+        showRaw: Boolean(options.showRaw),
+        detail: resolveDetail({
+          options
+        })
+      });
+      stdout.write(`${output}\n`);
+    });
+
+  cli
+    .command("agent <action> [name]", "Agent commands: show | install | remove | status")
+    .usage("agent <show|install|remove|status> [name] [options]")
+    .example("agent show codex")
+    .example("agent show codex --raw")
+    .example("agent install codex")
+    .example("agent install claude --scope global")
+    .example("agent install codex --dry-run")
+    .example("agent install codex --dry-run --raw")
+    .example("agent status")
+    .example("agent remove codex --scope repo")
+    .option("--scope <scope>", "Install scope: repo | global")
+    .option("--dry-run", "Show a short plan without changing files")
+    .option("--raw", "Print the exact managed block or dry-run file content")
+    .option("--yes", "Skip confirmation prompts when writing")
+    .option("--path <path>", "Explicit target path for install or remove")
+    .action(async (action: string, name: string | undefined, options: Record<string, unknown>) => {
+      const scope = normalizeAgentScope(options.scope);
+
+      if (action === "show") {
+        if (!name) {
+          throw new Error("Missing agent name.");
+        }
+
+        deps.showAgent({
+          agent: name as "codex" | "claude",
+          scope,
+          targetPath: options.path as string | undefined,
+          raw: Boolean(options.raw)
+        });
+        return;
+      }
+
+      if (action === "install") {
+        if (!name) {
+          throw new Error("Missing agent name.");
+        }
+
+        process.exitCode = await deps.installAgent({
+          agent: name as "codex" | "claude",
+          scope,
+          targetPath: options.path as string | undefined,
+          dryRun: Boolean(options.dryRun),
+          raw: Boolean(options.raw),
+          yes: Boolean(options.yes)
+        });
+        return;
+      }
+
+      if (action === "remove") {
+        if (!name) {
+          throw new Error("Missing agent name.");
+        }
+
+        process.exitCode = await deps.removeAgent({
+          agent: name as "codex" | "claude",
+          scope,
+          targetPath: options.path as string | undefined,
+          dryRun: Boolean(options.dryRun),
+          yes: Boolean(options.yes)
+        });
+        return;
+      }
+
+      if (action === "status") {
+        deps.statusAgents();
+        return;
+      }
+
+      throw new Error(`Unknown agent action: ${action}`);
     });
 
   cli
@@ -551,9 +972,15 @@ export function createCliApp(args: {
       }
 
       const format = (options.format as OutputFormat | undefined) ?? "brief";
+      const goal = normalizeGoal(options.goal) ?? "summarize";
+      assertSupportedGoal({
+        goal,
+        format
+      });
       await executeRun({
         question,
         format,
+        goal,
         detail: resolveDetail({
           options
         }),
@@ -576,8 +1003,16 @@ export function createCliApp(args: {
         title: ui.section("Quick start"),
         body: [
           `  ${ui.command("sift config setup")}`,
-          `  ${ui.command("sift exec --preset test-status -- pytest")}`,
-          `  ${ui.command("sift exec --preset test-status --show-raw -- pytest")}`,
+          `  ${ui.command("sift exec --preset test-status -- npm test")}`,
+          `  ${ui.command("sift exec --preset test-status -- npm test")}${ui.note("  # stop here if standard already shows the main buckets")}`,
+          `  ${ui.command("sift rerun")}${ui.note("  # rerun the cached full suite after a fix")}`,
+          `  ${ui.command("sift rerun --remaining --detail focused")}${ui.note("  # zoom into what is still failing")}`,
+          `  ${ui.command("sift rerun --remaining --detail verbose --show-raw")}`,
+          `  ${ui.command('sift watch "what changed between cycles?" < watcher-output.txt')}`,
+          `  ${ui.command('sift exec --watch "what changed between cycles?" -- node watcher.js')}`,
+          `  ${ui.command("sift agent install codex --dry-run")}`,
+          `  ${ui.command("sift agent install codex --dry-run --raw")}`,
+          `  ${ui.command("sift agent status")}`,
           `  ${ui.command('sift exec "what changed?" -- git diff')}`
         ].join("\n")
       },

@@ -3,8 +3,24 @@ import path from "node:path";
 
 export const DEFAULT_CONFIG_FILENAME = "sift.config.yaml";
 
-export function getDefaultGlobalConfigPath(): string {
-  return path.join(os.homedir(), ".config", "sift", "config.yaml");
+export function getDefaultCodexGlobalInstructionsPath(homeDir = os.homedir()): string {
+  return path.join(homeDir, ".codex", "AGENTS.md");
+}
+
+export function getDefaultClaudeGlobalInstructionsPath(homeDir = os.homedir()): string {
+  return path.join(homeDir, ".claude", "CLAUDE.md");
+}
+
+export function getDefaultGlobalConfigPath(homeDir = os.homedir()): string {
+  return path.join(homeDir, ".config", "sift", "config.yaml");
+}
+
+export function getDefaultGlobalStateDir(homeDir = os.homedir()): string {
+  return path.join(homeDir, ".config", "sift", "state");
+}
+
+export function getDefaultTestStatusStatePath(homeDir = os.homedir()): string {
+  return path.join(getDefaultGlobalStateDir(homeDir), "last-test-status.json");
 }
 
 export function getDefaultConfigSearchPaths(): string[] {

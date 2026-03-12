@@ -181,7 +181,7 @@ describe("misc core and UI helpers", () => {
     const plain = createPresentation(false);
     const color = createPresentation(true);
 
-    expect(plain.banner("0.2.3")).toContain("Trim the noise. Keep the signal.");
+    expect(plain.banner("0.3.0")).toContain("Trim the noise. Keep the signal.");
     expect(plain.welcome("hello")).toBe("Welcome to sift. hello");
     expect(plain.success("ok")).toBe("ok");
     expect(plain.warning("careful")).toBe("careful");

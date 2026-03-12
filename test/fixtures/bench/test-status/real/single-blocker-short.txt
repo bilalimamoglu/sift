@@ -1,0 +1,100 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.4, pytest-9.0.2, pluggy-1.6.0 -- /Users/bilalimamoglu/miniconda3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/bilalimamoglu/repos/modela-app/modela-backend
+configfile: pytest.ini
+plugins: anyio-4.12.1, cov-6.2.1, asyncio-1.3.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 640 items
+
+tests/contracts/test_backend_module_manifest_freeze.py::test_backend_module_manifest_is_frozen <- ../../modela-backend/tests/contracts/test_backend_module_manifest_freeze.py PASSED [  0%]
+tests/contracts/test_ci_non_regression_mandatory.py::test_backend_quality_gate_includes_required_non_regression_pack PASSED [  0%]
+tests/contracts/test_ci_non_regression_mandatory.py::test_release_gate_runs_full_backend_quality_gate_without_fast_mode PASSED [  0%]
+tests/contracts/test_ci_non_regression_mandatory.py::test_ci_workflow_executes_release_gate_on_pr_and_main PASSED [  0%]
+tests/contracts/test_ci_non_regression_mandatory.py::test_non_regression_workflow_uses_dedicated_test_cognito_secrets_for_smoke PASSED [  0%]
+tests/contracts/test_ci_non_regression_mandatory.py::test_compose_test_workflow_enforces_test_isolation_gates_and_marker_segmentation PASSED [  0%]
+tests/contracts/test_db_schema_freeze.py::test_database_schema_snapshot_is_frozen ERROR [  1%]
+
+==================================== ERRORS ====================================
+__________ ERROR at setup of test_database_schema_snapshot_is_frozen ___________
+
+fixturedef = <FixtureDef argname='_postgres_schema_isolation' scope='function' baseid='tests'>
+request = <SubRequest '_postgres_schema_isolation' for <Function test_database_schema_snapshot_is_frozen>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+                return (yield)
+            if not _is_coroutine_or_asyncgen(fixturedef.func):
+                return (yield)
+        default_loop_scope = request.config.getini("asyncio_default_fixture_loop_scope")
+        loop_scope = (
+            getattr(fixturedef.func, "_loop_scope", None)
+            or default_loop_scope
+            or fixturedef.scope
+        )
+        runner_fixture_id = f"_{loop_scope}_scoped_runner"
+        runner = request.getfixturevalue(runner_fixture_id)
+        synchronizer = _fixture_synchronizer(fixturedef, runner, request)
+        _make_asyncio_fixture_function(synchronizer, loop_scope)
+        with MonkeyPatch.context() as c:
+            c.setattr(fixturedef, "func", synchronizer)
+>           hook_result = yield
+                          ^^^^^
+
+../../../miniconda3/lib/python3.11/site-packages/pytest_asyncio/plugin.py:743: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../../miniconda3/lib/python3.11/site-packages/pytest_asyncio/plugin.py:313: in _asyncgen_fixture_wrapper
+    result = runner.run(setup(), context=context)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../miniconda3/lib/python3.11/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../miniconda3/lib/python3.11/asyncio/base_events.py:653: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+../../../miniconda3/lib/python3.11/site-packages/pytest_asyncio/plugin.py:309: in setup
+    res = await gen_obj.__anext__()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+request = <SubRequest '_postgres_schema_isolation' for <Function test_database_schema_snapshot_is_frozen>>
+
+    @pytest.fixture(autouse=True)
+    async def _postgres_schema_isolation(request: pytest.FixtureRequest):
+        """
+        PostgreSQL-only test runtime isolation.
+    
+        Each DB-heavy test gets a unique schema via search_path.
+        Setup/teardown is best-effort safe under both success and failure.
+        """
+        needs_isolation = _requires_db_isolation(request.node.nodeid) or bool(
+            request.node.get_closest_marker("db")
+        )
+        if not needs_isolation:
+            yield
+            return
+    
+        from app.config import settings
+        from app.storage.sql import api as database
+    
+        explicit_pgtest_dsn = (
+            (os.getenv("PGTEST_POSTGRES_DSN") or "").strip()
+            or (request.config.getoption("--pgtest-dsn", default="") or "").strip()
+        )
+        if not explicit_pgtest_dsn:
+>           raise RuntimeError(
+                "DB-isolated tests require PGTEST_POSTGRES_DSN (or --pgtest-dsn). "
+                "Refusing to fall back to DATABASE_URL to avoid polluting non-test users."
+            )
+E           RuntimeError: DB-isolated tests require PGTEST_POSTGRES_DSN (or --pgtest-dsn). Refusing to fall back to DATABASE_URL to avoid polluting non-test users.
+
+tests/conftest.py:374: RuntimeError
+=========================== short test summary info ============================
+ERROR tests/contracts/test_db_schema_freeze.py::test_database_schema_snapshot_is_frozen - RuntimeError: DB-isolated tests require PGTEST_POSTGRES_DSN (or --pgtest-dsn). Refusing to fall back to DATABASE_URL to avoid polluting non-test users.
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+========================== 6 passed, 1 error in 1.43s ==========================

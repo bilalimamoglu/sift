@@ -4,11 +4,21 @@ import pc from "picocolors";
 import { CAPTURE_OMITTED_MARKER } from "../constants.js";
 import type { OutputFormat, RunRequest, SiftConfig } from "../types.js";
 import { evaluateGate, supportsFailOnPreset } from "./gate.js";
+import { analyzeTestStatus } from "./heuristics.js";
 import {
   buildInsufficientSignalOutput,
   isInsufficientSignalOutput
 } from "./insufficient.js";
 import { runSift } from "./run.js";
+import { looksLikeWatchStream, runWatch } from "./watch.js";
+import {
+  buildTestStatusCommandKey,
+  createCachedTestStatusRun,
+  diffTestStatusRuns,
+  diffTestStatusTargets,
+  tryReadCachedTestStatusRun,
+  writeCachedTestStatusRun
+} from "./testStatusState.js";
 
 const PROMPT_PATTERNS = [
   /\[[^\]]*y\/n[^\]]*\]\s*$/i,
@@ -105,9 +115,13 @@ export function normalizeChildExitCode(
 
 export interface ExecRequest extends Omit<RunRequest, "stdin"> {
   command?: string[];
+  cwd?: string;
+  diff?: boolean;
   failOn?: boolean;
   showRaw?: boolean;
   shellCommand?: string;
+  skipCacheWrite?: boolean;
+  watch?: boolean;
 }
 
 export function buildCommandPreview(request: ExecRequest): string {
@@ -143,9 +157,14 @@ export async function runExec(request: ExecRequest): Promise<number> {
   }
 
   const shellPath = process.env.SHELL || "/bin/bash";
+  const commandPreview = buildCommandPreview(request);
+  const commandCwd = request.cwd ?? process.cwd();
+  const shouldCacheTestStatusBase =
+    request.presetName === "test-status" && !request.skipCacheWrite;
+  const previousCachedRun = shouldCacheTestStatusBase ? tryReadCachedTestStatusRun() : null;
   if (request.config.runtime.verbose) {
     process.stderr.write(
-      `${pc.dim("sift")} exec mode=${hasShellCommand ? "shell" : "argv"} command=${buildCommandPreview(request)}\n`
+      `${pc.dim("sift")} exec mode=${hasShellCommand ? "shell" : "argv"} command=${commandPreview}\n`
     );
   }
 
@@ -157,9 +176,11 @@ export async function runExec(request: ExecRequest): Promise<number> {
 
   const child = hasShellCommand
     ? spawn(shellPath, ["-lc", request.shellCommand as string], {
+        cwd: commandCwd,
         stdio: ["inherit", "pipe", "pipe"] as const
       })
     : spawn((request.command as string[])[0]!, (request.command as string[]).slice(1), {
+        cwd: commandCwd,
         stdio: ["inherit", "pipe", "pipe"] as const
       });
 
@@ -211,11 +232,18 @@ export async function runExec(request: ExecRequest): Promise<number> {
 
   const exitCode = normalizeChildExitCode(childStatus, childSignal);
   const capturedOutput = capture.render();
+  const autoWatchDetected = !request.watch && looksLikeWatchStream(capturedOutput);
+  const useWatchFlow = Boolean(request.watch) || autoWatchDetected;
+  const shouldCacheTestStatus = shouldCacheTestStatusBase && !useWatchFlow;
 
   if (request.config.runtime.verbose) {
     process.stderr.write(
       `${pc.dim("sift")} child_exit=${exitCode} captured_chars=${capture.getTotalChars()} capture_truncated=${capture.wasTruncated()}\n`
     );
+  }
+
+  if (autoWatchDetected) {
+    process.stderr.write(`${pc.dim("sift")} auto-watch=detected\n`);
   }
 
   if (!bypassed) {
@@ -226,11 +254,13 @@ export async function runExec(request: ExecRequest): Promise<number> {
       }
     }
 
-    const execSuccessShortcut = getExecSuccessShortcut({
-      presetName: request.presetName,
-      exitCode,
-      capturedOutput
-    });
+    const execSuccessShortcut = useWatchFlow
+      ? null
+      : getExecSuccessShortcut({
+          presetName: request.presetName,
+          exitCode,
+          capturedOutput
+        });
 
     if (execSuccessShortcut && !request.dryRun) {
       if (request.config.runtime.verbose) {
@@ -243,12 +273,113 @@ export async function runExec(request: ExecRequest): Promise<number> {
       return exitCode;
     }
 
+    if (useWatchFlow) {
+      let output = await runWatch({
+        ...request,
+        stdin: capturedOutput
+      });
+
+      if (isInsufficientSignalOutput(output)) {
+        output = buildInsufficientSignalOutput({
+          presetName: request.presetName,
+          originalLength: capture.getTotalChars(),
+          truncatedApplied: capture.wasTruncated(),
+          exitCode
+        });
+      }
+
+      process.stdout.write(`${output}\n`);
+      return exitCode;
+    }
+
+    const analysis = shouldCacheTestStatus ? analyzeTestStatus(capturedOutput) : null;
+    let currentCachedRun =
+      shouldCacheTestStatus && analysis
+        ? createCachedTestStatusRun({
+            cwd: commandCwd,
+            commandKey: buildTestStatusCommandKey({
+              commandPreview,
+              shellCommand: request.shellCommand
+            }),
+            commandPreview,
+            command: request.command,
+            shellCommand: request.shellCommand,
+            detail: request.detail ?? "standard",
+            exitCode,
+            rawOutput: capturedOutput,
+            originalChars: capture.getTotalChars(),
+            truncatedApplied: capture.wasTruncated(),
+            analysis
+          })
+        : null;
+    const targetDelta =
+      request.diff && !request.dryRun && previousCachedRun && currentCachedRun
+        ? diffTestStatusTargets({
+            previous: previousCachedRun,
+            current: currentCachedRun
+          })
+        : null;
+
     let output = await runSift({
       ...request,
-      stdin: capturedOutput
+      stdin: capturedOutput,
+      testStatusContext:
+        shouldCacheTestStatus && analysis
+          ? {
+              resolvedTests: targetDelta?.resolved,
+              remainingTests:
+                targetDelta?.remaining ??
+                currentCachedRun?.pytest?.failingNodeIds ??
+                undefined
+            }
+          : undefined
     });
 
-    if (isInsufficientSignalOutput(output)) {
+    if (shouldCacheTestStatus) {
+      if (isInsufficientSignalOutput(output)) {
+        output = buildInsufficientSignalOutput({
+          presetName: request.presetName,
+          originalLength: capture.getTotalChars(),
+          truncatedApplied: capture.wasTruncated(),
+          exitCode
+        });
+      }
+
+      if (request.diff && !request.dryRun && previousCachedRun && currentCachedRun) {
+        const delta = diffTestStatusRuns({
+          previous: previousCachedRun,
+          current: currentCachedRun
+        });
+        currentCachedRun = createCachedTestStatusRun({
+          cwd: commandCwd,
+          commandKey: currentCachedRun.commandKey,
+          commandPreview,
+          command: request.command,
+          shellCommand: request.shellCommand,
+          detail: request.detail ?? "standard",
+          exitCode,
+          rawOutput: capturedOutput,
+          originalChars: capture.getTotalChars(),
+          truncatedApplied: capture.wasTruncated(),
+          analysis: analysis!,
+          remainingNodeIds: delta.remainingNodeIds
+        });
+        if (delta.lines.length > 0) {
+          output = `${delta.lines.join("\n")}\n${output}`;
+        }
+      }
+
+      if (currentCachedRun) {
+        try {
+          writeCachedTestStatusRun(currentCachedRun);
+        } catch (error) {
+          if (request.config.runtime.verbose) {
+            const reason = error instanceof Error ? error.message : "unknown_error";
+            process.stderr.write(`${pc.dim("sift")} cache_write=failed reason=${reason}\n`);
+          }
+        }
+      }
+    } else if (isInsufficientSignalOutput(output)) {
       output = buildInsufficientSignalOutput({
         presetName: request.presetName,
         originalLength: capture.getTotalChars(),

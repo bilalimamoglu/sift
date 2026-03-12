@@ -1,5 +1,9 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getDefaultTestStatusStatePath } from "../src/constants.js";
 import { defaultConfig } from "../src/config/defaults.js";
 import {
   BoundedCapture,
@@ -46,15 +50,25 @@ function makeRequest(overrides: Partial<ExecRequest> = {}): ExecRequest {
   };
 }
 
+function readRealFixture(name: string): string {
+  return fs.readFileSync(
+    path.resolve(import.meta.dirname, "fixtures", "bench", "test-status", "real", name),
+    "utf8"
+  );
+}
+
 describe("runExec unit", () => {
+  let homeDir = "";
   let stdout = "";
   let stderr = "";
 
   beforeEach(() => {
+    homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "sift-exec-home-"));
     stdout = "";
     stderr = "";
     spawnMock.mockReset();
     runSiftMock.mockReset();
+    vi.spyOn(os, "homedir").mockReturnValue(homeDir);
     vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
       stdout += chunk.toString();
       return true;
@@ -151,6 +165,7 @@ describe("runExec unit", () => {
 
     await expect(pending).resolves.toBe(0);
     expect(spawnMock).toHaveBeenCalledWith("node", ["-e", "console.log('ok')"], {
+      cwd: process.cwd(),
       stdio: ["inherit", "pipe", "pipe"]
     });
     expect(runSiftMock).toHaveBeenCalledWith(
@@ -159,6 +174,120 @@ describe("runExec unit", () => {
       })
     );
     expect(stdout).toContain("Reduced answer");
+  });
+
+  it("caches non-interactive test-status runs for later escalation", async () => {
+    const child = new FakeChild();
+    spawnMock.mockReturnValue(child);
+    runSiftMock.mockResolvedValue("Reduced answer");
+    const statePath = getDefaultTestStatusStatePath(homeDir);
+    const rawOutput = [
+      "=================== short test summary info ===================",
+      "ERROR tests/db/test_users.py - RuntimeError: DB-isolated tests require PGTEST_POSTGRES_DSN",
+      "ERROR tests/db/test_posts.py - RuntimeError: DB-isolated tests require PGTEST_POSTGRES_DSN",
+      "2 errors in 0.12s"
+    ].join("\n");
+
+    const { runExec } = await import("../src/core/exec.js");
+    const pending = runExec(
+      makeRequest({
+        presetName: "test-status",
+        format: "bullets",
+        detail: "standard"
+      })
+    );
+
+    child.stdout.emit("data", rawOutput);
+    child.emit("close", 1, null);
+
+    await expect(pending).resolves.toBe(1);
+    expect(fs.existsSync(statePath)).toBe(true);
+    const stored = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+      rawOutput: string;
+      detail: string;
+      exitCode: number;
+    };
+    expect(stored.rawOutput).toBe(rawOutput);
+    expect(stored.detail).toBe("standard");
+    expect(stored.exitCode).toBe(1);
+  });
+
+  it("prepends diff output for matching cached test-status reruns", async () => {
+    const firstChild = new FakeChild();
+    const secondChild = new FakeChild();
+    spawnMock.mockReturnValueOnce(firstChild).mockReturnValueOnce(secondChild);
+    runSiftMock.mockResolvedValue("Reduced answer");
+    const firstRaw = readRealFixture("snapshot-drift-only.txt");
+    const secondRaw = readRealFixture("single-blocker-short.txt");
+
+    const { runExec } = await import("../src/core/exec.js");
+    const firstRun = runExec(
+      makeRequest({
+        presetName: "test-status",
+        format: "bullets",
+        detail: "standard"
+      })
+    );
+    firstChild.stdout.emit("data", firstRaw);
+    firstChild.emit("close", 1, null);
+    await expect(firstRun).resolves.toBe(1);
+
+    stdout = "";
+
+    const secondRun = runExec(
+      makeRequest({
+        presetName: "test-status",
+        format: "bullets",
+        detail: "standard",
+        diff: true
+      })
+    );
+    secondChild.stdout.emit("data", secondRaw);
+    secondChild.emit("close", 1, null);
+
+    await expect(secondRun).resolves.toBe(1);
+    expect(stdout).toContain("- Resolved:");
+    expect(stdout).toContain("- New:");
+    expect(stdout).toContain("Reduced answer");
+  });
+
+  it("keeps exec working when cache writes fail", async () => {
+    const child = new FakeChild();
+    spawnMock.mockReturnValue(child);
+    runSiftMock.mockResolvedValue("Reduced answer");
+    const writeSpy = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {
+      throw new Error("disk full");
+    });
+
+    const { runExec } = await import("../src/core/exec.js");
+    const pending = runExec(
+      makeRequest({
+        presetName: "test-status",
+        format: "bullets",
+        config: {
+          ...defaultConfig,
+          runtime: {
+            ...defaultConfig.runtime,
+            verbose: true
+          }
+        }
+      })
+    );
+
+    child.stdout.emit(
+      "data",
+      [
+        "=================== short test summary info ===================",
+        "FAILED tests/unit/test_auth.py::test_refresh - AssertionError: expected token",
+        "1 failed in 0.12s"
+      ].join("\n")
+    );
+    child.emit("close", 1, null);
+
+    await expect(pending).resolves.toBe(1);
+    expect(writeSpy).toHaveBeenCalled();
+    expect(stdout).toContain("Reduced answer");
+    expect(stderr).toContain("cache_write=failed");
   });
 
   it("prints captured raw output to stderr and appends a newline when needed", async () => {
@@ -234,6 +363,7 @@ describe("runExec unit", () => {
 
     await expect(pending).resolves.toBe(0);
     expect(spawnMock).toHaveBeenCalledWith(expect.any(String), ["-lc", "printf hi"], {
+      cwd: process.cwd(),
       stdio: ["inherit", "pipe", "pipe"]
     });
   });
@@ -288,6 +418,7 @@ describe("runExec unit", () => {
 
       await expect(pending).resolves.toBe(0);
       expect(spawnMock).toHaveBeenCalledWith("/bin/bash", ["-lc", "printf hi"], {
+        cwd: process.cwd(),
         stdio: ["inherit", "pipe", "pipe"]
       });
       expect(stderr).toContain("exec mode=shell");
@@ -350,11 +481,14 @@ describe("runExec unit", () => {
   it("bypasses reduction for interactive prompt-like output", async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);
+    const statePath = getDefaultTestStatusStatePath(homeDir);
 
     const { runExec } = await import("../src/core/exec.js");
     const pending = runExec(
       makeRequest({
-        command: ["node", "-e", "process.stdout.write('Continue? [y/N]')"]
+        command: ["node", "-e", "process.stdout.write('Continue? [y/N]')"],
+        presetName: "test-status",
+        format: "bullets"
       })
     );
 
@@ -366,6 +500,7 @@ describe("runExec unit", () => {
     expect(runSiftMock).not.toHaveBeenCalled();
     expect(stderr).toContain("Continue? [y/N]");
     expect(stderr).toContain("remaining output");
+    expect(fs.existsSync(statePath)).toBe(false);
   });
 
   it("logs interactive bypasses in verbose mode", async () => {

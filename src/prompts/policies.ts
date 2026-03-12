@@ -1,5 +1,7 @@
 import { INSUFFICIENT_SIGNAL_TEXT } from "../constants.js";
+import { TEST_STATUS_DIAGNOSE_JSON_CONTRACT } from "../core/testStatusDecision.js";
 import type {
+  Goal,
   OutputFormat,
   PromptPolicyName,
   ResponseMode
@@ -137,9 +139,37 @@ export function isPromptPolicyName(value: string): value is PromptPolicyName {
 
 export function resolvePromptPolicy(args: {
   format: OutputFormat;
+  goal?: Goal;
   outputContract?: string;
   policyName?: PromptPolicyName;
 }): PromptPolicy {
+  if (args.policyName === "test-status" && args.goal === "diagnose") {
+    return {
+      name: "test-status",
+      responseMode: args.format === "json" ? "json" : "text",
+      outputContract: args.format === "json"
+        ? args.outputContract ?? TEST_STATUS_DIAGNOSE_JSON_CONTRACT
+        : undefined,
+      sharedRules: SHARED_RULES,
+      taskRules:
+        args.format === "json"
+          ? [
+              "Return only valid JSON.",
+              `Use this exact contract: ${args.outputContract ?? TEST_STATUS_DIAGNOSE_JSON_CONTRACT}.`,
+              "Treat the heuristic context as extraction guidance, but do not invent hidden failures.",
+              "Identify the dominant blocker, remaining visible failure buckets, and the next best action.",
+              "Set diagnosis_complete to true only when the visible output is already sufficient to stop and act.",
+              "Set raw_needed to true only when exact traceback lines are still required."
+            ]
+          : [
+              "Produce a decision-complete diagnosis.",
+              "Name the main failure buckets, include counts and dominant root cause, and end with an explicit stop signal.",
+              "Prefer blocker-first ordering and keep evidence budget small.",
+              "Do not ask for more context."
+            ]
+    };
+  }
+
   if (args.policyName) {
     const policy = BUILT_IN_POLICIES[args.policyName];
     return {

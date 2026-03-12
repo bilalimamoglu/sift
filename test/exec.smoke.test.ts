@@ -1,6 +1,16 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
 import { runCliAsync } from "./helpers/cli.js";
+
+async function readRealFixture(name: string): Promise<string> {
+  return fs.readFile(
+    path.resolve(import.meta.dirname, "fixtures", "bench", "test-status", "real", name),
+    "utf8"
+  );
+}
 
 describe("exec mode", () => {
   it("runs against the native openai provider", async () => {
@@ -357,8 +367,11 @@ describe("exec mode", () => {
       [
         "- Tests did not complete.",
         "- 114 errors occurred during collection.",
-        "- Most failures are import/dependency errors during test collection.",
-        "- Missing modules include pydantic, fastapi, botocore."
+        "- Import/dependency blocker: 114 errors are caused by missing dependencies during test collection.",
+        "- Missing modules include pydantic, fastapi, botocore.",
+        "- Hint: Install the missing dependencies and rerun the affected tests.",
+        "- Next: Fix bucket 1 first, then rerun the full suite at standard.",
+        "- Stop signal: diagnosis complete; raw not needed."
       ].join("\n")
     );
     expect(result.stderr).toBe("");
@@ -398,9 +411,13 @@ describe("exec mode", () => {
       [
         "- Tests did not complete.",
         "- 4 errors occurred during collection.",
-        "- import/dependency errors during collection",
+        "- Import/dependency blocker: at least 2 visible errors are caused by missing dependencies during test collection.",
+        "- Missing modules include pydantic, fastapi.",
         "  - tests/unit/test_auth.py -> missing module: pydantic",
-        "  - tests/unit/test_api.py -> missing module: fastapi"
+        "  - tests/unit/test_api.py -> missing module: fastapi",
+        "  - Hint: Install the missing dependencies and rerun the affected tests.",
+        "- Next: Fix bucket 1 first, then rerun the full suite at standard.",
+        "- Stop signal: diagnosis complete; raw not needed."
       ].join("\n")
     );
   });
@@ -439,10 +456,232 @@ describe("exec mode", () => {
       [
         "- Tests did not complete.",
         "- 4 errors occurred during collection.",
-        "- tests/unit/test_auth.py -> missing module: pydantic",
-        "- tests/unit/test_api.py -> missing module: fastapi"
+        "- Import/dependency blocker: at least 2 visible errors are caused by missing dependencies during test collection.",
+        "- Missing modules include pydantic, fastapi.",
+        "  - tests/unit/test_auth.py -> missing module: pydantic",
+        "  - tests/unit/test_api.py -> missing module: fastapi",
+        "  - Hint: Install the missing dependencies and rerun the affected tests.",
+        "- Next: Fix bucket 1 first, then rerun the full suite at standard.",
+        "- Stop signal: diagnosis complete; raw not needed."
       ].join("\n")
     );
+  });
+
+  it("reuses the cached test-status run during escalate without rerunning the child command", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-escalate-home-"));
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-escalate-cwd-"));
+    const counterPath = path.join(cwd, "counter.txt");
+    const statePath = path.join(home, ".config", "sift", "state", "last-test-status.json");
+    const script = [
+      "const fs = require('node:fs');",
+      "fs.appendFileSync(process.argv[1], 'x');",
+      "console.error('FAILED tests/unit/test_auth.py::test_refresh - AssertionError: expected token');",
+      "process.exit(1);"
+    ].join(" ");
+
+    const execResult = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "test-status",
+        "--",
+        "node",
+        "-e",
+        script,
+        counterPath
+      ],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(execResult.status).toBe(1);
+    expect(await fs.readFile(counterPath, "utf8")).toBe("x");
+    expect(JSON.parse(await fs.readFile(statePath, "utf8")).detail).toBe("standard");
+
+    const escalateResult = await runCliAsync({
+      args: ["escalate", "--show-raw"],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(escalateResult.status).toBe(1);
+    expect(await fs.readFile(counterPath, "utf8")).toBe("x");
+    expect(escalateResult.stdout).toContain(
+      "tests/unit/test_auth.py::test_refresh -> assertion failed: expected token"
+    );
+    expect(escalateResult.stderr).toContain(
+      "FAILED tests/unit/test_auth.py::test_refresh - AssertionError: expected token"
+    );
+    expect(JSON.parse(await fs.readFile(statePath, "utf8")).detail).toBe("focused");
+
+    const secondEscalate = await runCliAsync({
+      args: ["escalate", "--show-raw"],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(secondEscalate.status).toBe(1);
+    expect(await fs.readFile(counterPath, "utf8")).toBe("x");
+    expect(JSON.parse(await fs.readFile(statePath, "utf8")).detail).toBe("verbose");
+  });
+
+  it("prepends matching diff output for cached test-status reruns", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-diff-home-"));
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-diff-cwd-"));
+    const rawPath = path.join(cwd, "pytest-output.txt");
+    const script = [
+      "process.stdout.write(require('node:fs').readFileSync(process.argv[1], 'utf8'));",
+      "process.exit(1);"
+    ].join(" ");
+
+    await fs.writeFile(
+      rawPath,
+      await readRealFixture("snapshot-drift-only.txt"),
+      "utf8"
+    );
+
+    const firstRun = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "test-status",
+        "--",
+        "node",
+        "-e",
+        script,
+        rawPath
+      ],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(firstRun.status).toBe(1);
+
+    await fs.writeFile(
+      rawPath,
+      await readRealFixture("single-blocker-short.txt"),
+      "utf8"
+    );
+
+    const secondRun = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "test-status",
+        "--diff",
+        "--",
+        "node",
+        "-e",
+        script,
+        rawPath
+      ],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(secondRun.status).toBe(1);
+    expect(secondRun.stdout).toContain("- Resolved:");
+    expect(secondRun.stdout).toContain("- New:");
+    expect(secondRun.stdout).toContain("Tests did not pass");
+  });
+
+  it("reruns the remaining pytest subset without replacing the cached full-suite truth", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-rerun-home-"));
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-rerun-cwd-"));
+    const pytestPath = path.join(cwd, "pytest");
+    const outputPath = path.join(cwd, "pytest-output.txt");
+    const argsLogPath = path.join(cwd, "pytest-args.log");
+    const script = [
+      "#!/usr/bin/env node",
+      "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      "const cwd = process.cwd();",
+      "fs.appendFileSync(path.join(cwd, 'pytest-args.log'), JSON.stringify(process.argv.slice(2)) + '\\n');",
+      "const output = fs.readFileSync(path.join(cwd, 'pytest-output.txt'), 'utf8');",
+      "process.stdout.write(output);",
+      "process.exit(/(?:^FAILED |^ERROR |\\b\\d+\\s+failed\\b|\\b\\d+\\s+errors?\\b)/m.test(output) ? 1 : 0);"
+    ].join("\n");
+
+    await fs.writeFile(pytestPath, script, {
+      encoding: "utf8",
+      mode: 0o755
+    });
+    await fs.writeFile(
+      outputPath,
+      [
+        "FAILED tests/unit/test_auth.py::test_refresh - AssertionError: expected token",
+        "FAILED tests/unit/test_users.py::test_list - AssertionError: expected user",
+        "2 failed in 0.12s"
+      ].join("\n"),
+      "utf8"
+    );
+
+    const firstRun = await runCliAsync({
+      args: ["exec", "--preset", "test-status", "--", "./pytest"],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(firstRun.status).toBe(1);
+
+    await fs.writeFile(
+      outputPath,
+      [
+        "FAILED tests/unit/test_users.py::test_list - AssertionError: expected user",
+        "1 failed in 0.12s"
+      ].join("\n"),
+      "utf8"
+    );
+
+    const fullRerun = await runCliAsync({
+      args: ["rerun"],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(fullRerun.status).toBe(1);
+    expect(fullRerun.stdout).toContain("- Resolved:");
+    expect(fullRerun.stdout).toContain("- Remaining:");
+
+    const remainingRerun = await runCliAsync({
+      args: ["rerun", "--remaining", "--detail", "verbose", "--show-raw"],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(remainingRerun.status).toBe(1);
+    expect(remainingRerun.stdout).toContain(
+      "tests/unit/test_users.py::test_list -> assertion failed: expected user"
+    );
+    expect(remainingRerun.stderr).toContain(
+      "FAILED tests/unit/test_users.py::test_list - AssertionError: expected user"
+    );
+
+    const argLog = (await fs.readFile(argsLogPath, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as string[]);
+    expect(argLog).toEqual([
+      [],
+      [],
+      ["tests/unit/test_users.py::test_list"]
+    ]);
   });
 
   it("treats standard as the default detail level for test-status", async () => {
@@ -475,8 +714,11 @@ describe("exec mode", () => {
     });
 
     expect(result.status).toBe(2);
-    expect(result.stdout).toContain("Most failures are import/dependency errors during test collection.");
+    expect(result.stdout).toContain(
+      "Import/dependency blocker: at least 2 visible errors are caused by missing dependencies during test collection."
+    );
     expect(result.stdout).toContain("Missing modules include pydantic, fastapi.");
+    expect(result.stdout).toContain("Hint: Install the missing dependencies and rerun the affected tests.");
     expect(result.stdout).not.toContain("->");
   });
 
