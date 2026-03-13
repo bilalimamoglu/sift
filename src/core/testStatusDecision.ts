@@ -32,6 +32,28 @@ export interface TestStatusDiagnoseBucket {
   mini_diff: TestStatusMiniDiff | null;
 }
 
+export interface TestStatusReadTarget {
+  file: string;
+  line: number | null;
+  why: string;
+  bucket_index: number;
+  context_hint: {
+    start_line: number | null;
+    end_line: number | null;
+    search_hint: string | null;
+  };
+}
+
+export interface TestStatusFamilySummary {
+  prefix: string;
+  count: number;
+}
+
+export interface TestStatusTargetSummary {
+  count: number;
+  families: TestStatusFamilySummary[];
+}
+
 export interface TestStatusDiagnoseContract {
   status: "ok" | "insufficient";
   diagnosis_complete: boolean;
@@ -48,11 +70,21 @@ export interface TestStatusDiagnoseContract {
   resolved_tests: string[];
   remaining_tests: string[];
   main_buckets: TestStatusDiagnoseBucket[];
+  read_targets: TestStatusReadTarget[];
   next_best_action: {
     code: DiagnoseActionCode;
     bucket_index: number | null;
     note: string;
   };
+}
+
+export interface TestStatusPublicDiagnoseContract
+  extends Omit<TestStatusDiagnoseContract, "resolved_tests" | "remaining_tests"> {
+  resolved_summary: TestStatusTargetSummary;
+  remaining_summary: TestStatusTargetSummary;
+  remaining_subset_available: boolean;
+  resolved_tests?: string[];
+  remaining_tests?: string[];
 }
 
 export interface TestStatusDecision {
@@ -91,7 +123,7 @@ export interface TestStatusContractOverrides {
 }
 
 export const TEST_STATUS_DIAGNOSE_JSON_CONTRACT =
-  '{"status":"ok|insufficient","diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","dominant_blocker_bucket_index":number|null,"provider_used":boolean,"provider_confidence":number|null,"provider_failed":boolean,"raw_slice_used":boolean,"raw_slice_strategy":"none|bucket_evidence|traceback_window|head_tail","resolved_tests":string[],"remaining_tests":string[],"main_buckets":[{"bucket_index":number,"label":string,"count":number,"root_cause":string,"evidence":string[],"bucket_confidence":number,"root_cause_confidence":number,"dominant":boolean,"secondary_visible_despite_blocker":boolean,"mini_diff":{"added_paths"?:number,"removed_models"?:number,"changed_task_mappings"?:number}|null}],"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string}}';
+  '{"status":"ok|insufficient","diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","dominant_blocker_bucket_index":number|null,"provider_used":boolean,"provider_confidence":number|null,"provider_failed":boolean,"raw_slice_used":boolean,"raw_slice_strategy":"none|bucket_evidence|traceback_window|head_tail","resolved_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_subset_available":boolean,"main_buckets":[{"bucket_index":number,"label":string,"count":number,"root_cause":string,"evidence":string[],"bucket_confidence":number,"root_cause_confidence":number,"dominant":boolean,"secondary_visible_despite_blocker":boolean,"mini_diff":{"added_paths"?:number,"removed_models"?:number,"changed_task_mappings"?:number}|null}],"read_targets":[{"file":string,"line":number|null,"why":string,"bucket_index":number,"context_hint":{"start_line":number|null,"end_line":number|null,"search_hint":string|null}}],"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string},"resolved_tests"?:string[],"remaining_tests"?:string[]}';
 export const TEST_STATUS_PROVIDER_SUPPLEMENT_JSON_CONTRACT =
   '{"diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","provider_confidence":number|null,"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string}}';
 
@@ -151,8 +183,48 @@ export const testStatusDiagnoseContractSchema = z.object({
         .nullable()
     })
   ),
+  read_targets: z
+    .array(
+      z.object({
+        file: z.string().min(1),
+        line: z.number().int().nullable(),
+        why: z.string().min(1),
+        bucket_index: z.number().int(),
+        context_hint: z.object({
+          start_line: z.number().int().nullable(),
+          end_line: z.number().int().nullable(),
+          search_hint: z.string().nullable()
+        })
+      })
+    )
+    .max(5),
   next_best_action: nextBestActionSchema
 });
+
+const testStatusTargetSummarySchema = z.object({
+  count: z.number().int().nonnegative(),
+  families: z
+    .array(
+      z.object({
+        prefix: z.string().min(1),
+        count: z.number().int().nonnegative()
+      })
+    )
+    .max(5)
+});
+
+export const testStatusPublicDiagnoseContractSchema = testStatusDiagnoseContractSchema
+  .omit({
+    resolved_tests: true,
+    remaining_tests: true
+  })
+  .extend({
+    resolved_summary: testStatusTargetSummarySchema,
+    remaining_summary: testStatusTargetSummarySchema,
+    remaining_subset_available: z.boolean(),
+    resolved_tests: z.array(z.string()).optional(),
+    remaining_tests: z.array(z.string()).optional()
+  });
 
 export function parseTestStatusProviderSupplement(input: string): TestStatusProviderSupplement {
   return testStatusProviderSupplementSchema.parse(JSON.parse(input));
@@ -178,6 +250,70 @@ function formatCount(count: number, singular: string, plural = `${singular}s`): 
 
 function unique<T>(values: readonly T[]): T[] {
   return [...new Set(values)];
+}
+
+function normalizeTestId(value: string): string {
+  return value.replace(/\\/g, "/").trim();
+}
+
+function extractTestFamilyPrefix(value: string): string {
+  const normalized = normalizeTestId(value);
+  const testsMatch = normalized.match(/^(tests\/[^/]+\/)/);
+  if (testsMatch) {
+    return testsMatch[1]!;
+  }
+
+  const filePart = normalized.split("::")[0]?.trim() ?? "";
+  if (!filePart.includes("/")) {
+    return "other";
+  }
+
+  const segments = filePart.replace(/^\/+/, "").split("/").filter(Boolean);
+  if (segments.length === 0) {
+    return "other";
+  }
+
+  return `${segments[0]}/`;
+}
+
+function buildTestTargetSummary(values: readonly string[]): TestStatusTargetSummary {
+  const counts = new Map<string, number>();
+
+  for (const value of values) {
+    const prefix = extractTestFamilyPrefix(value);
+    counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
+  }
+
+  const families = [...counts.entries()]
+    .map(([prefix, count]) => ({
+      prefix,
+      count
+    }))
+    .sort((left, right) => {
+      if (right.count !== left.count) {
+        return right.count - left.count;
+      }
+      return left.prefix.localeCompare(right.prefix);
+    })
+    .slice(0, 5);
+
+  return {
+    count: values.length,
+    families
+  };
+}
+
+function formatTargetSummary(summary: TestStatusTargetSummary): string {
+  if (summary.count === 0) {
+    return "count=0";
+  }
+
+  const families =
+    summary.families.length > 0
+      ? summary.families.map((family) => `${family.prefix}${family.count}`).join(", ")
+      : "none";
+
+  return `count=${summary.count}; families=${families}`;
 }
 
 function classifyGenericBucketType(reason: string): FailureBucketType {
@@ -274,8 +410,90 @@ function buildGenericBuckets(analysis: TestStatusAnalysis): GenericBucket[] {
   return buckets.sort((left, right) => right.count - left.count);
 }
 
+function normalizeBucketIdentity(bucket: Pick<GenericBucket, "type" | "reason">): string {
+  return `${bucket.type}:${bucket.reason.toLowerCase().replace(/\s+/g, " ").trim()}`;
+}
+
+function mergeRepresentativeItems(
+  left: FailureBucket["representativeItems"],
+  right: FailureBucket["representativeItems"]
+): FailureBucket["representativeItems"] {
+  const merged: FailureBucket["representativeItems"] = [...left];
+
+  for (const item of right) {
+    if (
+      merged.some(
+        (existing) => existing.label === item.label && existing.reason === item.reason
+      )
+    ) {
+      continue;
+    }
+
+    if (merged.length >= 6) {
+      break;
+    }
+
+    merged.push(item);
+  }
+
+  return merged;
+}
+
+function mergeBucketDetails(existing: GenericBucket, incoming: GenericBucket): GenericBucket {
+  const representativeItems = mergeRepresentativeItems(
+    existing.representativeItems,
+    incoming.representativeItems
+  );
+  const count = Math.max(existing.count, incoming.count);
+
+  return {
+    ...existing,
+    headline:
+      existing.summaryLines.length >= incoming.summaryLines.length &&
+      existing.headline.length >= incoming.headline.length
+        ? existing.headline
+        : incoming.headline,
+    summaryLines:
+      existing.summaryLines.length >= incoming.summaryLines.length
+        ? existing.summaryLines
+        : incoming.summaryLines,
+    count,
+    confidence: Math.max(existing.confidence, incoming.confidence),
+    representativeItems,
+    entities: unique([...existing.entities, ...incoming.entities]),
+    hint: existing.hint ?? incoming.hint,
+    overflowCount: Math.max(
+      existing.overflowCount,
+      incoming.overflowCount,
+      count - representativeItems.length
+    ),
+    overflowLabel: existing.overflowLabel || incoming.overflowLabel
+  };
+}
+
 function mergeBuckets(analysis: TestStatusAnalysis): GenericBucket[] {
-  const merged: GenericBucket[] = analysis.buckets.map((bucket) => ({
+  const mergedByIdentity = new Map<string, GenericBucket>();
+  const merged: GenericBucket[] = [];
+
+  const pushBucket = (bucket: GenericBucket) => {
+    const identity = normalizeBucketIdentity(bucket);
+    const existing = mergedByIdentity.get(identity);
+
+    if (existing) {
+      const replacement = mergeBucketDetails(existing, bucket);
+      const index = merged.indexOf(existing);
+      if (index >= 0) {
+        merged[index] = replacement;
+      }
+      mergedByIdentity.set(identity, replacement);
+      return;
+    }
+
+    merged.push(bucket);
+    mergedByIdentity.set(identity, bucket);
+  };
+
+  for (const bucket of analysis.buckets.map((bucket) => ({
     type: bucket.type,
     headline: bucket.headline,
     summaryLines: [...bucket.summaryLines],
@@ -287,33 +505,36 @@ function mergeBuckets(analysis: TestStatusAnalysis): GenericBucket[] {
     hint: bucket.hint,
     overflowCount: bucket.overflowCount,
     overflowLabel: bucket.overflowLabel
-  }));
-
-  if (merged.length >= 3) {
-    return merged;
+  }))) {
+    pushBucket(bucket);
   }
 
   const coveredLabels = new Set(
     merged.flatMap((bucket) => bucket.representativeItems.map((item) => item.label))
   );
   for (const bucket of buildGenericBuckets(analysis)) {
-    const unseenItems = bucket.representativeItems.filter((item) => !coveredLabels.has(item.label));
-    if (unseenItems.length === 0) {
+    const identity = normalizeBucketIdentity(bucket);
+    const unseenItems = bucket.representativeItems.filter(
+      (item) => !coveredLabels.has(item.label)
+    );
+    if (!mergedByIdentity.has(identity) && unseenItems.length === 0) {
       continue;
     }
 
-    merged.push({
+    pushBucket({
       ...bucket,
       count: Math.max(bucket.count, unseenItems.length),
-      representativeItems: unseenItems
+      representativeItems:
+        mergedByIdentity.has(identity) || unseenItems.length === 0
+          ? bucket.representativeItems
+          : unseenItems
     });
-    unseenItems.forEach((item) => coveredLabels.add(item.label));
-    if (merged.length >= 3) {
-      break;
+    for (const item of bucket.representativeItems) {
+      coveredLabels.add(item.label);
     }
   }
 
-  return merged.slice(0, 3);
+  return merged;
 }
 
 function dominantBucketPriority(bucket: GenericBucket): number {
@@ -433,6 +654,212 @@ function buildBucketEvidence(bucket: GenericBucket): string[] {
   }
 
   return bucket.entities.slice(0, 2);
+}
+
+function formatReadTargetLocation(target: TestStatusReadTarget): string {
+  return target.line === null ? target.file : `${target.file}:${target.line}`;
+}
+
+function buildReadTargetContextHint(args: {
+  bucket: GenericBucket;
+  anchor: FailureBucket["representativeItems"][number];
+}): TestStatusReadTarget["context_hint"] {
+  if (args.anchor.line !== null) {
+    return {
+      start_line: Math.max(1, args.anchor.line - 5),
+      end_line: args.anchor.line + 5,
+      search_hint: null
+    };
+  }
+
+  return {
+    start_line: null,
+    end_line: null,
+    search_hint: buildReadTargetSearchHint(args.bucket, args.anchor)
+  };
+}
+
+function buildReadTargetWhy(args: {
+  bucket: GenericBucket;
+  bucketLabel: string;
+}): string {
+  const envVar = args.bucket.reason.match(/^missing test env:\s+([A-Z][A-Z0-9_]{2,})$/)?.[1];
+  if (envVar) {
+    return `it contains the ${envVar} setup guard`;
+  }
+
+  if (args.bucket.reason.startsWith("fixture guard:")) {
+    return "it contains the fixture/setup guard behind this bucket";
+  }
+
+  if (args.bucket.reason.startsWith("db refused:")) {
+    return "it contains the database connection setup behind this bucket";
+  }
+
+  if (args.bucket.reason.startsWith("service unavailable:")) {
+    return "it contains the dependency service call or setup behind this bucket";
+  }
+
+  if (args.bucket.reason.startsWith("auth bypass absent:")) {
+    return "it contains the auth bypass setup behind this bucket";
+  }
+
+  if (args.bucket.type === "contract_snapshot_drift") {
+    if (args.bucketLabel === "route drift") {
+      return "it maps to the visible route drift bucket";
+    }
+    if (args.bucketLabel === "model catalog drift") {
+      return "it maps to the visible model drift bucket";
+    }
+    if (args.bucketLabel === "schema freeze mismatch") {
+      return "it maps to the visible schema freeze mismatch";
+    }
+    return "it maps to the visible stale snapshot expectation";
+  }
+
+  if (args.bucket.type === "import_dependency_failure") {
+    return "it is the first visible failing module in this missing dependency bucket";
+  }
+
+  if (args.bucket.type === "assertion_failure") {
+    return "it is the first visible failing test in this bucket";
+  }
+
+  if (args.bucket.type === "collection_failure") {
+    return "it is the first visible collection/setup anchor for this bucket";
+  }
+
+  return `it maps to the visible ${args.bucketLabel} bucket`;
+}
+
+function buildReadTargetSearchHint(
+  bucket: GenericBucket,
+  anchor: FailureBucket["representativeItems"][number]
+): string | null {
+  const envVar = bucket.reason.match(/^missing test env:\s+([A-Z][A-Z0-9_]{2,})$/)?.[1];
+  if (envVar) {
+    return envVar;
+  }
+
+  if (bucket.type === "contract_snapshot_drift") {
+    return bucket.entities.find((value) => value.startsWith("/api/")) ?? bucket.entities[0] ?? null;
+  }
+
+  const missingModule = bucket.reason.match(/^missing module:\s+(.+)$/)?.[1];
+  if (missingModule) {
+    return missingModule;
+  }
+
+  const fixtureGuard = bucket.reason.match(/^fixture guard:\s+(.+)$/)?.[1];
+  if (fixtureGuard) {
+    return fixtureGuard;
+  }
+
+  const serviceMarker = bucket.reason.match(
+    /^(?:service unavailable|db refused|auth bypass absent):\s+(.+)$/
+  )?.[1];
+  if (serviceMarker) {
+    return serviceMarker;
+  }
+
+  const assertionText = bucket.reason.match(/^assertion failed:\s+(.+)$/)?.[1];
+  if (assertionText) {
+    return assertionText;
+  }
+
+  const fallbackLabel = anchor.label.split("::")[1]?.trim();
+  return fallbackLabel || null;
+}
+
+function buildReadTargets(args: {
+  buckets: GenericBucket[];
+  dominantBucketIndex: number | null;
+}): TestStatusReadTarget[] {
+  return args.buckets
+    .map((bucket, index) => ({
+      bucket,
+      bucketIndex: index + 1,
+      bucketLabel: labelForBucket(bucket),
+      dominant: args.dominantBucketIndex === index + 1
+    }))
+    .sort((left, right) => {
+      if (left.dominant !== right.dominant) {
+        return left.dominant ? -1 : 1;
+      }
+      return left.bucketIndex - right.bucketIndex;
+    })
+    .flatMap(({ bucket, bucketIndex, bucketLabel }) => {
+      const anchor = [...bucket.representativeItems]
+        .filter((item) => item.file)
+        .sort((left, right) => {
+          if ((left.line !== null) !== (right.line !== null)) {
+            return left.line !== null ? -1 : 1;
+          }
+          if (right.anchor_confidence !== left.anchor_confidence) {
+            return right.anchor_confidence - left.anchor_confidence;
+          }
+          return left.label.localeCompare(right.label);
+        })[0];
+
+      if (!anchor?.file) {
+        return [];
+      }
+
+      return [
+        {
+          file: anchor.file,
+          line: anchor.line,
+          why: buildReadTargetWhy({
+            bucket,
+            bucketLabel
+          }),
+          bucket_index: bucketIndex,
+          context_hint: buildReadTargetContextHint({
+            bucket,
+            anchor
+          })
+        }
+      ];
+    })
+    .slice(0, 5);
+}
+
+function buildConcreteNextNote(args: {
+  nextBestAction: TestStatusDiagnoseContract["next_best_action"];
+  readTargets: TestStatusReadTarget[];
+  hasSecondaryVisibleBucket: boolean;
+}): string {
+  const primaryTarget =
+    args.readTargets.find((target) => target.bucket_index === args.nextBestAction.bucket_index) ??
+    args.readTargets[0];
+  if (!primaryTarget) {
+    return args.nextBestAction.note;
+  }
+
+  const lead =
+    primaryTarget.context_hint.start_line !== null &&
+    primaryTarget.context_hint.end_line !== null
+      ? `Read ${primaryTarget.file} lines ${primaryTarget.context_hint.start_line}-${primaryTarget.context_hint.end_line} first; ${primaryTarget.why}.`
+      : primaryTarget.context_hint.search_hint
+        ? `Search for ${primaryTarget.context_hint.search_hint} in ${primaryTarget.file} first; ${primaryTarget.why}.`
+        : `Read ${formatReadTargetLocation(primaryTarget)} first; ${primaryTarget.why}.`;
+
+  if (args.nextBestAction.code === "fix_dominant_blocker") {
+    if (
+      args.nextBestAction.bucket_index === 1 &&
+      args.hasSecondaryVisibleBucket
+    ) {
+      return "Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.";
+    }
+
+    return `Fix bucket ${args.nextBestAction.bucket_index ?? 1} first, then rerun the full suite at standard.`;
+  }
+
+  if (args.nextBestAction.code === "read_source_for_bucket") {
+    return lead;
+  }
+
+  return args.nextBestAction.note;
 }
 
 function extractMiniDiff(input: string, bucket: GenericBucket): TestStatusMiniDiff | null {
@@ -569,6 +996,101 @@ function renderBucketHeadline(bucket: TestStatusDiagnoseBucket): string {
   return `- Bucket ${bucket.bucket_index}: ${bucket.label} (${bucket.count}) -> ${bucket.root_cause}`;
 }
 
+interface StandardBucketSupport {
+  headline: string;
+  anchorText: string | null;
+  fixText: string | null;
+}
+
+function buildStandardAnchorText(target: TestStatusReadTarget | undefined): string | null {
+  if (!target) {
+    return null;
+  }
+
+  if (
+    target.context_hint.start_line !== null &&
+    target.context_hint.end_line !== null
+  ) {
+    return `${target.file} lines ${target.context_hint.start_line}-${target.context_hint.end_line}`;
+  }
+
+  if (target.context_hint.search_hint) {
+    return `search ${target.context_hint.search_hint} in ${target.file}`;
+  }
+
+  return formatReadTargetLocation(target);
+}
+
+function buildStandardFixText(args: {
+  bucket: GenericBucket;
+  bucketLabel: string;
+}): string | null {
+  if (args.bucket.hint) {
+    return args.bucket.hint;
+  }
+
+  const envVar = args.bucket.reason.match(/^missing test env:\s+([A-Z][A-Z0-9_]{2,})$/)?.[1];
+  if (envVar) {
+    return `Set ${envVar} before rerunning the affected tests.`;
+  }
+
+  const missingModule = args.bucket.reason.match(/^missing module:\s+(.+)$/)?.[1];
+  if (missingModule) {
+    return `Install ${missingModule} and rerun the affected tests.`;
+  }
+
+  if (args.bucket.reason.startsWith("fixture guard:")) {
+    return "Restore the missing fixture/setup guard and rerun the full suite at standard.";
+  }
+
+  if (args.bucket.reason.startsWith("db refused:")) {
+    return "Fix the test database connectivity and rerun the full suite at standard.";
+  }
+
+  if (args.bucket.reason.startsWith("service unavailable:")) {
+    return "Restore the dependency service or test double and rerun the full suite at standard.";
+  }
+
+  if (args.bucket.reason.startsWith("auth bypass absent:")) {
+    return "Restore the test auth bypass setup and rerun the full suite at standard.";
+  }
+
+  if (args.bucket.type === "contract_snapshot_drift") {
+    return "Review the visible drift and regenerate the contract snapshots if the changes are intentional.";
+  }
+
+  if (args.bucket.type === "assertion_failure") {
+    return "Inspect the failing assertion and rerun the full suite at standard.";
+  }
+
+  if (args.bucket.type === "collection_failure") {
+    return "Fix the collection/setup failure and rerun the full suite at standard.";
+  }
+
+  if (args.bucket.type === "runtime_failure") {
+    return `Fix the visible ${args.bucketLabel} and rerun the full suite at standard.`;
+  }
+
+  return null;
+}
+
+function buildStandardBucketSupport(args: {
+  bucket: GenericBucket;
+  contractBucket: TestStatusDiagnoseBucket;
+  readTarget?: TestStatusReadTarget;
+}): StandardBucketSupport {
+  return {
+    headline: args.bucket.summaryLines[0]
+      ? `- ${args.bucket.summaryLines[0]}`
+      : renderBucketHeadline(args.contractBucket),
+    anchorText: buildStandardAnchorText(args.readTarget),
+    fixText: buildStandardFixText({
+      bucket: args.bucket,
+      bucketLabel: args.contractBucket.label
+    })
+  };
+}
+
 function renderStandard(args: {
   analysis: TestStatusAnalysis;
   contract: TestStatusDiagnoseContract;
@@ -578,30 +1100,26 @@ function renderStandard(args: {
   if (args.contract.main_buckets.length > 0) {
     for (const bucket of args.contract.main_buckets.slice(0, 3)) {
       const rawBucket = args.buckets[bucket.bucket_index - 1];
-      lines.push(
-        ...(rawBucket?.summaryLines.length
-          ? rawBucket.summaryLines.map((line) => `- ${line}`)
-          : [renderBucketHeadline(bucket)])
-      );
-    }
-  }
-
-  if (args.contract.main_buckets.length > 0) {
-    const evidence = args.contract.main_buckets.flatMap((bucket) => {
-      const rawBucket = args.buckets[bucket.bucket_index - 1];
-      if (rawBucket?.summaryLines.length && rawBucket.summaryLines.length > 1) {
-        return [];
+      if (!rawBucket) {
+        lines.push(renderBucketHeadline(bucket));
+        continue;
       }
-      return bucket.evidence.map((value) => `- Evidence: ${value}`);
-    });
-    lines.push(...evidence.slice(0, 2));
-    lines.push(
-      ...args.buckets
-        .map((bucket) => bucket.hint)
-        .filter((value): value is string => Boolean(value))
-        .slice(0, 2)
-        .map((hint) => `- Hint: ${hint}`)
-    );
+
+      const support = buildStandardBucketSupport({
+        bucket: rawBucket,
+        contractBucket: bucket,
+        readTarget: args.contract.read_targets.find(
+          (target) => target.bucket_index === bucket.bucket_index
+        )
+      });
+      lines.push(support.headline);
+      if (support.anchorText) {
+        lines.push(`- Anchor: ${support.anchorText}`);
+      }
+      if (support.fixText) {
+        lines.push(`- Fix: ${support.fixText}`);
+      }
+    }
   }
   lines.push(buildDecisionLine(args.contract));
   lines.push(`- Next: ${args.contract.next_best_action.note}`);
@@ -676,7 +1194,7 @@ export function buildTestStatusDiagnoseContract(args: {
   remainingTests?: string[];
   contractOverrides?: TestStatusContractOverrides;
 }): TestStatusDecision {
-  const buckets = prioritizeBuckets(mergeBuckets(args.analysis));
+  const buckets = prioritizeBuckets(mergeBuckets(args.analysis)).slice(0, 3);
   const simpleCollectionFailure =
     args.analysis.collectionErrorCount !== undefined &&
     args.analysis.collectionItems.length === 0 &&
@@ -710,6 +1228,10 @@ export function buildTestStatusDiagnoseContract(args: {
     dominantBucket && isDominantBlockerType(dominantBucket.bucket.type)
       ? dominantBucket.index + 1
       : null;
+  const readTargets = buildReadTargets({
+    buckets,
+    dominantBucketIndex: dominantBlockerBucketIndex
+  });
   const mainBuckets = buckets.map((bucket, index) => ({
     bucket_index: index + 1,
     label: labelForBucket(bucket),
@@ -785,14 +1307,25 @@ export function buildTestStatusDiagnoseContract(args: {
     resolved_tests: resolvedTests,
     remaining_tests: remainingTests,
     main_buckets: mainBuckets,
+    read_targets: readTargets,
     next_best_action: nextBestAction
   };
+  const effectiveNextBestAction = args.contractOverrides?.next_best_action ?? baseContract.next_best_action;
   const mergedContractWithoutDecision: Omit<TestStatusDiagnoseContract, "decision"> = {
     ...baseContract,
     ...args.contractOverrides,
     status:
       (args.contractOverrides?.diagnosis_complete ?? diagnosisComplete) ? "ok" : "insufficient",
-    next_best_action: args.contractOverrides?.next_best_action ?? baseContract.next_best_action
+    next_best_action: {
+      ...effectiveNextBestAction,
+      note: buildConcreteNextNote({
+        nextBestAction: effectiveNextBestAction,
+        readTargets,
+        hasSecondaryVisibleBucket: mainBuckets.some(
+          (bucket) => bucket.secondary_visible_despite_blocker
+        )
+      })
+    }
   };
   const contract = testStatusDiagnoseContractSchema.parse({
     ...mergedContractWithoutDecision,
@@ -819,32 +1352,74 @@ export function buildTestStatusDiagnoseContract(args: {
   };
 }
 
-export function buildTestStatusAnalysisContext(
-  contract: TestStatusDiagnoseContract
-): string {
+export function buildTestStatusPublicDiagnoseContract(args: {
+  contract: TestStatusDiagnoseContract;
+  includeTestIds?: boolean;
+  remainingSubsetAvailable?: boolean;
+}): TestStatusPublicDiagnoseContract {
+  const {
+    resolved_tests,
+    remaining_tests,
+    ...rest
+  } = args.contract;
+
+  return testStatusPublicDiagnoseContractSchema.parse({
+    ...rest,
+    resolved_summary: buildTestTargetSummary(resolved_tests),
+    remaining_summary: buildTestTargetSummary(remaining_tests),
+    remaining_subset_available:
+      Boolean(args.remainingSubsetAvailable) && remaining_tests.length > 0,
+    ...(args.includeTestIds
+      ? {
+          resolved_tests,
+          remaining_tests
+        }
+      : {})
+  }) as TestStatusPublicDiagnoseContract;
+}
+
+export function buildTestStatusAnalysisContext(args: {
+  contract: TestStatusDiagnoseContract;
+  remainingSubsetAvailable?: boolean;
+  includeTestIds?: boolean;
+}): string {
+  const publicContract = buildTestStatusPublicDiagnoseContract({
+    contract: args.contract,
+    includeTestIds: args.includeTestIds,
+    remainingSubsetAvailable: args.remainingSubsetAvailable
+  });
   const bucketLines =
-    contract.main_buckets.length === 0
+    args.contract.main_buckets.length === 0
       ? ["- No failing buckets visible."]
-      : contract.main_buckets.map(
+      : args.contract.main_buckets.map(
           (bucket) =>
             `- Bucket ${bucket.bucket_index}: ${bucket.label}; count=${bucket.count}; root_cause=${bucket.root_cause}; dominant=${bucket.dominant}`
         );
 
   return [
     "Heuristic extract:",
-    `- diagnosis_complete=${contract.diagnosis_complete}`,
-    `- raw_needed=${contract.raw_needed}`,
-    `- decision=${contract.decision}`,
-    `- provider_used=${contract.provider_used}`,
-    `- provider_failed=${contract.provider_failed}`,
-    `- raw_slice_strategy=${contract.raw_slice_strategy}`,
-    ...(contract.resolved_tests.length > 0
-      ? [`- resolved_tests=${contract.resolved_tests.join(", ")}`]
+    `- diagnosis_complete=${args.contract.diagnosis_complete}`,
+    `- raw_needed=${args.contract.raw_needed}`,
+    `- decision=${args.contract.decision}`,
+    `- provider_used=${args.contract.provider_used}`,
+    `- provider_failed=${args.contract.provider_failed}`,
+    `- raw_slice_strategy=${args.contract.raw_slice_strategy}`,
+    `- resolved_summary=${formatTargetSummary(publicContract.resolved_summary)}`,
+    `- remaining_summary=${formatTargetSummary(publicContract.remaining_summary)}`,
+    `- remaining_subset_available=${publicContract.remaining_subset_available}`,
+    ...(args.includeTestIds && args.contract.resolved_tests.length > 0
+      ? [`- resolved_tests=${args.contract.resolved_tests.join(", ")}`]
       : []),
-    ...(contract.remaining_tests.length > 0
-      ? [`- remaining_tests=${contract.remaining_tests.join(", ")}`]
+    ...(args.includeTestIds && args.contract.remaining_tests.length > 0
+      ? [`- remaining_tests=${args.contract.remaining_tests.join(", ")}`]
+      : []),
+    ...(args.contract.read_targets.length > 0
+      ? args.contract.read_targets.map(
+          (target) =>
+            `- read_target[bucket=${target.bucket_index}]=${formatReadTargetLocation(target)} -> ${target.why}${target.context_hint.start_line !== null && target.context_hint.end_line !== null ? `; lines=${target.context_hint.start_line}-${target.context_hint.end_line}` : target.context_hint.search_hint ? `; search=${target.context_hint.search_hint}` : ""}`
+        )
       : []),
     ...bucketLines,
-    `- next_best_action=${contract.next_best_action.code}`
+    `- next_best_action=${args.contract.next_best_action.code}`
   ].join("\n");
 }

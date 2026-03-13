@@ -191,6 +191,36 @@ export function assertSupportedGoal(args: {
   );
 }
 
+export function assertSupportedIncludeTestIds(args: {
+  includeTestIds: boolean;
+  goal: Goal;
+  format: OutputFormat;
+  presetName?: string;
+  watch?: boolean;
+}): void {
+  if (!args.includeTestIds) {
+    return;
+  }
+
+  if (args.goal !== "diagnose" || args.format !== "json") {
+    throw new Error(
+      "`--include-test-ids` is supported only with `--goal diagnose --format json` on `--preset test-status`, `sift rerun`, and `test-status` watch flows."
+    );
+  }
+
+  if (args.presetName === "test-status") {
+    return;
+  }
+
+  if (args.watch && args.presetName === "test-status") {
+    return;
+  }
+
+  throw new Error(
+    "`--include-test-ids` is supported only with `--goal diagnose --format json` on `--preset test-status`, `sift rerun`, and `test-status` watch flows."
+  );
+}
+
 function shouldKeepPresetPolicy(args: {
   requestedFormat?: OutputFormat;
   presetFormat: OutputFormat;
@@ -234,6 +264,10 @@ function applySharedOptions(command: ReturnType<ReturnType<typeof cac>["command"
     .option("--raw-fallback", "Enable raw fallback text output")
     .option("--dry-run", "Show the reduced input and prompt without calling the provider")
     .option("--show-raw", "Print the captured raw input to stderr for debugging")
+    .option(
+      "--include-test-ids",
+      "Append full resolved/remaining test IDs to supported diagnose JSON outputs"
+    )
     .option(
       "--fail-on",
       "Fail with exit code 1 when a supported built-in preset produces a blocking result"
@@ -410,6 +444,7 @@ export function createCliApp(args: {
             config,
             dryRun: Boolean(input.options.dryRun),
             showRaw: Boolean(input.options.showRaw),
+            includeTestIds: Boolean(input.options.includeTestIds),
             detail: input.detail,
             presetName: input.presetName,
             policyName: input.policyName,
@@ -424,6 +459,7 @@ export function createCliApp(args: {
             config,
             dryRun: Boolean(input.options.dryRun),
             showRaw: Boolean(input.options.showRaw),
+            includeTestIds: Boolean(input.options.includeTestIds),
             detail: input.detail,
             presetName: input.presetName,
             policyName: input.policyName,
@@ -481,6 +517,7 @@ export function createCliApp(args: {
       diff: input.diff,
       failOn: Boolean(input.options.failOn),
       showRaw: Boolean(input.options.showRaw),
+      includeTestIds: Boolean(input.options.includeTestIds),
       watch: Boolean(input.options.watch),
       detail: input.detail,
       presetName: input.presetName,
@@ -505,11 +542,17 @@ export function createCliApp(args: {
       const preset = deps.getPreset(config, name);
       const goal = normalizeGoal(options.goal) ?? "summarize";
       const format = (options.format as OutputFormat | undefined) ?? preset.format;
-      assertSupportedGoal({
-        goal,
-        format,
-        presetName: name
-      });
+        assertSupportedGoal({
+          goal,
+          format,
+          presetName: name
+        });
+        assertSupportedIncludeTestIds({
+          includeTestIds: Boolean(options.includeTestIds),
+          goal,
+          format,
+          presetName: name
+        });
 
       await executeRun({
         question: preset.question,
@@ -581,6 +624,13 @@ export function createCliApp(args: {
           presetName,
           watch: Boolean(options.watch)
         });
+        assertSupportedIncludeTestIds({
+          includeTestIds: Boolean(options.includeTestIds),
+          goal,
+          format,
+          presetName,
+          watch: Boolean(options.watch)
+        });
 
         await executeExec({
           question: preset.question,
@@ -622,6 +672,12 @@ export function createCliApp(args: {
         format,
         watch: Boolean(options.watch)
       });
+      assertSupportedIncludeTestIds({
+        includeTestIds: Boolean(options.includeTestIds),
+        goal,
+        format,
+        watch: Boolean(options.watch)
+      });
       await executeExec({
         question,
         format,
@@ -658,6 +714,12 @@ export function createCliApp(args: {
         format,
         presetName: "test-status"
       });
+      assertSupportedIncludeTestIds({
+        includeTestIds: Boolean(options.includeTestIds),
+        goal,
+        format,
+        presetName: "test-status"
+      });
 
       process.exitCode = await deps.runEscalate({
         config,
@@ -665,6 +727,7 @@ export function createCliApp(args: {
         format,
         goal,
         dryRun: Boolean(options.dryRun),
+        includeTestIds: Boolean(options.includeTestIds),
         policyName:
           shouldKeepPresetPolicy({
             requestedFormat: options.format as OutputFormat | undefined,
@@ -710,12 +773,19 @@ export function createCliApp(args: {
         format,
         presetName: "test-status"
       });
+      assertSupportedIncludeTestIds({
+        includeTestIds: Boolean(options.includeTestIds),
+        goal,
+        format,
+        presetName: "test-status"
+      });
 
       process.exitCode = await deps.runRerun({
         question: preset.question,
         format,
         config,
         dryRun: Boolean(options.dryRun),
+        includeTestIds: Boolean(options.includeTestIds),
         goal,
         remaining,
         detail: resolveRerunDetail({
@@ -769,6 +839,13 @@ export function createCliApp(args: {
           presetName,
           watch: true
         });
+        assertSupportedIncludeTestIds({
+          includeTestIds: Boolean(options.includeTestIds),
+          goal,
+          format,
+          presetName,
+          watch: true
+        });
 
         const stdin = await deps.readStdin();
         const output = await deps.runWatch({
@@ -779,6 +856,7 @@ export function createCliApp(args: {
           config,
           dryRun: Boolean(options.dryRun),
           showRaw: Boolean(options.showRaw),
+          includeTestIds: Boolean(options.includeTestIds),
           detail: resolveDetail({
             presetName,
             options
@@ -810,6 +888,12 @@ export function createCliApp(args: {
         format,
         watch: true
       });
+      assertSupportedIncludeTestIds({
+        includeTestIds: Boolean(options.includeTestIds),
+        goal,
+        format,
+        watch: true
+      });
       const config = deps.resolveConfig({
         configPath: options.config as string | undefined,
         env,
@@ -824,6 +908,7 @@ export function createCliApp(args: {
         config,
         dryRun: Boolean(options.dryRun),
         showRaw: Boolean(options.showRaw),
+        includeTestIds: Boolean(options.includeTestIds),
         detail: resolveDetail({
           options
         })

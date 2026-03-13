@@ -10,6 +10,10 @@ describe("README quick start acceptance", () => {
   it("documents guided one-time setup", async () => {
     const readme = await fs.readFile(path.join(repoRoot(), "README.md"), "utf8");
 
+    expect(readme).toContain("turns a long terminal wall of text into a short answer");
+    expect(readme).toContain("standard` = map");
+    expect(readme).toContain("rerun --remaining` = zoom");
+    expect(readme).toContain("raw traceback = last resort");
     expect(readme).toContain("sift config setup");
     expect(readme).toContain("~/.config/sift/config.yaml");
     expect(readme).toContain("repo-local config can still override it");
@@ -25,16 +29,26 @@ describe("README quick start acceptance", () => {
     expect(readme).toContain("--show-raw");
     expect(readme).toContain("sift rerun");
     expect(readme).toContain("sift rerun --remaining --detail focused");
+    expect(readme).toContain("--include-test-ids");
     expect(readme).toContain("Shared blocker:");
     expect(readme).toContain("Contract drift:");
-    expect(readme).toContain("PGTEST_POSTGRES_DSN");
-    expect(readme).toContain("landing-gallery");
+    expect(readme).toContain("path/to/failing_test.py");
+    expect(readme).toContain("search <TEST_ENV_VAR> in path/to/test_setup.py");
+    expect(readme).toContain("search <route-or-entity> in path/to/freeze_test.py");
+    expect(readme).not.toContain("PGTEST_POSTGRES_DSN");
+    expect(readme).not.toContain("landing-gallery");
     expect(readme).toContain("npm run bench:test-status-ab");
     expect(readme).toContain("npm run bench:test-status-live");
-    expect(readme).toContain("Use `standard` for the full suite first.");
-    expect(readme).toContain("Use `sift escalate` only when you want a deeper render of the same cached output");
-    expect(readme).toContain("After fixing something, run `sift rerun` to refresh the full-suite truth");
-    expect(readme).toContain("Only then use `sift rerun --remaining --detail focused`");
+    expect(readme).toContain("Start with the map");
+    expect(readme).toContain("If `standard` already names the main failure buckets");
+    expect(readme).toContain("Use diagnose JSON only when automation or machine branching really needs it");
+    expect(readme).toContain("Default diagnose JSON is summary-first");
+    expect(readme).toContain("read_targets.context_hint");
+    expect(readme).toContain("search_hint");
+    expect(readme).toContain("Anchor:");
+    expect(readme).toContain("Fix:");
+    expect(readme).toContain("trust it and report or act from there directly");
+    expect(readme).toContain("do not re-verify the same bucket with raw pytest");
     expect(readme).toContain("Decision: stop and act");
   });
 

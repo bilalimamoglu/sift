@@ -13,6 +13,7 @@ import { isRetriableReason, looksLikeRejectedModelOutput } from "./quality.js";
 import {
   buildTestStatusAnalysisContext,
   buildTestStatusDiagnoseContract,
+  buildTestStatusPublicDiagnoseContract,
   parseTestStatusProviderSupplement,
   TEST_STATUS_DIAGNOSE_JSON_CONTRACT,
   TEST_STATUS_PROVIDER_SUPPLEMENT_JSON_CONTRACT,
@@ -21,6 +22,53 @@ import {
 import { buildGenericRawSlice, buildTestStatusRawSlice } from "./rawSlice.js";
 
 const RETRY_DELAY_MS = 300;
+
+function estimateTokenCount(text: string): number {
+  return Math.max(1, Math.ceil(text.length / 4));
+}
+
+function getDiagnosisCompleteAtLayer(contract: TestStatusDiagnoseContract): "heuristic" | "provider" | "raw" {
+  if (contract.raw_needed || contract.provider_failed) {
+    return "raw";
+  }
+
+  if (contract.provider_used) {
+    return "provider";
+  }
+
+  return "heuristic";
+}
+
+function logVerboseTestStatusTelemetry(args: {
+  request: RunRequest;
+  prepared: ReturnType<typeof prepareInput>;
+  contract: TestStatusDiagnoseContract;
+  finalOutput: string;
+  rawSliceChars?: number;
+  providerInputChars?: number;
+  providerOutputChars?: number;
+}): void {
+  if (!args.request.config.runtime.verbose) {
+    return;
+  }
+
+  const lines = [
+    `${pc.dim("sift")} diagnosis_complete_at_layer=${getDiagnosisCompleteAtLayer(args.contract)}`,
+    `${pc.dim("sift")} heuristic_short_circuit=${!args.contract.provider_used && args.contract.diagnosis_complete && !args.contract.raw_needed && !args.contract.provider_failed}`,
+    `${pc.dim("sift")} raw_input_chars=${args.request.stdin.length}`,
+    `${pc.dim("sift")} prepared_input_chars=${args.prepared.meta.finalLength}`,
+    `${pc.dim("sift")} raw_slice_chars=${args.rawSliceChars ?? 0}`,
+    `${pc.dim("sift")} provider_input_chars=${args.providerInputChars ?? 0}`,
+    `${pc.dim("sift")} provider_output_chars=${args.providerOutputChars ?? 0}`,
+    `${pc.dim("sift")} final_output_chars=${args.finalOutput.length}`,
+    `${pc.dim("sift")} final_output_tokens_est=${estimateTokenCount(args.finalOutput)}`,
+    `${pc.dim("sift")} read_targets_count=${args.contract.read_targets.length}`,
+    `${pc.dim("sift")} remaining_count=${args.contract.remaining_tests.length}`,
+    `${pc.dim("sift")} remaining_ids_exposed=${Boolean(args.request.includeTestIds)}`
+  ];
+
+  process.stderr.write(`${lines.join("\n")}\n`);
+}
 
 function normalizeOutput(text: string, responseMode: "text" | "json"): string {
   if (responseMode !== "json") {
@@ -175,7 +223,15 @@ function renderTestStatusDecisionOutput(args: {
   decision: ReturnType<typeof buildTestStatusDiagnoseContract>;
 }): string {
   if (args.request.goal === "diagnose" && args.request.format === "json") {
-    return JSON.stringify(args.decision.contract, null, 2);
+    return JSON.stringify(
+      buildTestStatusPublicDiagnoseContract({
+        contract: args.decision.contract,
+        includeTestIds: args.request.includeTestIds,
+        remainingSubsetAvailable: args.request.testStatusContext?.remainingSubsetAvailable
+      }),
+      null,
+      2
+    );
   }
 
   if (args.request.detail === "verbose") {
@@ -280,7 +336,7 @@ export async function runSift(request: RunRequest): Promise<string> {
       input: prepared.truncated,
       detail: request.detail,
       policyName: request.policyName,
-      outputContract:
+        outputContract:
         request.policyName === "test-status" &&
         request.goal === "diagnose" &&
         request.format === "json"
@@ -288,7 +344,13 @@ export async function runSift(request: RunRequest): Promise<string> {
           : request.outputContract,
       analysisContext: [
         request.analysisContext,
-        testStatusDecision ? buildTestStatusAnalysisContext(testStatusDecision.contract) : undefined
+        testStatusDecision
+          ? buildTestStatusAnalysisContext({
+              contract: testStatusDecision.contract,
+              includeTestIds: request.includeTestIds,
+              remainingSubsetAvailable: request.testStatusContext?.remainingSubsetAvailable
+            })
+          : undefined
       ]
         .filter((value): value is string => Boolean(value))
         .join("\n\n")
@@ -306,11 +368,20 @@ export async function runSift(request: RunRequest): Promise<string> {
       });
     }
 
-    return withInsufficientHint({
+    const finalOutput = withInsufficientHint({
       output: heuristicOutput,
       request,
       prepared
     });
+    if (testStatusDecision) {
+      logVerboseTestStatusTelemetry({
+        request,
+        prepared,
+        contract: testStatusDecision.contract,
+        finalOutput
+      });
+    }
+    return finalOutput;
   }
 
   if (testStatusDecision && testStatusAnalysis) {
@@ -331,11 +402,15 @@ export async function runSift(request: RunRequest): Promise<string> {
       analysisContext: [
         request.analysisContext,
         buildTestStatusAnalysisContext({
-          ...testStatusDecision.contract,
-          provider_used: true,
-          provider_failed: false,
-          raw_slice_used: rawSlice.used,
-          raw_slice_strategy: rawSlice.strategy
+          contract: {
+            ...testStatusDecision.contract,
+            provider_used: true,
+            provider_failed: false,
+            raw_slice_used: rawSlice.used,
+            raw_slice_strategy: rawSlice.strategy
+          },
+          includeTestIds: request.includeTestIds,
+          remainingSubsetAvailable: request.testStatusContext?.remainingSubsetAvailable
         })
       ]
         .filter((value): value is string => Boolean(value))
@@ -391,11 +466,20 @@ export async function runSift(request: RunRequest): Promise<string> {
           next_best_action: supplement.next_best_action
         }
       });
-
-      return renderTestStatusDecisionOutput({
+      const finalOutput = renderTestStatusDecisionOutput({
         request,
         decision: mergedDecision
       });
+      logVerboseTestStatusTelemetry({
+        request,
+        prepared,
+        contract: mergedDecision.contract,
+        finalOutput,
+        rawSliceChars: rawSlice.text.length,
+        providerInputChars: providerPrepared.truncated.length,
+        providerOutputChars: result.text.length
+      });
+      return finalOutput;
     } catch (error) {
       const reason = error instanceof Error ? error.message : "unknown_error";
       const failureDecision = buildTestStatusProviderFailureDecision({
@@ -408,14 +492,30 @@ export async function runSift(request: RunRequest): Promise<string> {
         rawSliceStrategy: rawSlice.strategy
       });
 
-      if (request.goal === "diagnose" && request.format === "json") {
-        return JSON.stringify(failureDecision.contract, null, 2);
-      }
-
-      return renderTestStatusDecisionOutput({
+      const finalOutput =
+        request.goal === "diagnose" && request.format === "json"
+          ? JSON.stringify(
+              buildTestStatusPublicDiagnoseContract({
+                contract: failureDecision.contract,
+                includeTestIds: request.includeTestIds,
+                remainingSubsetAvailable: request.testStatusContext?.remainingSubsetAvailable
+              }),
+              null,
+              2
+            )
+          : renderTestStatusDecisionOutput({
         request,
         decision: failureDecision
       });
+      logVerboseTestStatusTelemetry({
+        request,
+        prepared,
+        contract: failureDecision.contract,
+        finalOutput,
+        rawSliceChars: rawSlice.text.length,
+        providerInputChars: providerPrepared.truncated.length
+      });
+      return finalOutput;
     }
   }
 

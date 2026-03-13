@@ -139,6 +139,87 @@ describe("runSift unit", () => {
     ).resolves.toContain("Tests passed.");
 
     expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("heuristic=test-status"));
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("diagnosis_complete_at_layer=heuristic")
+    );
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("heuristic_short_circuit=true")
+    );
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("remaining_ids_exposed=false"));
+  });
+
+  it("returns summary-first diagnose JSON by default and full ids only when requested", async () => {
+    const mixedOutput = [
+      "collecting ... collected 10 items",
+      "tests/contracts/test_db_schema_freeze.py::test_database_schema_snapshot_is_frozen ERROR [ 10%]",
+      "tests/contracts/test_openapi_contract_freeze.py::test_openapi_paths_and_methods_are_frozen FAILED [ 20%]",
+      "tests/unit/test_auth.py::test_refresh FAILED [ 30%]",
+      "E   RuntimeError: DB-isolated tests require PGTEST_POSTGRES_DSN (or --pgtest-dsn).",
+      "============= 2 failed, 1 error in 0.20s ============="
+    ].join("\n");
+
+    prepareInputMock.mockReturnValue({
+      raw: mixedOutput,
+      sanitized: mixedOutput,
+      redacted: mixedOutput,
+      truncated: mixedOutput,
+      meta: {
+        originalLength: mixedOutput.length,
+        finalLength: mixedOutput.length,
+        redactionApplied: false,
+        truncatedApplied: false
+      }
+    });
+    const { runSift } = await import("../src/core/run.js");
+
+    const summaryOutput = await runSift(
+      makeRequest({
+        policyName: "test-status",
+        presetName: "test-status",
+        goal: "diagnose",
+        format: "json",
+        testStatusContext: {
+          remainingSubsetAvailable: true
+        }
+      })
+    );
+    const summaryParsed = JSON.parse(summaryOutput) as {
+      remaining_summary: { count: number; families: Array<{ prefix: string; count: number }> };
+      resolved_summary: { count: number };
+      remaining_subset_available: boolean;
+      remaining_tests?: string[];
+      resolved_tests?: string[];
+    };
+
+    expect(summaryParsed.remaining_summary.count).toBe(3);
+    expect(summaryParsed.remaining_summary.families[0]).toEqual({
+      prefix: "tests/contracts/",
+      count: 2
+    });
+    expect(summaryParsed.remaining_subset_available).toBe(true);
+    expect(summaryParsed.resolved_summary.count).toBe(0);
+    expect(summaryParsed.remaining_tests).toBeUndefined();
+    expect(summaryParsed.resolved_tests).toBeUndefined();
+
+    const withIdsOutput = await runSift(
+      makeRequest({
+        policyName: "test-status",
+        presetName: "test-status",
+        goal: "diagnose",
+        format: "json",
+        includeTestIds: true,
+        testStatusContext: {
+          remainingSubsetAvailable: true
+        }
+      })
+    );
+    const withIdsParsed = JSON.parse(withIdsOutput) as {
+      remaining_tests?: string[];
+      resolved_tests?: string[];
+    };
+
+    expect(withIdsParsed.remaining_tests).toHaveLength(3);
+    expect(withIdsParsed.resolved_tests).toEqual([]);
   });
 
   it("returns provider dry-run payloads without calling generate", async () => {
@@ -425,6 +506,16 @@ describe("runSift unit", () => {
     expect(buildPromptMock).toHaveBeenCalledWith(
       expect.objectContaining({
         outputContract: expect.stringContaining('"provider_confidence":number|null')
+      })
+    );
+    expect(buildPromptMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analysisContext: expect.stringContaining("remaining_summary=")
+      })
+    );
+    expect(buildPromptMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analysisContext: expect.not.stringContaining("remaining_tests=")
       })
     );
   });

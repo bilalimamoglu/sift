@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import stripAnsi from "strip-ansi";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   collectAgentStatus,
@@ -122,6 +123,22 @@ describe("agent command helpers", () => {
     expect(block).toContain("refresh the truth with `sift rerun`");
     expect(block).toContain("sift rerun --remaining --detail focused");
     expect(block).toContain("`sift rerun --remaining` currently supports only argv-mode `pytest ...` or `python -m pytest ...` runs;");
+    expect(block).toContain("Use diagnose JSON only when automation or machine branching truly needs it.");
+    expect(block).toContain(
+      "If `standard` already shows bucket-level root cause, anchor, and fix lines, trust it and report from it directly."
+    );
+    expect(block).toContain(
+      "do not re-verify the same bucket with raw pytest; at most do one targeted source read before you edit."
+    );
+    expect(block).toContain(
+      "Diagnose JSON is summary-first by default. Add `--include-test-ids` only when you truly need the raw failing test IDs."
+    );
+    expect(block).toContain(
+      "If diagnose JSON returns `read_targets.context_hint.start_line/end_line`, read only that small line range first."
+    );
+    expect(block).toContain(
+      "If diagnose JSON returns only `read_targets.context_hint.search_hint`, search for that string in the target file before reading the whole file."
+    );
     expect(block).toContain("--show-raw");
     expect(block).not.toContain("When debugging test failures, use this order:");
     expect(block).toContain(markers.end);
@@ -276,23 +293,30 @@ describe("agent command helpers", () => {
       },
       showIo
     );
-    expect(showIo.stdout).toContain("Claude instructions preview");
-    expect(showIo.stdout).toContain("status: managed block already installed here");
-    expect(showIo.stdout).toContain("Also installed in global scope");
-    expect(showIo.stdout).toContain("This is only a preview. Nothing will be changed.");
-    expect(showIo.stdout).toContain("Use --raw to print the exact managed block.");
-    expect(showIo.stdout).toContain("target file: CLAUDE.md");
-    expect(showIo.stdout).toContain("context-window and token budget");
-    expect(showIo.stdout).toContain("default to sift first, keep raw as the last resort");
-    expect(showIo.stdout).toContain("standard should usually be enough for first-pass triage");
-    expect(showIo.stdout).toContain("After a fix, refresh the truth with sift rerun");
-    expect(showIo.stdout).toContain("Only then zoom into what is still broken");
+    const previewOutput = stripAnsi(showIo.stdout);
+    expect(previewOutput).toContain("Claude instructions preview");
+    expect(previewOutput).toContain("status: managed block already installed here");
+    expect(previewOutput).toContain("Also installed in global scope");
+    expect(previewOutput).toContain("This is only a preview. Nothing will be changed.");
+    expect(previewOutput).toContain("Use --raw to print the exact managed block.");
+    expect(previewOutput).toContain("target file: CLAUDE.md");
+    expect(previewOutput).toContain("context-window and token budget");
+    expect(previewOutput).toContain("default to sift first, keep raw as the last resort");
+    expect(previewOutput).toContain("standard should usually be enough for first-pass triage");
+    expect(previewOutput).toContain("After a fix, refresh the truth with sift rerun");
+    expect(previewOutput).toContain("Only then zoom into what is still broken");
+    expect(previewOutput).toContain("Use diagnose JSON only for automation or machine branching");
+    expect(previewOutput).toContain(
+      "If standard already shows bucket-level root cause, anchor, and fix lines"
+    );
+    expect(previewOutput).toContain("avoid re-verifying the same bucket with raw pytest");
 
     const rawShowIo = createIo({ stdoutIsTTY: false });
     showAgent({ agent: "claude", raw: true }, rawShowIo);
     expect(rawShowIo.stdout).toContain("<!-- sift:begin claude -->");
     expect(rawShowIo.stdout).toContain("refresh the truth with `sift rerun`");
     expect(rawShowIo.stdout).toContain("`sift escalate` and `sift rerun` require a cached `sift exec --preset test-status -- <test command>` run first.");
+    expect(rawShowIo.stdout).toContain("--include-test-ids");
     expect(rawShowIo.stdout).toContain("--show-raw");
 
     const pathShowIo = createIo();
@@ -304,9 +328,10 @@ describe("agent command helpers", () => {
       },
       pathShowIo
     );
-    expect(pathShowIo.stdout).toContain("target path:");
-    expect(pathShowIo.stdout).toContain(path.resolve(process.cwd(), "custom/AGENTS.md"));
-    expect(pathShowIo.stdout).toContain("status: not installed in this target yet");
+    const pathPreviewOutput = stripAnsi(pathShowIo.stdout);
+    expect(pathPreviewOutput).toContain("target path:");
+    expect(pathPreviewOutput).toContain(path.resolve(process.cwd(), "custom/AGENTS.md"));
+    expect(pathPreviewOutput).toContain("status: not installed in this target yet");
 
     const globalShowIo = createIo();
     showAgent(
@@ -318,8 +343,9 @@ describe("agent command helpers", () => {
       },
       globalShowIo
     );
-    expect(globalShowIo.stdout).toContain("scope: global");
-    expect(globalShowIo.stdout).toContain("status: not installed in this target yet");
+    const globalPreviewOutput = stripAnsi(globalShowIo.stdout);
+    expect(globalPreviewOutput).toContain("scope: global");
+    expect(globalPreviewOutput).toContain("status: not installed in this target yet");
 
     fs.writeFileSync(path.join(cwd, "AGENTS.md"), renderManagedBlock("codex"), "utf8");
 

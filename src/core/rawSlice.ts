@@ -122,6 +122,86 @@ function buildHeadTailFallback(input: string, config: InputConfig): RawSliceResu
   };
 }
 
+function findReadTargetIndexes(args: {
+  lines: string[];
+  file: string;
+  line: number | null;
+  contextHint: TestStatusDiagnoseContract["read_targets"][number]["context_hint"];
+}): number[] {
+  const escapedFile = escapeRegExp(args.file);
+  const exactPatterns =
+    args.line === null
+      ? [new RegExp(escapedFile)]
+      : [
+          new RegExp(`${escapedFile}:${args.line}(?::\\d+)?`),
+          new RegExp(`File\\s+"${escapedFile}",\\s+line\\s+${args.line}\\b`),
+          new RegExp(`['"]${escapedFile}['"].*\\b${args.line}\\b`)
+        ];
+
+  const matches = args.lines
+    .map((line, index) =>
+      exactPatterns.some((pattern) => pattern.test(line)) ? index : -1
+    )
+    .filter((index) => index >= 0);
+
+  if (matches.length > 0) {
+    return matches;
+  }
+
+  if (args.contextHint.start_line !== null && args.contextHint.end_line !== null) {
+    const startLine = args.contextHint.start_line;
+    const endLine = args.contextHint.end_line;
+    const rangeMatches = args.lines
+      .map((line, index) => {
+        const fileWithLine =
+          line.match(/^([A-Za-z0-9_./-]+\.[A-Za-z0-9]+):(\d+)(?::\d+)?:\s+in\b/) ??
+          line.match(/^([^:\s][^:]*\.[A-Za-z0-9]+):(\d+)(?::\d+)?:\s+in\b/) ??
+          line.match(/^File\s+"([^"]+)",\s+line\s+(\d+)/);
+
+        if (!fileWithLine || !fileWithLine[1] || !fileWithLine[2]) {
+          return -1;
+        }
+
+        if (fileWithLine[1].replace(/\\/g, "/") !== args.file) {
+          return -1;
+        }
+
+        const lineNumber = Number(fileWithLine[2]);
+        return lineNumber >= startLine &&
+          lineNumber <= endLine
+          ? index
+          : -1;
+      })
+      .filter((index) => index >= 0);
+
+    if (rangeMatches.length > 0) {
+      return rangeMatches;
+    }
+  }
+
+  if (args.line !== null) {
+    return [];
+  }
+
+  return args.lines
+    .map((line, index) => (line.includes(args.file) ? index : -1))
+    .filter((index) => index >= 0);
+}
+
+function findSearchHintIndexes(args: {
+  lines: string[];
+  searchHint: string | null;
+}): number[] {
+  if (!args.searchHint) {
+    return [];
+  }
+
+  const pattern = new RegExp(escapeRegExp(args.searchHint), "i");
+  return args.lines
+    .map((line, index) => (pattern.test(line) ? index : -1))
+    .filter((index) => index >= 0);
+}
+
 function buildTracebackSlice(args: { input: string; config: InputConfig }): RawSliceResult {
   const lines = args.input.split("\n");
   const indexes = lines
@@ -205,6 +285,25 @@ export function buildTestStatusRawSlice(args: {
       })
     ]);
   });
+  const targetGroups = args.contract.read_targets.map((target) =>
+    buildLineWindows({
+      lines,
+      indexes: unique([
+        ...findReadTargetIndexes({
+          lines,
+          file: target.file,
+          line: target.line,
+          contextHint: target.context_hint
+        }),
+        ...findSearchHintIndexes({
+          lines,
+          searchHint: target.context_hint.search_hint
+        })
+      ]),
+      radius: target.line === null ? 1 : 2,
+      maxLines: target.line === null ? 6 : 8
+    })
+  );
 
   const failureIndexes = lines
     .map((line, index) => (/\b(FAILED|ERROR)\b/.test(line) || /^E\s/.test(line) ? index : -1))
@@ -212,6 +311,7 @@ export function buildTestStatusRawSlice(args: {
 
   const selected = collapseSelectedLineGroups({
     groups: [
+      ...targetGroups,
       unique([
         ...summaryIndexes.map((index) => lines[index]!).filter(Boolean),
         ...buildLineWindows({

@@ -65,6 +65,10 @@ interface FocusedFailureItem {
   label: string;
   reason: string;
   group: string;
+  file: string | null;
+  line: number | null;
+  anchor_kind: "traceback" | "test_label" | "entity" | "none";
+  anchor_confidence: number;
 }
 
 interface StatusFailureItem extends FocusedFailureItem {
@@ -74,6 +78,107 @@ interface StatusFailureItem extends FocusedFailureItem {
 interface FailureClassification {
   reason: string;
   group: string;
+}
+
+function emptyAnchor(): Pick<
+  FocusedFailureItem,
+  "file" | "line" | "anchor_kind" | "anchor_confidence"
+> {
+  return {
+    file: null,
+    line: null,
+    anchor_kind: "none",
+    anchor_confidence: 0
+  };
+}
+
+function normalizeAnchorFile(value: string): string {
+  return value.replace(/\\/g, "/").trim();
+}
+
+function inferFileFromLabel(label: string): string | null {
+  const candidate = cleanFailureLabel(label).split("::")[0]?.trim();
+  if (!candidate) {
+    return null;
+  }
+
+  if (!/[./\\]/.test(candidate) || !/\.[A-Za-z0-9]+$/.test(candidate)) {
+    return null;
+  }
+
+  return normalizeAnchorFile(candidate);
+}
+
+function buildLabelAnchor(label: string): Pick<
+  FocusedFailureItem,
+  "file" | "line" | "anchor_kind" | "anchor_confidence"
+> {
+  const file = inferFileFromLabel(label);
+  if (!file) {
+    return emptyAnchor();
+  }
+
+  return {
+    file,
+    line: null,
+    anchor_kind: "test_label",
+    anchor_confidence: 0.72
+  };
+}
+
+function parseObservedAnchor(
+  line: string
+): Pick<FocusedFailureItem, "file" | "line" | "anchor_kind" | "anchor_confidence"> | null {
+  const normalized = line.trim();
+  if (normalized.length === 0) {
+    return null;
+  }
+
+  const fileWithLine =
+    normalized.match(/^([A-Za-z0-9_./-]+\.[A-Za-z0-9]+):(\d+)(?::\d+)?:\s+in\b/) ??
+    normalized.match(/^([^:\s][^:]*\.[A-Za-z0-9]+):(\d+)(?::\d+)?:\s+in\b/);
+  if (fileWithLine) {
+    return {
+      file: normalizeAnchorFile(fileWithLine[1]!),
+      line: Number(fileWithLine[2]),
+      anchor_kind: "traceback",
+      anchor_confidence: 1
+    };
+  }
+
+  const pythonTraceback = normalized.match(/^File\s+"([^"]+)",\s+line\s+(\d+)/);
+  if (pythonTraceback) {
+    return {
+      file: normalizeAnchorFile(pythonTraceback[1]!),
+      line: Number(pythonTraceback[2]),
+      anchor_kind: "traceback",
+      anchor_confidence: 1
+    };
+  }
+
+  const importModule = normalized.match(
+    /ImportError while importing test module ['"]([^'"]+\.[A-Za-z0-9]+)['"]/i
+  );
+  if (importModule) {
+    return {
+      file: normalizeAnchorFile(importModule[1]!),
+      line: null,
+      anchor_kind: "traceback",
+      anchor_confidence: 0.92
+    };
+  }
+
+  return null;
+}
+
+function resolveAnchorForLabel(args: {
+  label: string;
+  observedAnchor: Pick<
+    FocusedFailureItem,
+    "file" | "line" | "anchor_kind" | "anchor_confidence"
+  > | null;
+}): Pick<FocusedFailureItem, "file" | "line" | "anchor_kind" | "anchor_confidence"> {
+  return args.observedAnchor ?? buildLabelAnchor(args.label);
 }
 
 function cleanFailureLabel(label: string): string {
@@ -146,6 +251,14 @@ function classifyFailureReason(
   }
 
   if (isLowValueInternalReason(normalized)) {
+    return null;
+  }
+
+  if (
+    /^([A-Za-z0-9_./-]+\.[A-Za-z0-9]+):\d+(?::\d+)?:\s+in\b/.test(normalized) ||
+    /^([^:\s][^:]*\.[A-Za-z0-9]+):\d+(?::\d+)?:\s+in\b/.test(normalized) ||
+    /^File\s+"[^"]+",\s+line\s+\d+/.test(normalized)
+  ) {
     return null;
   }
 
@@ -306,25 +419,37 @@ function collectCollectionFailureItems(input: string): FocusedFailureItem[] {
   const lines = input.split("\n");
   let currentLabel: string | null = null;
   let pendingGenericReason: FailureClassification | null = null;
+  let currentAnchor: Pick<
+    FocusedFailureItem,
+    "file" | "line" | "anchor_kind" | "anchor_confidence"
+  > | null = null;
 
   for (const line of lines) {
     const collecting = line.match(/^_+\s+ERROR collecting\s+(.+?)\s+_+\s*$/);
     if (collecting) {
       if (currentLabel && pendingGenericReason) {
+        const anchor = resolveAnchorForLabel({
+          label: currentLabel,
+          observedAnchor: currentAnchor
+        });
         pushFocusedFailureItem(items, {
           label: currentLabel,
           reason: pendingGenericReason.reason,
-          group: pendingGenericReason.group
+          group: pendingGenericReason.group,
+          ...anchor
         });
       }
       currentLabel = cleanFailureLabel(collecting[1]!);
       pendingGenericReason = null;
+      currentAnchor = null;
       continue;
     }
 
     if (!currentLabel) {
       continue;
     }
+
+    currentAnchor = parseObservedAnchor(line) ?? currentAnchor;
 
     const classification = classifyFailureReason(line, {
       duringCollection: true
@@ -338,20 +463,31 @@ function collectCollectionFailureItems(input: string): FocusedFailureItem[] {
       continue;
     }
 
+    const anchor = resolveAnchorForLabel({
+      label: currentLabel,
+      observedAnchor: currentAnchor
+    });
     pushFocusedFailureItem(items, {
       label: currentLabel,
       reason: classification.reason,
-      group: classification.group
+      group: classification.group,
+      ...anchor
     });
     currentLabel = null;
     pendingGenericReason = null;
+    currentAnchor = null;
   }
 
   if (currentLabel && pendingGenericReason) {
+    const anchor = resolveAnchorForLabel({
+      label: currentLabel,
+      observedAnchor: currentAnchor
+    });
     pushFocusedFailureItem(items, {
       label: currentLabel,
       reason: pendingGenericReason.reason,
-      group: pendingGenericReason.group
+      group: pendingGenericReason.group,
+      ...anchor
     });
   }
 
@@ -382,7 +518,11 @@ function collectInlineFailureItems(input: string): FocusedFailureItem[] {
     pushFocusedFailureItem(items, {
       label: cleanedLabel,
       reason: classification.reason,
-      group: classification.group
+      group: classification.group,
+      ...resolveAnchorForLabel({
+        label: cleanedLabel,
+        observedAnchor: parseObservedAnchor(inlineFailure[3]!)
+      })
     });
   }
 
@@ -419,7 +559,11 @@ function collectInlineFailureItemsWithStatus(input: string): StatusFailureItem[]
       label: cleanedLabel,
       reason: classification.reason,
       group: classification.group,
-      status: inlineFailure[1] === "FAILED" ? "failed" : "error"
+      status: inlineFailure[1] === "FAILED" ? "failed" : "error",
+      ...resolveAnchorForLabel({
+        label: cleanedLabel,
+        observedAnchor: parseObservedAnchor(details)
+      })
     });
   }
 
@@ -851,12 +995,17 @@ function synthesizeSharedBlockerBucket(args: {
     visibleStats?.items.slice(0, 4).map((item) => ({
       label: item.label,
       reason: effectiveReason,
-      group
+      group,
+      file: item.file,
+      line: item.line,
+      anchor_kind: item.anchor_kind,
+      anchor_confidence: item.anchor_confidence
     })) ??
     args.errorStatusLabels.slice(0, 4).map((label) => ({
       label,
       reason: effectiveReason,
-      group
+      group,
+      ...buildLabelAnchor(label)
     }));
   const envVar = effectiveReason.match(/^missing test env:\s+([A-Z][A-Z0-9_]{2,})$/)?.[1];
   let hint: string | undefined;
@@ -954,7 +1103,11 @@ function synthesizeImportDependencyBucket(args: {
     representativeItems: importItems.slice(0, 4).map((item) => ({
       label: item.label,
       reason: item.reason,
-      group: item.group
+      group: item.group,
+      file: item.file,
+      line: item.line,
+      anchor_kind: item.anchor_kind,
+      anchor_confidence: item.anchor_confidence
     })),
     entities: modules,
     hint:
@@ -1091,7 +1244,8 @@ function synthesizeContractDriftBucket(args: {
       usedPaths,
       usedModels
     }),
-    group: "contract drift"
+    group: "contract drift",
+    ...buildLabelAnchor(label)
   }));
   const summaryLines = [
     `Contract drift: ${formatCount(contractLabels.length, "freeze test")} ${contractLabels.length === 1 ? "is" : "are"} out of sync with current API/model state.`

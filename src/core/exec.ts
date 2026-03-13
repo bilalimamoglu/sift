@@ -338,13 +338,24 @@ export async function runExec(request: ExecRequest): Promise<number> {
       testStatusContext:
         shouldCacheTestStatus && analysis
           ? {
-              resolvedTests: targetDelta?.resolved,
+              ...request.testStatusContext,
+              resolvedTests: targetDelta?.resolved ?? request.testStatusContext?.resolvedTests,
               remainingTests:
                 targetDelta?.remaining ??
                 currentCachedRun?.pytest?.failingNodeIds ??
-                undefined
+                request.testStatusContext?.remainingTests,
+              remainingSubsetAvailable:
+                request.testStatusContext?.remainingSubsetAvailable ??
+                Boolean(
+                  currentCachedRun?.pytest?.subsetCapable &&
+                    (
+                      targetDelta?.remaining ??
+                      currentCachedRun?.pytest?.failingNodeIds ??
+                      []
+                    ).length > 0
+                )
             }
-          : undefined
+          : request.testStatusContext
     });
 
     if (shouldCacheTestStatus) {

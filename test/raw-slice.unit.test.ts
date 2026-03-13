@@ -34,6 +34,17 @@ function buildMixedFailureOutput(): string {
   ].join("\n");
 }
 
+function buildObservedAnchorFailureOutput(): string {
+  return [
+    ...Array.from({ length: 80 }, (_, index) => `noise line ${index + 1}`),
+    "_ ERROR collecting tests/contracts/test_db_schema_freeze.py _",
+    "tests/conftest.py:374: in _postgres_schema_isolation",
+    "    raise RuntimeError(\"DB-isolated tests require PGTEST_POSTGRES_DSN\")",
+    "E   RuntimeError: DB-isolated tests require PGTEST_POSTGRES_DSN (or --pgtest-dsn). Refusing to fall back to DATABASE_URL to avoid polluting non-test users.",
+    "============= 1 error in 0.22s ============="
+  ].join("\n");
+}
+
 describe("raw slice helpers", () => {
   it("keeps short inputs untouched", () => {
     const slice = buildGenericRawSlice({
@@ -76,6 +87,32 @@ describe("raw slice helpers", () => {
     expect(slice.text).toContain("PGTEST_POSTGRES_DSN");
     expect(slice.text).toContain("/api/v1/admin/landing-gallery");
     expect(slice.text).toContain("FAILED");
+  });
+
+  it("prioritizes observed read-target anchors and narrow traceback windows", () => {
+    const input = buildObservedAnchorFailureOutput();
+    const analysis = analyzeTestStatus(input);
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis
+    });
+
+    const slice = buildTestStatusRawSlice({
+      input,
+      config: {
+        ...defaultConfig.input,
+        maxInputChars: 260,
+        headChars: 60,
+        tailChars: 60
+      },
+      contract: decision.contract
+    });
+
+    expect(slice.used).toBe(true);
+    expect(slice.strategy).toBe("bucket_evidence");
+    expect(slice.text).toContain("tests/conftest.py:374: in _postgres_schema_isolation");
+    expect(slice.text).toContain("PGTEST_POSTGRES_DSN");
+    expect(slice.text).not.toContain("noise line 1\nnoise line 2\nnoise line 3");
   });
 
   it("falls back to traceback windows for generic long output", () => {

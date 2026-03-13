@@ -384,8 +384,8 @@ describe("exec mode", () => {
         "- Tests did not complete.",
         "- 114 errors occurred during collection.",
         "- Import/dependency blocker: 114 errors are caused by missing dependencies during test collection.",
-        "- Missing modules include pydantic, fastapi, botocore.",
-        "- Hint: Install the missing dependencies and rerun the affected tests.",
+        "- Anchor: /tmp/tests/unit/test_api.py",
+        "- Fix: Install the missing dependencies and rerun the affected tests.",
         "- Decision: stop and act. Do not escalate unless you need exact traceback lines.",
         "- Next: Fix bucket 1 first, then rerun the full suite at standard.",
         "- Stop signal: diagnosis complete; raw not needed."
@@ -703,6 +703,113 @@ describe("exec mode", () => {
     ]);
   });
 
+  it("returns summary-first diagnose JSON by default and keeps full pytest ids opt-in", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-diagnose-json-home-"));
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-diagnose-json-cwd-"));
+    const pytestPath = path.join(cwd, "pytest");
+    const script = [
+      "#!/usr/bin/env node",
+      "process.stdout.write([",
+      "  'FAILED tests/contracts/test_openapi_contract_freeze.py::test_openapi_paths_and_methods_are_frozen - AssertionError: expected frozen schema',",
+      "  'FAILED tests/unit/test_auth.py::test_refresh - RuntimeError: PGTEST_POSTGRES_DSN missing',",
+      "  '2 failed in 0.12s'",
+      "].join('\\n'));",
+      "process.exit(1);"
+    ].join("\n");
+
+    await fs.writeFile(pytestPath, script, {
+      encoding: "utf8",
+      mode: 0o755
+    });
+
+    const summaryResult = await runCliAsync({
+      args: ["exec", "--preset", "test-status", "--goal", "diagnose", "--format", "json", "--", "./pytest"],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(summaryResult.status).toBe(1);
+    expect(summaryResult.stderr).toBe("");
+    const summaryParsed = JSON.parse(summaryResult.stdout) as {
+      remaining_summary: { count: number; families: Array<{ prefix: string; count: number }> };
+      resolved_summary: { count: number };
+      remaining_subset_available: boolean;
+      read_targets: Array<{
+        file: string;
+        line: number | null;
+        why: string;
+        bucket_index: number;
+        context_hint: {
+          start_line: number | null;
+          end_line: number | null;
+          search_hint: string | null;
+        };
+      }>;
+      remaining_tests?: string[];
+      resolved_tests?: string[];
+    };
+    expect(summaryParsed.remaining_summary).toEqual({
+      count: 2,
+      families: [
+        { prefix: "tests/contracts/", count: 1 },
+        { prefix: "tests/unit/", count: 1 }
+      ]
+    });
+    expect(summaryParsed.resolved_summary.count).toBe(0);
+    expect(summaryParsed.remaining_subset_available).toBe(true);
+    expect(summaryParsed.read_targets.map((target) => target.file)).toEqual(
+      expect.arrayContaining([
+        "tests/contracts/test_openapi_contract_freeze.py",
+        "tests/unit/test_auth.py"
+      ])
+    );
+    const authReadTarget = summaryParsed.read_targets.find((target) =>
+      target.file.endsWith("tests/unit/test_auth.py")
+    );
+    expect(authReadTarget?.context_hint.start_line).toBeNull();
+    expect(authReadTarget?.context_hint.end_line).toBeNull();
+    expect(authReadTarget?.context_hint.search_hint).toEqual(expect.any(String));
+    expect(summaryParsed.remaining_tests).toBeUndefined();
+    expect(summaryParsed.resolved_tests).toBeUndefined();
+
+    const withIdsResult = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "test-status",
+        "--goal",
+        "diagnose",
+        "--format",
+        "json",
+        "--include-test-ids",
+        "--verbose",
+        "--",
+        "./pytest"
+      ],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(withIdsResult.status).toBe(1);
+    const withIdsParsed = JSON.parse(withIdsResult.stdout) as {
+      remaining_tests?: string[];
+      resolved_tests?: string[];
+    };
+    expect(withIdsParsed.remaining_tests).toEqual([
+      "tests/contracts/test_openapi_contract_freeze.py::test_openapi_paths_and_methods_are_frozen",
+      "tests/unit/test_auth.py::test_refresh"
+    ]);
+    expect(withIdsParsed.resolved_tests).toEqual([]);
+    expect(withIdsResult.stderr).toContain("diagnosis_complete_at_layer=heuristic");
+    expect(withIdsResult.stderr).toContain("heuristic_short_circuit=true");
+    expect(withIdsResult.stderr).toContain("remaining_ids_exposed=true");
+    expect(withIdsResult.stderr).toContain("final_output_tokens_est=");
+  });
+
   it("treats standard as the default detail level for test-status", async () => {
     const script = [
       "const lines = [",
@@ -736,8 +843,8 @@ describe("exec mode", () => {
     expect(result.stdout).toContain(
       "Import/dependency blocker: at least 2 visible errors are caused by missing dependencies during test collection."
     );
-    expect(result.stdout).toContain("Missing modules include pydantic, fastapi.");
-    expect(result.stdout).toContain("Hint: Install the missing dependencies and rerun the affected tests.");
+    expect(result.stdout).toContain("Anchor: /tmp/tests/unit/test_api.py");
+    expect(result.stdout).toContain("Fix: Install the missing dependencies and rerun the affected tests.");
     expect(result.stdout).not.toContain("->");
   });
 

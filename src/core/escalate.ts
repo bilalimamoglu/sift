@@ -18,6 +18,7 @@ export interface EscalateRequest {
   outputContract?: string;
   fallbackJson?: unknown;
   dryRun?: boolean;
+  includeTestIds?: boolean;
   detail?: "focused" | "verbose";
   showRaw?: boolean;
   verbose?: boolean;
@@ -70,11 +71,16 @@ export async function runEscalate(request: EscalateRequest): Promise<number> {
     stdin: state.rawOutput,
     config: request.config,
     dryRun: request.dryRun,
+    includeTestIds: request.includeTestIds,
     detail,
     presetName: "test-status",
     policyName: request.policyName ?? "test-status",
     outputContract: request.outputContract,
-    fallbackJson: request.fallbackJson
+    fallbackJson: request.fallbackJson,
+    testStatusContext: {
+      remainingSubsetAvailable:
+        Boolean(state.pytest?.subsetCapable) && (state.pytest?.failingNodeIds.length ?? 0) > 0
+    }
   });
 
   if (isInsufficientSignalOutput(output)) {

@@ -112,6 +112,8 @@ describe("buildPrompt", () => {
     expect(prompt.prompt).toContain("Goal: diagnose");
     expect(prompt.prompt).toContain("diagnosis_complete");
     expect(prompt.prompt).toContain("dominant_blocker_bucket_index");
+    expect(prompt.prompt).toContain("remaining_summary");
+    expect(prompt.prompt).toContain("remaining_subset_available");
     expect(prompt.prompt).toContain("Use this exact contract");
   });
 });

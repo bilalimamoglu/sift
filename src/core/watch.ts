@@ -181,8 +181,16 @@ async function runTestStatusWatch(request: RunRequest, cycles: string[]): Promis
             ])
       ].join("\n"),
       testStatusContext: {
-        resolvedTests: targetDelta?.resolved,
-        remainingTests: targetDelta?.remaining ?? currentRun.pytest?.failingNodeIds
+        ...request.testStatusContext,
+        resolvedTests: targetDelta?.resolved ?? request.testStatusContext?.resolvedTests,
+        remainingTests:
+          targetDelta?.remaining ??
+          currentRun.pytest?.failingNodeIds ??
+          request.testStatusContext?.remainingTests,
+        remainingSubsetAvailable:
+          request.testStatusContext?.remainingSubsetAvailable ??
+          (Boolean(currentRun.pytest?.subsetCapable) &&
+            (currentRun.pytest?.failingNodeIds.length ?? 0) > 0)
       }
     });
 

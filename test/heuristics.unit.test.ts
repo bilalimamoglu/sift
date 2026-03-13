@@ -3,7 +3,10 @@ import {
   analyzeTestStatus,
   applyHeuristicPolicy
 } from "../src/core/heuristics.js";
-import { buildTestStatusDiagnoseContract } from "../src/core/testStatusDecision.js";
+import {
+  buildTestStatusDiagnoseContract,
+  buildTestStatusPublicDiagnoseContract
+} from "../src/core/testStatusDecision.js";
 
 function buildMixedFailureOutput(): string {
   return [
@@ -46,6 +49,16 @@ function buildCollectionImportOutput(): string {
   ].join("\n");
 }
 
+function buildObservedAnchorOutput(): string {
+  return [
+    "1 error during collection",
+    "_ ERROR collecting tests/contracts/test_db_schema_freeze.py _",
+    "tests/conftest.py:374: in _postgres_schema_isolation",
+    "    raise RuntimeError(\"DB-isolated tests require PGTEST_POSTGRES_DSN\")",
+    "E   RuntimeError: DB-isolated tests require PGTEST_POSTGRES_DSN (or --pgtest-dsn). Refusing to fall back to DATABASE_URL to avoid polluting non-test users."
+  ].join("\n");
+}
+
 describe("heuristic policies", () => {
   it("returns null when no policy is active", () => {
     expect(applyHeuristicPolicy(undefined, "anything")).toBeNull();
@@ -70,8 +83,23 @@ describe("heuristic policies", () => {
     expect(output).toContain("- Tests did not pass.");
     expect(output).toContain("- 3 tests failed. 124 errors occurred.");
     expect(output).toContain("Shared blocker: 124 errors require PGTEST_POSTGRES_DSN");
+    expect(output).toContain(
+      "Anchor: search PGTEST_POSTGRES_DSN in tests/contracts/test_db_schema_freeze.py"
+    );
+    expect(output).toContain(
+      "Fix: Set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-isolated tests."
+    );
     expect(output).toContain("Contract drift: 3 freeze tests are out of sync");
+    expect(output).toContain(
+      "Anchor: search /api/v1/admin/landing-gallery in tests/contracts/test_feature_manifest_freeze.py"
+    );
+    expect(output).toContain(
+      "Fix: If these changes are intentional, run python scripts/update_contract_snapshots.py and rerun the freeze tests."
+    );
     expect(output).toContain("Next: Fix bucket 1 first, then rerun the full suite at standard.");
+    expect(output).toContain(
+      "Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it."
+    );
     expect(output).toContain("Stop signal: diagnosis complete; raw not needed.");
   });
 
@@ -116,7 +144,7 @@ describe("heuristic policies", () => {
     expect(output).toContain("tests/unit/test_auth.py -> missing module: pydantic");
   });
 
-  it("classifies service, db, fixture, and auth setup failures into visible buckets", () => {
+  it("classifies service, db, fixture, and auth setup failures into first-class buckets", () => {
     const input = [
       "ERROR tests/api/test_health.py::test_ready - 503 Service Unavailable",
       "ERROR tests/db/test_users.py::test_refresh - ConnectionRefusedError: could not connect to server on port 5432",
@@ -125,11 +153,31 @@ describe("heuristic policies", () => {
       "============= 4 errors in 0.40s ============="
     ].join("\n");
 
-    const output = applyHeuristicPolicy("test-status", input, "focused");
+    const analysis = analyzeTestStatus(input);
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis
+    });
 
-    expect(output).toContain("service unavailable");
-    expect(output).toContain("db refused");
-    expect(output).toContain("auth bypass absent");
+    expect(decision.contract.main_buckets.map((bucket) => bucket.root_cause)).toEqual(
+      expect.arrayContaining([
+        "fixture guard: capsys",
+        "auth bypass absent: test auth bypass is missing",
+        "db refused: database connection was refused"
+      ])
+    );
+
+    const serviceOnlyInput = [
+      "ERROR tests/api/test_health.py::test_ready - 503 Service Unavailable",
+      "============= 1 error in 0.10s ============="
+    ].join("\n");
+    const serviceOnlyDecision = buildTestStatusDiagnoseContract({
+      input: serviceOnlyInput,
+      analysis: analyzeTestStatus(serviceOnlyInput)
+    });
+    expect(serviceOnlyDecision.contract.main_buckets[0]?.root_cause).toBe(
+      "service unavailable: dependency service is unavailable"
+    );
   });
 
   it("builds a structured diagnose contract with dominant blocker and remaining tests", () => {
@@ -159,6 +207,101 @@ describe("heuristic policies", () => {
       removed_models: 1
     });
     expect(decision.contract.next_best_action.code).toBe("fix_dominant_blocker");
+    expect(decision.contract.read_targets).toMatchObject([
+      {
+        file: "tests/contracts/test_db_schema_freeze.py",
+        line: null,
+        bucket_index: 1
+      },
+      {
+        file: "tests/contracts/test_feature_manifest_freeze.py",
+        line: null
+      }
+    ]);
+    expect(new Set(decision.contract.read_targets.map((target) => target.bucket_index)).size).toBe(
+      decision.contract.read_targets.length
+    );
+    expect(decision.contract.next_best_action.note).toContain(
+      "Fix bucket 1 first, then rerun the full suite at standard."
+    );
+    expect(decision.contract.read_targets[0]?.context_hint).toEqual({
+      start_line: null,
+      end_line: null,
+      search_hint: "PGTEST_POSTGRES_DSN"
+    });
+  });
+
+  it("builds a summary-first public diagnose contract and keeps full ids opt-in", () => {
+    const input = buildMixedFailureOutput();
+    const analysis = analyzeTestStatus(input);
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis,
+      resolvedTests: ["tests/contracts/test_feature_manifest_freeze.py::test_feature_manifest_is_frozen"],
+      remainingTests: [
+        "tests/contracts/test_db_schema_freeze.py::test_database_schema_snapshot_is_frozen",
+        "tests/contracts/test_openapi_contract_freeze.py::test_openapi_paths_and_methods_are_frozen",
+        "worker/test_job.py::test_other_failure",
+        "opaque-id"
+      ]
+    });
+
+    const summaryFirst = buildTestStatusPublicDiagnoseContract({
+      contract: decision.contract,
+      remainingSubsetAvailable: true
+    });
+    expect(summaryFirst.resolved_summary).toEqual({
+      count: 1,
+      families: [{ prefix: "tests/contracts/", count: 1 }]
+    });
+    expect(summaryFirst.remaining_summary).toEqual({
+      count: 4,
+      families: [
+        { prefix: "tests/contracts/", count: 2 },
+        { prefix: "other", count: 1 },
+        { prefix: "worker/", count: 1 }
+      ]
+    });
+    expect(summaryFirst.remaining_subset_available).toBe(true);
+    expect(summaryFirst).not.toHaveProperty("resolved_tests");
+    expect(summaryFirst).not.toHaveProperty("remaining_tests");
+
+    const withIds = buildTestStatusPublicDiagnoseContract({
+      contract: decision.contract,
+      remainingSubsetAvailable: true,
+      includeTestIds: true
+    });
+    expect(withIds.resolved_tests).toHaveLength(1);
+    expect(withIds.remaining_tests).toHaveLength(4);
+  });
+
+  it("prefers observed traceback anchors for read targets without inventing line numbers", () => {
+    const input = buildObservedAnchorOutput();
+    const analysis = analyzeTestStatus(input);
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis
+    });
+
+    expect(analysis.collectionItems[0]).toMatchObject({
+      file: "tests/conftest.py",
+      line: 374,
+      anchor_kind: "traceback"
+    });
+    expect(decision.contract.read_targets[0]).toEqual({
+      file: "tests/conftest.py",
+      line: 374,
+      why: "it contains the PGTEST_POSTGRES_DSN setup guard",
+      bucket_index: 1,
+      context_hint: {
+        start_line: 369,
+        end_line: 379,
+        search_hint: null
+      }
+    });
+    expect(decision.contract.next_best_action.note).toContain(
+      "Fix bucket 1 first, then rerun the full suite at standard."
+    );
   });
 
   it("keeps audit-critical and infra-risk heuristics intact", () => {

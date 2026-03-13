@@ -2,10 +2,17 @@
 
 <img src="assets/brand/sift-logo-badge-monochrome.svg" alt="sift logo" width="88" />
 
-`sift` is a small CLI that runs a noisy shell command, keeps the useful signal, and returns a much smaller answer.
+`sift` turns a long terminal wall of text into a short answer you can act on.
 
-It is a good fit when you want an agent or CI job to understand:
-- test results
+Think of it like this:
+- `standard` = map
+- `focused` or `rerun --remaining` = zoom
+- raw traceback = last resort
+
+It is a good fit when a human, agent, or CI job needs the answer faster than it needs the whole log.
+
+Common uses:
+- test failures
 - typecheck failures
 - lint failures
 - build logs
@@ -13,10 +20,10 @@ It is a good fit when you want an agent or CI job to understand:
 - `npm audit`
 - `terraform plan`
 
-It is not a good fit when you need:
-- the exact raw log as the main output
-- interactive or TUI commands
-- shell behavior that depends on raw command output
+Do not use it when:
+- the exact raw log is the main thing you need
+- the command is interactive or TUI-based
+- shell behavior depends on exact raw command output
 
 ## Install
 
@@ -57,15 +64,21 @@ Then check it:
 sift doctor
 ```
 
-## Quick start
+## Start here
+
+The default path is simple:
+1. run the noisy command through `sift`
+2. read the short `standard` answer first
+3. only zoom in if `standard` clearly tells you more detail is still worth it
+
+Examples:
 
 ```bash
 sift exec "what changed?" -- git diff
-sift exec --preset test-status -- npm test
+sift exec --preset test-status -- pytest -q
 sift rerun
 sift rerun --remaining --detail focused
 sift rerun --remaining --detail verbose --show-raw
-sift exec --preset test-status --goal diagnose --format json -- pytest -q
 sift watch "what changed between cycles?" < watcher-output.txt
 sift exec --watch "what changed between cycles?" -- node watcher.js
 sift exec --preset typecheck-summary -- npm run typecheck
@@ -75,41 +88,14 @@ sift exec --preset infra-risk -- terraform plan
 sift agent install codex --dry-run
 ```
 
-## The main workflow
+## Simple workflow
 
-`sift exec` is the default path:
-
-```bash
-sift exec "what changed?" -- git diff
-sift exec --preset test-status -- npm test
-sift rerun
-sift rerun --remaining --detail focused
-sift rerun --remaining --detail verbose --show-raw
-sift watch "what changed between cycles?" < watcher-output.txt
-```
-
-If your project uses `pytest`, `vitest`, `jest`, `bun test`, or another test runner instead of `npm test`, use the same preset with that command.
-
-What happens:
-1. `sift` runs the command
-2. captures `stdout` and `stderr`
-3. trims the noise
-4. sends a smaller input to the model
-5. prints a short answer or JSON
-6. preserves the child command exit code in `exec` mode
-
-Useful debug flags:
-- `--dry-run`: show the reduced input and prompt without calling the provider
-- `--show-raw`: print the captured raw input to `stderr`
-
-For `test-status`, `sift` also caches the last non-interactive exec run so you can choose between the same cached output, a fresh full-suite rerun, and a narrowed pytest-only zoom:
+For most repos, this is the whole story:
 
 ```bash
-sift exec --preset test-status -- npm test
-sift escalate
+sift exec --preset test-status -- <test command>
 sift rerun
 sift rerun --remaining --detail focused
-sift rerun --remaining --detail verbose --show-raw
 ```
 
 Mental model:
@@ -121,7 +107,48 @@ Mental model:
 - `Decision: zoom` = one deeper sift pass is justified before raw
 - `Decision: raw only if exact traceback is required` = raw is last resort, not the next default step
 
-If you need a machine-readable diagnosis for tests, use:
+If your project uses `pytest`, `vitest`, `jest`, `bun test`, or another test runner instead of `npm test`, use the same preset with that command.
+
+What `sift` does in `exec` mode:
+1. runs the child command
+2. captures `stdout` and `stderr`
+3. keeps the useful signal
+4. returns a short answer or JSON
+5. preserves the child command exit code
+
+Useful debug flags:
+- `--dry-run`: show the reduced input and prompt without calling the provider
+- `--show-raw`: print the captured raw input to `stderr`
+
+## When tests fail
+
+Start with the map:
+
+```bash
+sift exec --preset test-status -- <test command>
+```
+
+If `standard` already names the main failure buckets, counts, and hints, stop there and read code.
+
+Then use this order:
+1. `sift exec --preset test-status -- <test command>`
+2. `sift rerun`
+3. `sift rerun --remaining --detail focused`
+4. `sift rerun --remaining --detail verbose`
+5. `sift rerun --remaining --detail verbose --show-raw`
+6. raw pytest only if exact traceback lines are still needed
+
+The normal stop budget is `standard` first, then at most one zoom step before raw.
+
+If you want the older explicit compare shape, `sift exec --preset test-status --diff -- <test command>` still works. `sift rerun` is the shorter normal path for the same idea.
+
+## Diagnose JSON
+
+Most of the time, you do not need JSON. Start with text first.
+
+If `standard` already shows bucket-level root cause, `Anchor`, and `Fix`, do not re-verify the same bucket with raw pytest. At most do one targeted source read before you edit.
+
+Use diagnose JSON only when automation or machine branching really needs it:
 
 ```bash
 sift exec --preset test-status --goal diagnose --format json -- pytest -q
@@ -129,15 +156,20 @@ sift rerun --goal diagnose --format json
 sift watch --preset test-status --goal diagnose --format json < pytest-watch.txt
 ```
 
+Default diagnose JSON is summary-first:
+- `remaining_summary` and `resolved_summary` keep the answer small
+- `read_targets` points to the first file or line worth reading
+- `read_targets.context_hint` can tell an agent to read only a small line window first
+- if `context_hint` only includes `search_hint`, search for that string before reading the whole file
+- `remaining_subset_available` tells you whether `sift rerun --remaining` can zoom safely
+
+If an agent truly needs every raw failing test ID, opt in:
+
+```bash
+sift exec --preset test-status --goal diagnose --format json --include-test-ids -- pytest -q
+```
+
 `--goal diagnose --format json` is currently supported only for `test-status`, `rerun`, and `test-status` watch flows.
-
-If you want the older explicit compare shape, `sift exec --preset test-status --diff -- <test command>` still works. `sift rerun` is the shorter normal path for the same idea.
-
-Use `standard` for the full suite first.
-Use `sift escalate` only when you want a deeper render of the same cached output.
-After fixing something, run `sift rerun` to refresh the full-suite truth.
-Only then use `sift rerun --remaining --detail focused`.
-The normal stop budget is `standard` first, then at most one zoom step before raw.
 
 ## Watch mode
 
@@ -201,9 +233,9 @@ Typical shapes:
 ```text
 - Tests did not complete.
 - 114 errors occurred during collection.
-- Import/dependency blocker: 114 errors are caused by missing dependencies during test collection.
-- Missing modules include pydantic, fastapi, botocore, PIL, httpx, numpy.
-- Hint: Install the missing dependencies and rerun the affected tests.
+- Import/dependency blocker: repeated collection failures are caused by missing dependencies.
+- Anchor: path/to/failing_test.py
+- Fix: Install the missing dependencies and rerun the affected tests.
 - Decision: stop and act. Do not escalate unless you need exact traceback lines.
 - Next: Fix bucket 1 first, then rerun the full suite at standard.
 - Stop signal: diagnosis complete; raw not needed.
@@ -213,11 +245,12 @@ Typical shapes:
 ```text
 - Tests did not pass.
 - 3 tests failed. 124 errors occurred.
-- Shared blocker: 124 errors require PGTEST_POSTGRES_DSN for DB-isolated tests.
-- Contract drift: 3 freeze tests are out of sync with current API/model state.
-- OpenAPI drift includes 4 added landing-gallery paths.
-- Hint: set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-backed tests.
-- Hint: review and regenerate the contract snapshots if these API/model changes are intentional.
+- Shared blocker: DB-isolated tests are missing a required test env var.
+- Anchor: search <TEST_ENV_VAR> in path/to/test_setup.py
+- Fix: Set the required test env var and rerun the suite.
+- Contract drift: snapshot expectations are out of sync with the current API or model state.
+- Anchor: search <route-or-entity> in path/to/freeze_test.py
+- Fix: Review the drift and regenerate the snapshots if the change is intentional.
 - Decision: stop and act. Do not escalate unless you need exact traceback lines.
 - Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.
 - Stop signal: diagnosis complete; raw not needed.
@@ -228,9 +261,9 @@ Typical shapes:
 - Tests did not complete.
 - 114 errors occurred during collection.
 - Import/dependency blocker: missing dependencies are blocking collection.
-  - Missing modules include botocore, pydantic.
-  - tests/unit/test_auth_refresh.py -> missing module: botocore
-  - tests/unit/test_cognito.py -> missing module: pydantic
+  - Missing modules include <module-a>, <module-b>.
+  - path/to/test_a.py -> missing module: <module-a>
+  - path/to/test_b.py -> missing module: <module-b>
   - Hint: Install the missing dependencies and rerun the affected tests.
  - Next: Fix bucket 1 first, then rerun the full suite at standard.
  - Stop signal: diagnosis complete; raw not needed.
@@ -241,9 +274,9 @@ Typical shapes:
 - Tests did not complete.
 - 114 errors occurred during collection.
 - Import/dependency blocker: missing dependencies are blocking collection.
-  - tests/unit/test_auth_refresh.py -> missing module: botocore
-  - tests/unit/test_cognito.py -> missing module: pydantic
-  - tests/unit/test_dataset_use_case_facade.py -> missing module: fastapi
+  - path/to/test_a.py -> missing module: <module-a>
+  - path/to/test_b.py -> missing module: <module-b>
+  - path/to/test_c.py -> missing module: <module-c>
   - Hint: Install the missing dependencies and rerun the affected tests.
  - Next: Fix bucket 1 first, then rerun the full suite at standard.
  - Stop signal: diagnosis complete; raw not needed.
@@ -251,7 +284,7 @@ Typical shapes:
 
 Recommended debugging order for tests:
 1. Use `standard` for the full suite first.
-2. Treat `standard` as the map. If it already shows the main buckets, counts, and hints, stop there and read source.
+2. Treat `standard` as the map. If it already shows bucket-level root cause, `Anchor`, and `Fix`, trust it and report or act from there directly.
 3. Use `sift escalate` only when you want a deeper render of the same cached output without rerunning the command.
 4. After fixing something, run `sift rerun` to refresh the full-suite truth at `standard`.
 5. Only then use `sift rerun --remaining --detail focused` as the zoom lens after the full-suite truth is refreshed.

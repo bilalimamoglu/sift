@@ -16,6 +16,7 @@ export interface RerunRequest {
   outputContract?: string;
   fallbackJson?: unknown;
   dryRun?: boolean;
+  includeTestIds?: boolean;
   remaining?: boolean;
   detail?: "standard" | "focused" | "verbose";
   showRaw?: boolean;
@@ -25,15 +26,15 @@ export async function runRerun(request: RerunRequest): Promise<number> {
   const state = readCachedTestStatusRun();
 
   if (!request.remaining) {
-    return runExec({
-      ...request,
-      ...getCachedRerunCommand(state),
+  return runExec({
+    ...request,
+    ...getCachedRerunCommand(state),
       cwd: state.cwd,
       diff: true,
       presetName: "test-status",
-      detail: "standard",
-      showRaw: false
-    });
+    detail: "standard",
+    showRaw: false
+  });
   }
 
   const remainingNodeIds = getRemainingPytestNodeIds(state);
@@ -48,6 +49,9 @@ export async function runRerun(request: RerunRequest): Promise<number> {
     cwd: state.cwd,
     diff: false,
     presetName: "test-status",
-    skipCacheWrite: true
+    skipCacheWrite: true,
+    testStatusContext: {
+      remainingSubsetAvailable: true
+    }
   });
 }

@@ -96,6 +96,7 @@ export interface RunRequest {
   goal?: Goal;
   dryRun?: boolean;
   showRaw?: boolean;
+  includeTestIds?: boolean;
   detail?: DetailLevel;
   presetName?: string;
   policyName?: PromptPolicyName;
@@ -104,6 +105,7 @@ export interface RunRequest {
   testStatusContext?: {
     resolvedTests?: string[];
     remainingTests?: string[];
+    remainingSubsetAvailable?: boolean;
   };
   fallbackJson?: unknown;
 }

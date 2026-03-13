@@ -117,7 +117,15 @@ interface LiveSessionReport {
   siftFirst: LiveSessionFlowReport & {
     standardSurfacedDominantBlocker: boolean;
     standardSurfacedSecondaryBucket: boolean;
+    standardSelfSufficientForVisibleBuckets: boolean;
+    sourceReadCount: number | null;
+    firstSourceReadCoveredByReadTargets: boolean | null;
+    firstSourceReadNarrowedByContextHint: boolean | null;
+    rawReverificationAvoided: boolean;
+    sourceReadsStayedTargeted: boolean;
     sourceReadAfterZoomSteps: number | null;
+    remainingIdsExposedPublicly: boolean;
+    diagnosisCompleteAtLayer: "heuristic" | "provider" | "raw";
   };
   delta: {
     tokensSaved: number;
@@ -131,7 +139,15 @@ interface LiveSessionReport {
     internalToolUsesImproved: boolean;
     standardSurfacedDominantBlocker: boolean;
     standardSurfacedSecondaryBucket: boolean;
+    standardSelfSufficientForVisibleBuckets: boolean;
+    sourceReadCount: number | null;
+    firstSourceReadCoveredByReadTargets: boolean | null;
+    firstSourceReadNarrowedByContextHint: boolean | null;
+    rawReverificationAvoided: boolean;
+    sourceReadsStayedTargeted: boolean;
     sourceReadAfterZoomSteps: number | null;
+    remainingIdsExposedPublicly: boolean;
+    diagnosisCompleteAtLayer: "heuristic" | "provider" | "raw";
     stopBudgetSatisfied: boolean;
   };
 }
@@ -139,13 +155,20 @@ interface LiveSessionReport {
 interface LiveAggregateReport {
   rawFirst: LiveSessionFlowReport;
   siftFirst: LiveSessionFlowReport;
-  comparisons: {
-    sessions: number;
-    outputBudgetBetterCount: number;
-    internalToolUsesImprovedCount: number;
-    stopBudgetSatisfiedCount: number;
-  };
-}
+    comparisons: {
+      sessions: number;
+      outputBudgetBetterCount: number;
+      internalToolUsesImprovedCount: number;
+      standardSelfSufficientCount: number;
+      firstSourceReadCoveredByReadTargetsCount: number;
+      firstSourceReadNarrowedByContextHintCount: number;
+      rawReverificationAvoidedCount: number;
+      sourceReadsStayedTargetedCount: number;
+      remainingIdsHiddenCount: number;
+      heuristicCompletionCount: number;
+      stopBudgetSatisfiedCount: number;
+    };
+  }
 
 const INSUFFICIENT_SIGNAL = "Insufficient signal in the provided input.";
 const DETAIL_ORDER: Record<DetailLevel, number> = {
@@ -365,7 +388,18 @@ function buildLiveSessionReport(fixture: LiveSessionFixture): LiveSessionReport 
         fixture.siftFirst.internalToolUses < fixture.rawFirst.internalToolUses,
       standardSurfacedDominantBlocker: fixture.siftFirst.standardSurfacedDominantBlocker,
       standardSurfacedSecondaryBucket: fixture.siftFirst.standardSurfacedSecondaryBucket,
+      standardSelfSufficientForVisibleBuckets:
+        fixture.siftFirst.standardSelfSufficientForVisibleBuckets,
+      sourceReadCount: fixture.siftFirst.sourceReadCount,
+      firstSourceReadCoveredByReadTargets:
+        fixture.siftFirst.firstSourceReadCoveredByReadTargets,
+      firstSourceReadNarrowedByContextHint:
+        fixture.siftFirst.firstSourceReadNarrowedByContextHint,
+      rawReverificationAvoided: fixture.siftFirst.rawReverificationAvoided,
+      sourceReadsStayedTargeted: fixture.siftFirst.sourceReadsStayedTargeted,
       sourceReadAfterZoomSteps: fixture.siftFirst.sourceReadAfterZoomSteps,
+      remainingIdsExposedPublicly: fixture.siftFirst.remainingIdsExposedPublicly,
+      diagnosisCompleteAtLayer: fixture.siftFirst.diagnosisCompleteAtLayer,
       stopBudgetSatisfied:
         fixture.siftFirst.sourceReadAfterZoomSteps !== null &&
         fixture.siftFirst.sourceReadAfterZoomSteps <= 1
@@ -406,6 +440,27 @@ function buildLiveAggregate(reports: LiveSessionReport[]): LiveAggregateReport {
       outputBudgetBetterCount: reports.filter((report) => report.acceptance.outputBudgetBetter).length,
       internalToolUsesImprovedCount: reports.filter(
         (report) => report.acceptance.internalToolUsesImproved
+      ).length,
+      standardSelfSufficientCount: reports.filter(
+        (report) => report.acceptance.standardSelfSufficientForVisibleBuckets
+      ).length,
+      firstSourceReadCoveredByReadTargetsCount: reports.filter(
+        (report) => report.acceptance.firstSourceReadCoveredByReadTargets === true
+      ).length,
+      firstSourceReadNarrowedByContextHintCount: reports.filter(
+        (report) => report.acceptance.firstSourceReadNarrowedByContextHint === true
+      ).length,
+      rawReverificationAvoidedCount: reports.filter(
+        (report) => report.acceptance.rawReverificationAvoided
+      ).length,
+      sourceReadsStayedTargetedCount: reports.filter(
+        (report) => report.acceptance.sourceReadsStayedTargeted
+      ).length,
+      remainingIdsHiddenCount: reports.filter(
+        (report) => report.acceptance.remainingIdsExposedPublicly === false
+      ).length,
+      heuristicCompletionCount: reports.filter(
+        (report) => report.acceptance.diagnosisCompleteAtLayer === "heuristic"
       ).length,
       stopBudgetSatisfiedCount: reports.filter((report) => report.acceptance.stopBudgetSatisfied).length
     }
@@ -505,6 +560,34 @@ function renderHumanReport(report: BenchmarkReport): string {
       lines.push(
         `  acceptance: outputBudgetBetter=${session.acceptance.outputBudgetBetter}, dominantBlockerVisibleAtStandard=${session.acceptance.standardSurfacedDominantBlocker}, secondaryBucketVisibleAtStandard=${session.acceptance.standardSurfacedSecondaryBucket}, stopBudgetSatisfied=${session.acceptance.stopBudgetSatisfied}`
       );
+      lines.push(
+        `  standard self-sufficient for visible buckets: ${session.acceptance.standardSelfSufficientForVisibleBuckets}`
+      );
+      if (session.acceptance.sourceReadCount !== null) {
+        lines.push(`  source reads: ${session.acceptance.sourceReadCount}`);
+      }
+      if (session.acceptance.firstSourceReadCoveredByReadTargets !== null) {
+        lines.push(
+          `  first source read covered by read_targets: ${session.acceptance.firstSourceReadCoveredByReadTargets}`
+        );
+      }
+      if (session.acceptance.firstSourceReadNarrowedByContextHint !== null) {
+        lines.push(
+          `  first source read narrowed by context_hint: ${session.acceptance.firstSourceReadNarrowedByContextHint}`
+        );
+      }
+      lines.push(
+        `  raw re-verification avoided: ${session.acceptance.rawReverificationAvoided}`
+      );
+      lines.push(
+        `  source reads stayed targeted: ${session.acceptance.sourceReadsStayedTargeted}`
+      );
+      lines.push(
+        `  remaining ids exposed publicly: ${session.acceptance.remainingIdsExposedPublicly}`
+      );
+      lines.push(
+        `  diagnosis complete at layer: ${session.acceptance.diagnosisCompleteAtLayer}`
+      );
       if (session.acceptance.sourceReadAfterZoomSteps !== null) {
         lines.push(
           `  source-read depth: after ${session.acceptance.sourceReadAfterZoomSteps} zoom step(s)`
@@ -526,6 +609,27 @@ function renderHumanReport(report: BenchmarkReport): string {
       );
       lines.push(
         `  internal-tool-use wins: ${report.liveAggregate.comparisons.internalToolUsesImprovedCount}/${report.liveAggregate.comparisons.sessions}`
+      );
+      lines.push(
+        `  self-sufficient standard wins: ${report.liveAggregate.comparisons.standardSelfSufficientCount}/${report.liveAggregate.comparisons.sessions}`
+      );
+      lines.push(
+        `  read-target-covered first source reads: ${report.liveAggregate.comparisons.firstSourceReadCoveredByReadTargetsCount}/${report.liveAggregate.comparisons.sessions}`
+      );
+      lines.push(
+        `  context-hint-narrowed first source reads: ${report.liveAggregate.comparisons.firstSourceReadNarrowedByContextHintCount}/${report.liveAggregate.comparisons.sessions}`
+      );
+      lines.push(
+        `  raw re-verification avoided: ${report.liveAggregate.comparisons.rawReverificationAvoidedCount}/${report.liveAggregate.comparisons.sessions}`
+      );
+      lines.push(
+        `  targeted-source-read wins: ${report.liveAggregate.comparisons.sourceReadsStayedTargetedCount}/${report.liveAggregate.comparisons.sessions}`
+      );
+      lines.push(
+        `  hidden remaining-id defaults: ${report.liveAggregate.comparisons.remainingIdsHiddenCount}/${report.liveAggregate.comparisons.sessions}`
+      );
+      lines.push(
+        `  heuristic completions: ${report.liveAggregate.comparisons.heuristicCompletionCount}/${report.liveAggregate.comparisons.sessions}`
       );
       lines.push(
         `  stop-budget wins: ${report.liveAggregate.comparisons.stopBudgetSatisfiedCount}/${report.liveAggregate.comparisons.sessions}`

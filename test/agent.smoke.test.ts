@@ -22,6 +22,8 @@ describe("agent installer smoke", () => {
     expect(codex.stdout).toContain("default to sift first, keep raw as the last resort");
     expect(codex.stdout).toContain("standard should usually be enough for first-pass triage");
     expect(codex.stdout).toContain("Only then zoom into what is still broken");
+    expect(codex.stdout).toContain("Use diagnose JSON only for automation or machine branching");
+    expect(codex.stdout).toContain("If standard already shows bucket-level root cause, anchor, and fix lines");
     expect(codex.stdout).not.toContain("<!-- sift:begin codex -->");
     expect(claude.status).toBe(0);
     expect(claude.stdout).toContain("Claude instructions preview");
@@ -29,6 +31,10 @@ describe("agent installer smoke", () => {
     expect(rawCodex.stdout).toContain("<!-- sift:begin codex -->");
     expect(rawCodex.stdout).toContain("refresh the truth with `sift rerun`");
     expect(rawCodex.stdout).toContain("`sift rerun --remaining` currently supports only argv-mode `pytest ...` or `python -m pytest ...` runs;");
+    expect(rawCodex.stdout).toContain("--include-test-ids");
+    expect(rawCodex.stdout).toContain("read_targets.context_hint.start_line/end_line");
+    expect(rawCodex.stdout).toContain("read_targets.context_hint.search_hint");
+    expect(rawCodex.stdout).toContain("trust it and report from it directly");
     expect(rawCodex.stdout).toContain("--show-raw");
   });
 

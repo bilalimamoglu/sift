@@ -58,6 +58,14 @@ type BenchmarkReport = {
       outputBudgetBetter: boolean;
       standardSurfacedDominantBlocker: boolean;
       standardSurfacedSecondaryBucket: boolean;
+      standardSelfSufficientForVisibleBuckets: boolean;
+      sourceReadCount: number | null;
+      firstSourceReadCoveredByReadTargets: boolean | null;
+      firstSourceReadNarrowedByContextHint: boolean | null;
+      rawReverificationAvoided: boolean;
+      sourceReadsStayedTargeted: boolean;
+      remainingIdsExposedPublicly: boolean;
+      diagnosisCompleteAtLayer: "heuristic" | "provider" | "raw";
       stopBudgetSatisfied: boolean;
     };
   }>;
@@ -66,6 +74,13 @@ type BenchmarkReport = {
       sessions: number;
       outputBudgetBetterCount: number;
       internalToolUsesImprovedCount: number;
+      standardSelfSufficientCount: number;
+      firstSourceReadCoveredByReadTargetsCount: number;
+      firstSourceReadNarrowedByContextHintCount: number;
+      rawReverificationAvoidedCount: number;
+      sourceReadsStayedTargetedCount: number;
+      remainingIdsHiddenCount: number;
+      heuristicCompletionCount: number;
       stopBudgetSatisfiedCount: number;
     };
   };
@@ -170,23 +185,38 @@ describe("benchmark harness", () => {
     expect(report.liveSessions?.[0]).toMatchObject({
       name: "mixed-full-suite-live",
       delta: {
-        tokensSaved: 28926,
-        charsSaved: 70000,
-        internalToolUseDelta: 40
+        tokensSaved: 15633,
+        charsSaved: 40000,
+        internalToolUseDelta: -10
       },
       acceptance: {
         outputBudgetBetter: true,
-        standardSurfacedDominantBlocker: false,
+        standardSurfacedDominantBlocker: true,
         standardSurfacedSecondaryBucket: true,
-        stopBudgetSatisfied: false
+        standardSelfSufficientForVisibleBuckets: true,
+        sourceReadCount: 3,
+        firstSourceReadCoveredByReadTargets: true,
+        firstSourceReadNarrowedByContextHint: null,
+        rawReverificationAvoided: true,
+        sourceReadsStayedTargeted: true,
+        remainingIdsExposedPublicly: false,
+        diagnosisCompleteAtLayer: "heuristic",
+        stopBudgetSatisfied: true
       }
     });
     expect(report.liveAggregate).toMatchObject({
       comparisons: {
         sessions: 1,
         outputBudgetBetterCount: 1,
-        internalToolUsesImprovedCount: 0,
-        stopBudgetSatisfiedCount: 0
+        internalToolUsesImprovedCount: 1,
+        standardSelfSufficientCount: 1,
+        firstSourceReadCoveredByReadTargetsCount: 1,
+        firstSourceReadNarrowedByContextHintCount: 0,
+        rawReverificationAvoidedCount: 1,
+        sourceReadsStayedTargetedCount: 1,
+        remainingIdsHiddenCount: 1,
+        heuristicCompletionCount: 1,
+        stopBudgetSatisfiedCount: 1
       }
     });
   });

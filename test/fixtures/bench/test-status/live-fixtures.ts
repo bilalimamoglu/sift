@@ -16,7 +16,15 @@ export interface LiveSessionFlowFixture {
 export interface LiveSessionSiftFlowFixture extends LiveSessionFlowFixture {
   standardSurfacedDominantBlocker: boolean;
   standardSurfacedSecondaryBucket: boolean;
+  standardSelfSufficientForVisibleBuckets: boolean;
+  sourceReadCount: number | null;
+  firstSourceReadCoveredByReadTargets: boolean | null;
+  firstSourceReadNarrowedByContextHint: boolean | null;
+  rawReverificationAvoided: boolean;
+  sourceReadsStayedTargeted: boolean;
   sourceReadAfterZoomSteps: number | null;
+  remainingIdsExposedPublicly: boolean;
+  diagnosisCompleteAtLayer: "heuristic" | "provider" | "raw";
 }
 
 export interface LiveSessionFixture {
@@ -33,27 +41,35 @@ export function buildLiveSessionFixtures(): LiveSessionFixture[] {
       description:
         "Captured mixed full-suite agent session comparing raw pytest against sift-first diagnosis.",
       rawFirst: {
-        totalTokens: 86299,
-        consumedChars: 120000,
-        externalToolCalls: 17,
-        internalToolUses: 32,
-        wallClockSeconds: 227,
+        totalTokens: 63206,
+        consumedChars: 75000,
+        externalToolCalls: 14,
+        internalToolUses: 34,
+        wallClockSeconds: 330,
         providerInvocations: 0,
         stopDepth: "raw",
         diagnosisCorrect: true
       },
       siftFirst: {
-        totalTokens: 57373,
-        consumedChars: 50000,
-        externalToolCalls: 18,
-        internalToolUses: 72,
-        wallClockSeconds: 448,
+        totalTokens: 47573,
+        consumedChars: 35000,
+        externalToolCalls: 9,
+        internalToolUses: 24,
+        wallClockSeconds: 297,
         providerInvocations: null,
-        stopDepth: "verbose",
+        stopDepth: "standard",
         diagnosisCorrect: true,
-        standardSurfacedDominantBlocker: false,
+        standardSurfacedDominantBlocker: true,
         standardSurfacedSecondaryBucket: true,
-        sourceReadAfterZoomSteps: 2
+        standardSelfSufficientForVisibleBuckets: true,
+        sourceReadCount: 3,
+        firstSourceReadCoveredByReadTargets: true,
+        firstSourceReadNarrowedByContextHint: null,
+        rawReverificationAvoided: true,
+        sourceReadsStayedTargeted: true,
+        sourceReadAfterZoomSteps: 0,
+        remainingIdsExposedPublicly: false,
+        diagnosisCompleteAtLayer: "heuristic"
       }
     }
   ];

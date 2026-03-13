@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultConfig } from "../src/config/defaults.js";
 import {
   assertSupportedGoal,
+  assertSupportedIncludeTestIds,
   buildCliOverrides,
   cleanHelpSectionBody,
   createCliApp,
@@ -262,6 +263,24 @@ describe("cli app unit", () => {
         presetName: "test-status"
       })
     ).not.toThrow();
+    expect(() =>
+      assertSupportedIncludeTestIds({
+        includeTestIds: true,
+        goal: "summarize",
+        format: "json",
+        presetName: "test-status"
+      })
+    ).toThrow(
+      "`--include-test-ids` is supported only with `--goal diagnose --format json` on `--preset test-status`, `sift rerun`, and `test-status` watch flows."
+    );
+    expect(() =>
+      assertSupportedIncludeTestIds({
+        includeTestIds: true,
+        goal: "diagnose",
+        format: "json",
+        presetName: "test-status"
+      })
+    ).not.toThrow();
   });
 
   it("cleans duplicate version text only for string help sections", () => {
@@ -305,7 +324,7 @@ describe("cli app unit", () => {
     const deps = createDeps();
 
     await runMatched(
-      ["exec", "--preset", "test-status", "--watch", "--goal", "diagnose", "--format", "json", "--", "pytest"],
+      ["exec", "--preset", "test-status", "--watch", "--goal", "diagnose", "--format", "json", "--include-test-ids", "--", "pytest"],
       deps
     );
     expect(deps.runExec).toHaveBeenCalledWith(
@@ -313,6 +332,7 @@ describe("cli app unit", () => {
         watch: true,
         goal: "diagnose",
         format: "json",
+        includeTestIds: true,
         presetName: "test-status"
       })
     );

@@ -35,6 +35,7 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("sift exec [question] [options] -- <program> [args...]");
     expect(result.stdout).toContain("exec --preset test-status -- npm test");
     expect(result.stdout).toContain("--diff");
+    expect(result.stdout).toContain("--include-test-ids");
   });
 
   it("prints escalate help", () => {
@@ -57,6 +58,7 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("sift rerun [options]");
     expect(result.stdout).toContain("rerun --remaining --detail focused");
     expect(result.stdout).toContain("--remaining");
+    expect(result.stdout).toContain("--include-test-ids");
     expect(result.stdout).toContain("--show-raw");
   });
 
@@ -69,6 +71,7 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("sift watch [question] [options]");
     expect(result.stdout).toContain("watch --preset test-status < pytest-watch.txt");
     expect(result.stdout).toContain("--goal <goal>");
+    expect(result.stdout).toContain("--include-test-ids");
   });
 
   it("prints agent help with scope and dry-run examples", () => {
