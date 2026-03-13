@@ -35,6 +35,7 @@ describe("agent installer smoke", () => {
     expect(rawCodex.stdout).toContain("read_targets.context_hint.start_line/end_line");
     expect(rawCodex.stdout).toContain("read_targets.context_hint.search_hint");
     expect(rawCodex.stdout).toContain("trust it and report from it directly");
+    expect(rawCodex.stdout).toContain("unknown bucket or ends with `Decision: zoom`");
     expect(rawCodex.stdout).toContain("--show-raw");
   });
 

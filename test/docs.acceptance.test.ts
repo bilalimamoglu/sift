@@ -49,6 +49,7 @@ describe("README quick start acceptance", () => {
     expect(readme).toContain("Fix:");
     expect(readme).toContain("trust it and report or act from there directly");
     expect(readme).toContain("do not re-verify the same bucket with raw pytest");
+    expect(readme).toContain("unknown bucket or ends with `Decision: zoom`");
     expect(readme).toContain("Decision: stop and act");
   });
 

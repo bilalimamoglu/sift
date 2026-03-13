@@ -101,6 +101,18 @@ export interface TestStatusProviderSupplement {
   read_raw_only_if: string | null;
   decision: TestStatusDecisionKind;
   provider_confidence: number | null;
+  bucket_supplements: Array<{
+    label: string;
+    count: number;
+    root_cause: string;
+    anchor: {
+      file: string | null;
+      line: number | null;
+      search_hint: string | null;
+    };
+    fix_hint: string | null;
+    confidence: number;
+  }>;
   next_best_action: {
     code: DiagnoseActionCode;
     bucket_index: number | null;
@@ -125,7 +137,7 @@ export interface TestStatusContractOverrides {
 export const TEST_STATUS_DIAGNOSE_JSON_CONTRACT =
   '{"status":"ok|insufficient","diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","dominant_blocker_bucket_index":number|null,"provider_used":boolean,"provider_confidence":number|null,"provider_failed":boolean,"raw_slice_used":boolean,"raw_slice_strategy":"none|bucket_evidence|traceback_window|head_tail","resolved_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_subset_available":boolean,"main_buckets":[{"bucket_index":number,"label":string,"count":number,"root_cause":string,"evidence":string[],"bucket_confidence":number,"root_cause_confidence":number,"dominant":boolean,"secondary_visible_despite_blocker":boolean,"mini_diff":{"added_paths"?:number,"removed_models"?:number,"changed_task_mappings"?:number}|null}],"read_targets":[{"file":string,"line":number|null,"why":string,"bucket_index":number,"context_hint":{"start_line":number|null,"end_line":number|null,"search_hint":string|null}}],"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string},"resolved_tests"?:string[],"remaining_tests"?:string[]}';
 export const TEST_STATUS_PROVIDER_SUPPLEMENT_JSON_CONTRACT =
-  '{"diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","provider_confidence":number|null,"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string}}';
+  '{"diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","provider_confidence":number|null,"bucket_supplements":[{"label":string,"count":number,"root_cause":string,"anchor":{"file":string|null,"line":number|null,"search_hint":string|null},"fix_hint":string|null,"confidence":number}],"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string}}';
 
 const nextBestActionSchema = z.object({
   code: z.enum([
@@ -145,6 +157,22 @@ export const testStatusProviderSupplementSchema = z.object({
   read_raw_only_if: z.string().nullable(),
   decision: z.enum(["stop", "zoom", "read_source", "read_raw"]),
   provider_confidence: z.number().min(0).max(1).nullable(),
+  bucket_supplements: z
+    .array(
+      z.object({
+        label: z.string().min(1),
+        count: z.number().int().positive(),
+        root_cause: z.string().min(1),
+        anchor: z.object({
+          file: z.string().nullable(),
+          line: z.number().int().nullable(),
+          search_hint: z.string().nullable()
+        }),
+        fix_hint: z.string().nullable(),
+        confidence: z.number().min(0).max(1)
+      })
+    )
+    .max(2),
   next_best_action: nextBestActionSchema
 });
 
@@ -242,6 +270,12 @@ interface GenericBucket {
   hint?: string;
   overflowCount: number;
   overflowLabel: string;
+  labelOverride?: string;
+  coverage: {
+    error: number;
+    failed: number;
+  };
+  source: "heuristic" | "provider" | "unknown";
 }
 
 function formatCount(count: number, singular: string, plural = `${singular}s`): string {
@@ -352,15 +386,96 @@ function classifyGenericBucketType(reason: string): FailureBucketType {
   return "unknown_failure";
 }
 
+function isUnknownBucket(bucket: Pick<GenericBucket, "reason" | "source">): boolean {
+  return bucket.source === "unknown" || bucket.reason.startsWith("unknown ");
+}
+
+function classifyVisibleStatusForLabel(args: {
+  label: string;
+  errorLabels: Set<string>;
+  failedLabels: Set<string>;
+}): "error" | "failed" | "mixed" | "unknown" {
+  const isError = args.errorLabels.has(args.label);
+  const isFailed = args.failedLabels.has(args.label);
+  if (isError && isFailed) {
+    return "mixed";
+  }
+  if (isError) {
+    return "error";
+  }
+  if (isFailed) {
+    return "failed";
+  }
+  return "unknown";
+}
+
+function inferCoverageFromReason(reason: string): "error" | "failed" | "mixed" {
+  if (
+    reason.startsWith("missing test env:") ||
+    reason.startsWith("fixture guard:") ||
+    reason.startsWith("service unavailable:") ||
+    reason.startsWith("db refused:") ||
+    reason.startsWith("auth bypass absent:") ||
+    reason.startsWith("missing module:")
+  ) {
+    return "error";
+  }
+
+  if (reason.startsWith("assertion failed:")) {
+    return "failed";
+  }
+
+  return "mixed";
+}
+
+function buildCoverageCounts(args: {
+  count: number;
+  coverageKind: "error" | "failed" | "mixed";
+}): GenericBucket["coverage"] {
+  if (args.coverageKind === "error") {
+    return {
+      error: args.count,
+      failed: 0
+    };
+  }
+
+  if (args.coverageKind === "failed") {
+    return {
+      error: 0,
+      failed: args.count
+    };
+  }
+
+  return {
+    error: 0,
+    failed: 0
+  };
+}
+
 function buildGenericBuckets(analysis: TestStatusAnalysis): GenericBucket[] {
   const buckets: GenericBucket[] = [];
   const grouped = new Map<string, GenericBucket>();
+  const errorLabels = new Set(analysis.visibleErrorLabels);
+  const failedLabels = new Set(analysis.visibleFailedLabels);
 
   const push = (reason: string, item: FailureBucket["representativeItems"][number]) => {
-    const key = `${classifyGenericBucketType(reason)}:${reason}`;
+    const coverageKind = (() => {
+      const status = classifyVisibleStatusForLabel({
+        label: item.label,
+        errorLabels,
+        failedLabels
+      });
+      return status === "unknown" ? inferCoverageFromReason(reason) : status;
+    })();
+    const key = `${classifyGenericBucketType(reason)}:${coverageKind}:${reason}`;
     const existing = grouped.get(key);
     if (existing) {
       existing.count += 1;
+      if (coverageKind === "error") {
+        existing.coverage.error += 1;
+      } else if (coverageKind === "failed") {
+        existing.coverage.failed += 1;
+      }
       if (
         !existing.representativeItems.some((entry) => entry.label === item.label) &&
         existing.representativeItems.length < 6
@@ -384,7 +499,12 @@ function buildGenericBuckets(analysis: TestStatusAnalysis): GenericBucket[] {
       entities: [],
       hint: undefined,
       overflowCount: 0,
-      overflowLabel: "failing tests/modules"
+      overflowLabel: "failing tests/modules",
+      coverage: buildCoverageCounts({
+        count: 1,
+        coverageKind
+      }),
+      source: "heuristic"
     });
   };
 
@@ -467,11 +587,68 @@ function mergeBucketDetails(existing: GenericBucket, incoming: GenericBucket): G
       incoming.overflowCount,
       count - representativeItems.length
     ),
-    overflowLabel: existing.overflowLabel || incoming.overflowLabel
+    overflowLabel: existing.overflowLabel || incoming.overflowLabel,
+    labelOverride: existing.labelOverride ?? incoming.labelOverride,
+    coverage: {
+      error: Math.max(existing.coverage.error, incoming.coverage.error),
+      failed: Math.max(existing.coverage.failed, incoming.coverage.failed)
+    },
+    source: existing.source
   };
 }
 
-function mergeBuckets(analysis: TestStatusAnalysis): GenericBucket[] {
+function inferFailureBucketCoverage(bucket: FailureBucket, analysis: TestStatusAnalysis): GenericBucket["coverage"] {
+  const errorLabels = new Set(analysis.visibleErrorLabels);
+  const failedLabels = new Set(analysis.visibleFailedLabels);
+  let error = 0;
+  let failed = 0;
+
+  for (const item of bucket.representativeItems) {
+    const status = classifyVisibleStatusForLabel({
+      label: item.label,
+      errorLabels,
+      failedLabels
+    });
+    if (status === "error") {
+      error += 1;
+    } else if (status === "failed") {
+      failed += 1;
+    }
+  }
+
+  const claimed = bucket.countClaimed ?? bucket.countVisible;
+  if (bucket.type === "contract_snapshot_drift" || bucket.type === "assertion_failure") {
+    return {
+      error,
+      failed: Math.max(failed, claimed)
+    };
+  }
+
+  if (
+    bucket.type === "shared_environment_blocker" ||
+    bucket.type === "import_dependency_failure" ||
+    bucket.type === "collection_failure" ||
+    bucket.type === "fixture_guard_failure" ||
+    bucket.type === "service_unavailable" ||
+    bucket.type === "db_connection_failure" ||
+    bucket.type === "auth_bypass_absent"
+  ) {
+    return {
+      error: Math.max(error, claimed),
+      failed
+    };
+  }
+
+  return {
+    error,
+    failed
+  };
+}
+
+function mergeBuckets(
+  analysis: TestStatusAnalysis,
+  extraBuckets: GenericBucket[] = []
+): GenericBucket[] {
   const mergedByIdentity = new Map<string, GenericBucket>();
   const merged: GenericBucket[] = [];
 
@@ -504,7 +681,9 @@ function mergeBuckets(analysis: TestStatusAnalysis): GenericBucket[] {
     entities: [...bucket.entities],
     hint: bucket.hint,
     overflowCount: bucket.overflowCount,
-    overflowLabel: bucket.overflowLabel
+    overflowLabel: bucket.overflowLabel,
+    coverage: inferFailureBucketCoverage(bucket, analysis),
+    source: "heuristic" as const
   }))) {
     pushBucket(bucket);
   }
@@ -534,6 +713,10 @@ function mergeBuckets(analysis: TestStatusAnalysis): GenericBucket[] {
     }
   }
 
+  for (const bucket of extraBuckets) {
+    pushBucket(bucket);
+  }
+
   return merged;
 }
 
@@ -548,6 +731,9 @@ function dominantBucketPriority(bucket: GenericBucket): number {
     return 3;
   }
   if (bucket.type === "collection_failure") {
+    return 2;
+  }
+  if (isUnknownBucket(bucket)) {
     return 2;
   }
   if (bucket.type === "contract_snapshot_drift") {
@@ -584,6 +770,10 @@ function isDominantBlockerType(type: FailureBucketType): boolean {
 }
 
 function labelForBucket(bucket: GenericBucket): string {
+  if (bucket.labelOverride) {
+    return bucket.labelOverride;
+  }
+
   if (bucket.reason.startsWith("missing test env:")) {
     return "missing test env";
   }
@@ -623,10 +813,20 @@ function labelForBucket(bucket: GenericBucket): string {
   if (bucket.type === "runtime_failure") {
     return "runtime failure";
   }
+  if (bucket.reason.startsWith("unknown setup blocker:")) {
+    return "unknown setup blocker";
+  }
+  if (bucket.reason.startsWith("unknown failure family:")) {
+    return "unknown failure family";
+  }
   return "unknown failure";
 }
 
 function rootCauseConfidenceFor(bucket: GenericBucket): number {
+  if (isUnknownBucket(bucket)) {
+    return 0.52;
+  }
+
   if (
     bucket.reason.startsWith("missing test env:") ||
     bucket.reason.startsWith("missing module:") ||
@@ -639,6 +839,10 @@ function rootCauseConfidenceFor(bucket: GenericBucket): number {
 
   if (bucket.type === "contract_snapshot_drift") {
     return bucket.entities.length > 0 ? 0.92 : 0.76;
+  }
+
+  if (bucket.source === "provider") {
+    return Math.max(0.6, Math.min(bucket.confidence, 0.82));
   }
 
   return Math.max(0.6, Math.min(bucket.confidence, 0.88));
@@ -704,6 +908,14 @@ function buildReadTargetWhy(args: {
     return "it contains the auth bypass setup behind this bucket";
   }
 
+  if (args.bucket.reason.startsWith("unknown setup blocker:")) {
+    return "it is the first anchored setup failure in this unknown bucket";
+  }
+
+  if (args.bucket.reason.startsWith("unknown failure family:")) {
+    return "it is the first anchored failing test in this unknown bucket";
+  }
+
   if (args.bucket.type === "contract_snapshot_drift") {
     if (args.bucketLabel === "route drift") {
       return "it maps to the visible route drift bucket";
@@ -765,6 +977,10 @@ function buildReadTargetSearchHint(
   const assertionText = bucket.reason.match(/^assertion failed:\s+(.+)$/)?.[1];
   if (assertionText) {
     return assertionText;
+  }
+
+  if (bucket.reason.startsWith("unknown ")) {
+    return anchor.reason;
   }
 
   const fallbackLabel = anchor.label.split("::")[1]?.trim();
@@ -859,6 +1075,13 @@ function buildConcreteNextNote(args: {
     return lead;
   }
 
+  if (args.nextBestAction.code === "insufficient_signal") {
+    if (args.nextBestAction.note.startsWith("Provider follow-up failed")) {
+      return args.nextBestAction.note;
+    }
+    return `${lead} Then take one deeper sift pass before raw traceback.`;
+  }
+
   return args.nextBestAction.note;
 }
 
@@ -885,6 +1108,213 @@ function extractMiniDiff(input: string, bucket: GenericBucket): TestStatusMiniDi
     ...(addedPaths > 0 ? { added_paths: addedPaths } : {}),
     ...(removedModels > 0 ? { removed_models: removedModels } : {}),
     ...(changedTaskMappings > 0 ? { changed_task_mappings: changedTaskMappings } : {})
+  };
+}
+
+function inferSupplementCoverageKind(args: {
+  label: string;
+  rootCause: string;
+  remainingErrors: number;
+  remainingFailed: number;
+}): "error" | "failed" {
+  const normalized = `${args.label} ${args.rootCause}`.toLowerCase();
+  if (
+    /env|setup|fixture|import|dependency|service|db|database|auth bypass|collection|connection refused/.test(
+      normalized
+    )
+  ) {
+    return "error";
+  }
+
+  if (/snapshot|contract|drift|assertion|expected|actual|golden/.test(normalized)) {
+    return "failed";
+  }
+
+  if (args.remainingErrors > 0 && args.remainingFailed === 0) {
+    return "error";
+  }
+
+  return "failed";
+}
+
+function buildProviderSupplementBuckets(args: {
+  supplements: TestStatusProviderSupplement["bucket_supplements"];
+  remainingErrors: number;
+  remainingFailed: number;
+}): GenericBucket[] {
+  let remainingErrors = args.remainingErrors;
+  let remainingFailed = args.remainingFailed;
+
+  return args.supplements.flatMap((supplement) => {
+    const coverageKind = inferSupplementCoverageKind({
+      label: supplement.label,
+      rootCause: supplement.root_cause,
+      remainingErrors,
+      remainingFailed
+    });
+    const budget = coverageKind === "error" ? remainingErrors : remainingFailed;
+    const count = Math.max(0, Math.min(supplement.count, budget));
+    if (count === 0) {
+      return [];
+    }
+
+    if (coverageKind === "error") {
+      remainingErrors -= count;
+    } else {
+      remainingFailed -= count;
+    }
+
+    const representativeLabel =
+      supplement.anchor.file ??
+      `${supplement.label} supplement`;
+    const representativeItem: FailureBucket["representativeItems"][number] = {
+      label: representativeLabel,
+      reason: supplement.root_cause,
+      group: supplement.label,
+      file: supplement.anchor.file,
+      line: supplement.anchor.line,
+      anchor_kind:
+        supplement.anchor.file && supplement.anchor.line !== null
+          ? "traceback"
+          : supplement.anchor.file
+            ? "test_label"
+            : supplement.anchor.search_hint
+              ? "entity"
+              : "none",
+      anchor_confidence: Math.max(0.4, Math.min(supplement.confidence, 0.82))
+    };
+
+    return [
+      {
+        type: classifyGenericBucketType(supplement.root_cause),
+        headline: `${supplement.label}: ${formatCount(count, "visible failure")} share ${supplement.root_cause}.`,
+        summaryLines: [
+          `${supplement.label}: ${formatCount(count, "visible failure")} share ${supplement.root_cause}.`
+        ],
+        reason: supplement.root_cause,
+        count,
+        confidence: Math.max(0.4, Math.min(supplement.confidence, 0.82)),
+        representativeItems: [representativeItem],
+        entities: supplement.anchor.search_hint ? [supplement.anchor.search_hint] : [],
+        hint: supplement.fix_hint ?? undefined,
+        overflowCount: Math.max(count - 1, 0),
+        overflowLabel: "failing tests/modules",
+        labelOverride: supplement.label,
+        coverage: buildCoverageCounts({
+          count,
+          coverageKind
+        }),
+        source: "provider"
+      }
+    ];
+  });
+}
+
+function pickUnknownAnchor(args: {
+  analysis: TestStatusAnalysis;
+  kind: "error" | "failed";
+}): FailureBucket["representativeItems"][number] | null {
+  const fromStatusItems =
+    args.kind === "error"
+      ? args.analysis.visibleErrorItems[0]
+      : null;
+
+  if (fromStatusItems) {
+    return {
+      label: fromStatusItems.label,
+      reason: fromStatusItems.reason,
+      group: fromStatusItems.group,
+      file: fromStatusItems.file,
+      line: fromStatusItems.line,
+      anchor_kind: fromStatusItems.anchor_kind,
+      anchor_confidence: fromStatusItems.anchor_confidence
+    };
+  }
+
+  const label =
+    args.kind === "error"
+      ? args.analysis.visibleErrorLabels[0]
+      : args.analysis.visibleFailedLabels[0];
+  if (label) {
+    const normalizedLabel = normalizeTestId(label);
+    const fileMatch = normalizedLabel.match(/^([A-Za-z0-9_./-]+\.[A-Za-z0-9]+)\b/);
+    const file = fileMatch?.[1] ?? normalizedLabel.split("::")[0] ?? null;
+    return {
+      label,
+      reason:
+        args.kind === "error"
+          ? "setup failures share a repeated but unclassified pattern"
+          : "failing tests share a repeated but unclassified pattern",
+      group: args.kind === "error" ? "unknown setup blocker" : "unknown failure family",
+      file: file && file !== label ? file : null,
+      line: null,
+      anchor_kind: file && file !== label ? "test_label" : "none",
+      anchor_confidence: file && file !== label ? 0.6 : 0
+    };
+  }
+
+  return null;
+}
+
+function buildUnknownBucket(args: {
+  analysis: TestStatusAnalysis;
+  kind: "error" | "failed";
+  count: number;
+}): GenericBucket | null {
+  if (args.count <= 0) {
+    return null;
+  }
+
+  const anchor = pickUnknownAnchor(args);
+  const isError = args.kind === "error";
+  const label = isError ? "unknown setup blocker" : "unknown failure family";
+  const reason = isError
+    ? "unknown setup blocker: setup failures share a repeated but unclassified pattern"
+    : "unknown failure family: failing tests share a repeated but unclassified pattern";
+
+  return {
+    type: "unknown_failure",
+    headline: `${label}: ${formatCount(args.count, "visible failure")} share a repeated but unclassified pattern.`,
+    summaryLines: [
+      `${label}: ${formatCount(args.count, "visible failure")} share a repeated but unclassified pattern.`
+    ],
+    reason,
+    count: args.count,
+    confidence: 0.45,
+    representativeItems: anchor ? [anchor] : [],
+    entities: [],
+    hint: isError
+      ? "Take one deeper sift pass or inspect the first anchored setup failure."
+      : "Take one deeper sift pass or inspect the first anchored failing test.",
+    overflowCount: Math.max(args.count - (anchor ? 1 : 0), 0),
+    overflowLabel: "failing tests/modules",
+    labelOverride: label,
+    coverage: buildCoverageCounts({
+      count: args.count,
+      coverageKind: isError ? "error" : "failed"
+    }),
+    source: "unknown"
+  };
+}
+
+function buildCoverageResiduals(args: {
+  analysis: TestStatusAnalysis;
+  buckets: GenericBucket[];
+}): { remainingErrors: number; remainingFailed: number } {
+  const covered = args.buckets.reduce(
+    (totals, bucket) => ({
+      error: totals.error + bucket.coverage.error,
+      failed: totals.failed + bucket.coverage.failed
+    }),
+    {
+      error: 0,
+      failed: 0
+    }
+  );
+
+  return {
+    remainingErrors: Math.max(args.analysis.errors - Math.min(args.analysis.errors, covered.error), 0),
+    remainingFailed: Math.max(args.analysis.failed - Math.min(args.analysis.failed, covered.failed), 0)
   };
 }
 
@@ -1055,6 +1485,14 @@ function buildStandardFixText(args: {
     return "Restore the test auth bypass setup and rerun the full suite at standard.";
   }
 
+  if (args.bucket.reason.startsWith("unknown setup blocker:")) {
+    return "Take one deeper sift pass or inspect the first anchored setup failure before rerunning.";
+  }
+
+  if (args.bucket.reason.startsWith("unknown failure family:")) {
+    return "Take one deeper sift pass or inspect the first anchored failing test before rerunning.";
+  }
+
   if (args.bucket.type === "contract_snapshot_drift") {
     return "Review the visible drift and regenerate the contract snapshots if the changes are intentional.";
   }
@@ -1192,9 +1630,44 @@ export function buildTestStatusDiagnoseContract(args: {
   analysis: TestStatusAnalysis;
   resolvedTests?: string[];
   remainingTests?: string[];
+  providerBucketSupplements?: TestStatusProviderSupplement["bucket_supplements"];
   contractOverrides?: TestStatusContractOverrides;
 }): TestStatusDecision {
-  const buckets = prioritizeBuckets(mergeBuckets(args.analysis)).slice(0, 3);
+  const heuristicBuckets = mergeBuckets(args.analysis);
+  const preUnknownSimpleCollectionFailure =
+    args.analysis.collectionErrorCount !== undefined &&
+    args.analysis.collectionItems.length === 0 &&
+    heuristicBuckets.length === 0 &&
+    (args.providerBucketSupplements?.length ?? 0) === 0;
+  const heuristicResiduals = buildCoverageResiduals({
+    analysis: args.analysis,
+    buckets: heuristicBuckets
+  });
+  const providerSupplementBuckets = buildProviderSupplementBuckets({
+    supplements: args.providerBucketSupplements ?? [],
+    remainingErrors: heuristicResiduals.remainingErrors,
+    remainingFailed: heuristicResiduals.remainingFailed
+  });
+  const combinedBuckets = mergeBuckets(args.analysis, providerSupplementBuckets);
+  const residuals = buildCoverageResiduals({
+    analysis: args.analysis,
+    buckets: combinedBuckets
+  });
+  const unknownBuckets = preUnknownSimpleCollectionFailure
+    ? []
+    : [
+        buildUnknownBucket({
+          analysis: args.analysis,
+          kind: "error",
+          count: residuals.remainingErrors
+        }),
+        buildUnknownBucket({
+          analysis: args.analysis,
+          kind: "failed",
+          count: residuals.remainingFailed
+        })
+      ].filter((bucket): bucket is GenericBucket => Boolean(bucket));
+  const buckets = prioritizeBuckets([...combinedBuckets, ...unknownBuckets]).slice(0, 3);
   const simpleCollectionFailure =
     args.analysis.collectionErrorCount !== undefined &&
     args.analysis.collectionItems.length === 0 &&
@@ -1211,19 +1684,28 @@ export function buildTestStatusDiagnoseContract(args: {
         }
         return right.bucket.confidence - left.bucket.confidence;
       })[0] ?? null;
+  const hasUnknownBucket = buckets.some((bucket) => isUnknownBucket(bucket));
+  const hasConcreteCoverage =
+    args.analysis.failed === 0 && args.analysis.errors === 0
+      ? true
+      : residuals.remainingErrors === 0 && residuals.remainingFailed === 0;
   const diagnosisComplete =
     (args.analysis.failed === 0 && args.analysis.errors === 0 && args.analysis.passed > 0) ||
     simpleCollectionFailure ||
-    (buckets.length > 0 && (dominantBucket?.bucket.confidence ?? 0) >= 0.7);
-  const rawNeeded =
-    buckets.length > 0
-      ? buckets.every((bucket) => bucket.confidence < 0.7)
-      : !(
-          (args.analysis.failed === 0 &&
-            args.analysis.errors === 0 &&
-            args.analysis.passed > 0) ||
-          simpleCollectionFailure
-        );
+    (buckets.length > 0 &&
+      hasConcreteCoverage &&
+      !hasUnknownBucket &&
+      (dominantBucket?.bucket.confidence ?? 0) >= 0.6);
+  const rawNeeded = buckets.length === 0
+    ? !(
+        (args.analysis.failed === 0 &&
+          args.analysis.errors === 0 &&
+          args.analysis.passed > 0) ||
+        simpleCollectionFailure
+      )
+    : !diagnosisComplete &&
+      !hasUnknownBucket &&
+      buckets.every((bucket) => bucket.confidence < 0.7);
   const dominantBlockerBucketIndex =
     dominantBucket && isDominantBlockerType(dominantBucket.bucket.type)
       ? dominantBucket.index + 1
@@ -1262,6 +1744,13 @@ export function buildTestStatusDiagnoseContract(args: {
       code: "read_source_for_bucket",
       bucket_index: null,
       note: "Inspect the collection traceback or setup code next; the run failed before tests executed."
+    };
+  } else if (hasUnknownBucket) {
+    nextBestAction = {
+      code: "insufficient_signal",
+      bucket_index: dominantBucket ? dominantBucket.index + 1 : null,
+      note:
+        "Take one deeper sift pass or inspect the first anchored failure before falling back to raw traceback."
     };
   } else if (!diagnosisComplete) {
     nextBestAction = {
@@ -1310,12 +1799,19 @@ export function buildTestStatusDiagnoseContract(args: {
     read_targets: readTargets,
     next_best_action: nextBestAction
   };
+  const effectiveDiagnosisComplete =
+    Boolean(args.contractOverrides?.diagnosis_complete ?? diagnosisComplete) && !hasUnknownBucket;
+  const requestedDecision = args.contractOverrides?.decision;
+  const effectiveDecision =
+    hasUnknownBucket && requestedDecision && (requestedDecision === "stop" || requestedDecision === "read_source")
+      ? "zoom"
+      : requestedDecision;
   const effectiveNextBestAction = args.contractOverrides?.next_best_action ?? baseContract.next_best_action;
   const mergedContractWithoutDecision: Omit<TestStatusDiagnoseContract, "decision"> = {
     ...baseContract,
     ...args.contractOverrides,
-    status:
-      (args.contractOverrides?.diagnosis_complete ?? diagnosisComplete) ? "ok" : "insufficient",
+    diagnosis_complete: effectiveDiagnosisComplete,
+    status: effectiveDiagnosisComplete ? "ok" : "insufficient",
     next_best_action: {
       ...effectiveNextBestAction,
       note: buildConcreteNextNote({
@@ -1329,7 +1825,7 @@ export function buildTestStatusDiagnoseContract(args: {
   };
   const contract = testStatusDiagnoseContractSchema.parse({
     ...mergedContractWithoutDecision,
-    decision: args.contractOverrides?.decision ?? deriveDecision(mergedContractWithoutDecision)
+    decision: effectiveDecision ?? deriveDecision(mergedContractWithoutDecision)
   }) as TestStatusDiagnoseContract;
 
   return {

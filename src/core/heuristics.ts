@@ -236,7 +236,28 @@ function extractEnvBlockerName(normalized: string): string | null {
   const fallbackMatch = normalized.match(
     /\b([A-Z][A-Z0-9_]{2,})\b(?=[^.\n]*DB-isolated tests)/
   );
-  return fallbackMatch?.[1] ?? null;
+  if (fallbackMatch) {
+    return fallbackMatch[1]!;
+  }
+
+  const leadingEnvMatch = normalized.match(
+    /\b([A-Z][A-Z0-9_]{2,})\b(?=[^.\n]{0,80}\b(?:is\s+)?(?:missing|unset|not set|not configured|required)\b)/
+  );
+  if (leadingEnvMatch) {
+    return leadingEnvMatch[1]!;
+  }
+
+  const trailingEnvMatch = normalized.match(
+    /\b(?:missing|unset|not set|not configured|required)\b[^.\n]{0,80}\b([A-Z][A-Z0-9_]{2,})\b/
+  );
+  if (trailingEnvMatch) {
+    return trailingEnvMatch[1]!;
+  }
+
+  const validationEnvMatch = normalized.match(
+    /\bValidationError\b[^.\n]{0,120}\b([A-Z][A-Z0-9_]{2,})\b/
+  );
+  return validationEnvMatch?.[1] ?? null;
 }
 
 function classifyFailureReason(
@@ -271,7 +292,7 @@ function classifyFailureReason(
   }
 
   const missingEnv = normalized.match(
-    /\b(?:environment variable|env(?:ironment)? var(?:iable)?|Missing required env(?:ironment)? variable)\s+([A-Z][A-Z0-9_]{2,})\b/i
+    /\b(?:environment variable|env(?:ironment)? var(?:iable)?|missing required env(?:ironment)? variable)\s+([A-Z][A-Z0-9_]{2,})\b/
   );
   if (missingEnv) {
     return {
@@ -307,6 +328,13 @@ function classifyFailureReason(
     return {
       reason: "db refused: database connection was refused",
       group: "database connectivity failures"
+    };
+  }
+
+  if (/(ECONNREFUSED|ConnectionRefusedError|connection refused)/i.test(normalized)) {
+    return {
+      reason: "service unavailable: dependency connection was refused",
+      group: "service availability failures"
     };
   }
 
@@ -1074,7 +1102,7 @@ function synthesizeImportDependencyBucket(args: {
     args.visibleErrorItems.length > 0 &&
     args.visibleErrorItems.every((item) => item.reason.startsWith("missing module:"));
   const countClaimed =
-    allVisibleErrorsAreImportRelated && importItems.length >= 3 && args.errors >= importItems.length
+    allVisibleErrorsAreImportRelated && importItems.length >= 2 && args.errors >= importItems.length
       ? args.errors
       : undefined;
   const modules = Array.from(
@@ -1122,7 +1150,7 @@ function synthesizeImportDependencyBucket(args: {
 }
 
 function isContractDriftLabel(label: string): boolean {
-  return /(freeze|snapshot|contract|manifest|openapi)/i.test(label);
+  return /(freeze|snapshot|contract|manifest|openapi|golden)/i.test(label);
 }
 
 function looksLikeTaskKey(value: string): boolean {

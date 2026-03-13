@@ -42,6 +42,18 @@ describe("release workflow", () => {
     expect(vitestConfig).toContain("branches: 85");
     expect(vitestConfig).toContain("statements: 85");
     expect(ciWorkflow).toContain("npm run test:coverage");
+    expect(ciWorkflow).toContain("matrix:");
+    expect(ciWorkflow).toContain("node-version: [20, 24]");
+    expect(ciWorkflow).toContain("node-version: ${{ matrix.node-version }}");
+  });
+
+  it("ignores local secrets and machine-local artifacts", () => {
+    const gitignore = fs.readFileSync(path.join(root, ".gitignore"), "utf8");
+
+    expect(gitignore).toContain(".env");
+    expect(gitignore).toContain(".env.*");
+    expect(gitignore).toContain("!.env.example");
+    expect(gitignore).toContain(".pytest_cache/");
   });
 
   it("defines a manual trusted-publishing release workflow with tag and GitHub release creation", () => {

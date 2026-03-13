@@ -200,6 +200,7 @@ function renderInstructionBody(): string {
     "- Start with `standard` text. Use diagnose JSON only when automation or machine branching truly needs it.",
     "- If `standard` already shows bucket-level root cause, anchor, and fix lines, trust it and report from it directly.",
     "- In that case, do not re-verify the same bucket with raw pytest; at most do one targeted source read before you edit.",
+    "- If `standard` still contains an unknown bucket or ends with `Decision: zoom`, do one deeper sift pass before raw traceback.",
     "- If you need a machine-readable diagnosis, use `sift exec --preset test-status --goal diagnose --format json -- <test command>` or the same shape with `sift rerun` / `sift watch --preset test-status`.",
     "- Diagnose JSON is summary-first by default. Add `--include-test-ids` only when you truly need the raw failing test IDs.",
     "- If diagnose JSON returns `read_targets.context_hint.start_line/end_line`, read only that small line range first.",

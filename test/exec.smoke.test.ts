@@ -428,7 +428,7 @@ describe("exec mode", () => {
       [
         "- Tests did not complete.",
         "- 4 errors occurred during collection.",
-        "- Import/dependency blocker: at least 2 visible errors are caused by missing dependencies during test collection.",
+        "- Import/dependency blocker: 4 errors are caused by missing dependencies during test collection.",
         "- Missing modules include pydantic, fastapi.",
         "  - tests/unit/test_auth.py -> missing module: pydantic",
         "  - tests/unit/test_api.py -> missing module: fastapi",
@@ -474,7 +474,7 @@ describe("exec mode", () => {
       [
         "- Tests did not complete.",
         "- 4 errors occurred during collection.",
-        "- Import/dependency blocker: at least 2 visible errors are caused by missing dependencies during test collection.",
+        "- Import/dependency blocker: 4 errors are caused by missing dependencies during test collection.",
         "- Missing modules include pydantic, fastapi.",
         "  - tests/unit/test_auth.py -> missing module: pydantic",
         "  - tests/unit/test_api.py -> missing module: fastapi",
@@ -841,7 +841,7 @@ describe("exec mode", () => {
 
     expect(result.status).toBe(2);
     expect(result.stdout).toContain(
-      "Import/dependency blocker: at least 2 visible errors are caused by missing dependencies during test collection."
+      "Import/dependency blocker: 4 errors are caused by missing dependencies during test collection."
     );
     expect(result.stdout).toContain("Anchor: /tmp/tests/unit/test_api.py");
     expect(result.stdout).toContain("Fix: Install the missing dependencies and rerun the affected tests.");

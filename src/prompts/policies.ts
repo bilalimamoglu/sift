@@ -157,9 +157,12 @@ export function resolvePromptPolicy(args: {
               "Return only valid JSON.",
               `Use this exact contract: ${args.outputContract ?? TEST_STATUS_DIAGNOSE_JSON_CONTRACT}.`,
               "Treat the heuristic context as extraction guidance, but do not invent hidden failures.",
-              "Use the heuristic extract as the bucket truth unless the visible command output clearly disproves it.",
+              "Use the heuristic extract as the base bucket truth unless the visible command output clearly disproves it.",
+              "If some visible failure or error families remain unexplained, add at most 2 bucket_supplements for the residual families only.",
+              "Do not rewrite or delete heuristic buckets; only supplement missing residual coverage.",
+              "Keep bucket_supplement counts within the unexplained residual failures or errors.",
               "Identify the dominant blocker, remaining visible failure buckets, the decision, and the next best action.",
-              "Set diagnosis_complete to true only when the visible output is already sufficient to stop and act.",
+              "Set diagnosis_complete to true only when the visible output is already sufficient to stop and act and no unknown residual family remains.",
               "Set raw_needed to true only when exact traceback lines are still required.",
               "Set provider_confidence to a number between 0 and 1, or null only when confidence cannot be estimated."
             ]

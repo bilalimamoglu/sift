@@ -131,6 +131,9 @@ describe("agent command helpers", () => {
       "do not re-verify the same bucket with raw pytest; at most do one targeted source read before you edit."
     );
     expect(block).toContain(
+      "If `standard` still contains an unknown bucket or ends with `Decision: zoom`, do one deeper sift pass before raw traceback."
+    );
+    expect(block).toContain(
       "Diagnose JSON is summary-first by default. Add `--include-test-ids` only when you truly need the raw failing test IDs."
     );
     expect(block).toContain(

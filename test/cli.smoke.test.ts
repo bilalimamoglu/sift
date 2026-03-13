@@ -352,7 +352,7 @@ describe("CLI smoke", () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain(
-      "Import/dependency blocker: at least 2 visible errors are caused by missing dependencies during test collection."
+      "Import/dependency blocker: 4 errors are caused by missing dependencies during test collection."
     );
     expect(result.stdout).toContain("tests/unit/test_auth.py -> missing module: pydantic");
     expect(result.stdout).toContain("tests/unit/test_api.py -> missing module: fastapi");

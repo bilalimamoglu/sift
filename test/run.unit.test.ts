@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultConfig } from "../src/config/defaults.js";
 import type { RunRequest } from "../src/types.js";
@@ -105,6 +106,11 @@ describe("runSift unit", () => {
     expect(parsed.status).toBe("dry-run");
     expect(parsed.strategy).toBe("heuristic");
     expect(parsed.heuristicOutput).toContain("Tests passed.");
+    expect(parsed.heuristicInput).toEqual({
+      length: 9,
+      truncatedApplied: false,
+      strategy: "full-redacted"
+    });
   });
 
   it("logs heuristic usage in verbose mode", async () => {
@@ -145,7 +151,140 @@ describe("runSift unit", () => {
     expect(stderrSpy).toHaveBeenCalledWith(
       expect.stringContaining("heuristic_short_circuit=true")
     );
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("heuristic_input_chars=9"));
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("heuristic_input_truncated=false")
+    );
     expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("remaining_ids_exposed=false"));
+  });
+
+  it("uses full redacted input for test-status heuristics even when provider-prepared input misses the blocker tail", async () => {
+    const mixedFixture = readFileSync(
+      new URL("./fixtures/bench/test-status/real/mixed-full-suite.txt", import.meta.url),
+      "utf8"
+    );
+
+    expect(mixedFixture.includes("PGTEST_POSTGRES_DSN")).toBe(true);
+    expect(mixedFixture.slice(0, 54272).includes("PGTEST_POSTGRES_DSN")).toBe(false);
+
+    prepareInputMock.mockReturnValue({
+      raw: mixedFixture,
+      sanitized: mixedFixture,
+      redacted: mixedFixture,
+      truncated: mixedFixture.slice(0, 54272),
+      meta: {
+        originalLength: mixedFixture.length,
+        finalLength: 54272,
+        redactionApplied: false,
+        truncatedApplied: true
+      }
+    });
+
+    const provider = {
+      name: "openai",
+      generate: vi.fn()
+    };
+    createProviderMock.mockReturnValue(provider);
+    const { runSift } = await import("../src/core/run.js");
+
+    const output = await runSift(
+      makeRequest({
+        policyName: "test-status",
+        presetName: "test-status"
+      })
+    );
+
+    expect(output).toContain("Shared blocker: 124 errors require PGTEST_POSTGRES_DSN");
+    expect(output).toContain("Contract drift: 3 freeze tests are out of sync");
+    expect(output).toContain("Decision: stop and act");
+    expect(provider.generate).not.toHaveBeenCalled();
+  });
+
+  it("uses full redacted input for tail-only audit-critical heuristic findings", async () => {
+    const actualHeuristics = await vi.importActual<typeof import("../src/core/heuristics.js")>(
+      "../src/core/heuristics.js"
+    );
+    applyHeuristicPolicyMock.mockImplementation(actualHeuristics.applyHeuristicPolicy);
+
+    const fullInput = [
+      "npm audit report",
+      ...Array.from({ length: 400 }, () => "informational line without findings"),
+      "lodash: critical vulnerability"
+    ].join("\n");
+
+    prepareInputMock.mockReturnValue({
+      raw: fullInput,
+      sanitized: fullInput,
+      redacted: fullInput,
+      truncated: "npm audit report\ninformational line without findings\n",
+      meta: {
+        originalLength: fullInput.length,
+        finalLength: 52,
+        redactionApplied: false,
+        truncatedApplied: true
+      }
+    });
+
+    const { runSift } = await import("../src/core/run.js");
+    const output = await runSift(
+      makeRequest({
+        format: "json",
+        policyName: "audit-critical",
+        outputContract: defaultConfig.presets["audit-critical"]!.outputContract
+      })
+    );
+
+    expect(JSON.parse(output)).toEqual({
+      status: "ok",
+      vulnerabilities: [
+        {
+          package: "lodash",
+          severity: "critical",
+          remediation: "Upgrade lodash to a patched version."
+        }
+      ],
+      summary: "One critical vulnerability found in lodash."
+    });
+  });
+
+  it("uses full redacted input for tail-only infra-risk heuristic findings", async () => {
+    const actualHeuristics = await vi.importActual<typeof import("../src/core/heuristics.js")>(
+      "../src/core/heuristics.js"
+    );
+    applyHeuristicPolicyMock.mockImplementation(actualHeuristics.applyHeuristicPolicy);
+
+    const fullInput = [
+      "Terraform plan start",
+      ...Array.from({ length: 400 }, () => "safe-looking planning noise"),
+      "Plan: 2 to add, 1 to destroy"
+    ].join("\n");
+
+    prepareInputMock.mockReturnValue({
+      raw: fullInput,
+      sanitized: fullInput,
+      redacted: fullInput,
+      truncated: "Terraform plan start\nsafe-looking planning noise\n",
+      meta: {
+        originalLength: fullInput.length,
+        finalLength: 47,
+        redactionApplied: false,
+        truncatedApplied: true
+      }
+    });
+
+    const { runSift } = await import("../src/core/run.js");
+    const output = await runSift(
+      makeRequest({
+        format: "verdict",
+        policyName: "infra-risk"
+      })
+    );
+
+    expect(JSON.parse(output)).toEqual({
+      verdict: "fail",
+      reason: "Destructive or clearly risky infrastructure change signals are present.",
+      evidence: ["Plan: 2 to add, 1 to destroy"]
+    });
   });
 
   it("returns summary-first diagnose JSON by default and full ids only when requested", async () => {
@@ -234,6 +373,11 @@ describe("runSift unit", () => {
     const parsed = JSON.parse(output);
 
     expect(parsed.strategy).toBe("provider");
+    expect(parsed.heuristicInput).toEqual({
+      length: 3,
+      truncatedApplied: false,
+      strategy: "full-redacted"
+    });
     expect(provider.generate).not.toHaveBeenCalled();
   });
 
@@ -451,16 +595,30 @@ describe("runSift unit", () => {
       name: "openai",
       generate: vi.fn().mockResolvedValue({
         text: JSON.stringify({
-          diagnosis_complete: false,
+          diagnosis_complete: true,
           raw_needed: false,
-          additional_source_read_likely_low_value: false,
+          additional_source_read_likely_low_value: true,
           read_raw_only_if: null,
-          decision: "zoom",
+          decision: "read_source",
           provider_confidence: 0.58,
+          bucket_supplements: [
+            {
+              label: "runtime failure",
+              count: 1,
+              root_cause: "TypeError: refresh token payload is undefined",
+              anchor: {
+                file: "tests/unit/test_auth.py",
+                line: 21,
+                search_hint: null
+              },
+              fix_hint: "Inspect the refresh token payload setup before rerunning the full suite at standard.",
+              confidence: 0.7
+            }
+          ],
           next_best_action: {
-            code: "insufficient_signal",
-            bucket_index: null,
-            note: "Take one deeper sift zoom step before raw."
+            code: "read_source_for_bucket",
+            bucket_index: 1,
+            note: "Read tests/unit/test_auth.py:21 next."
           }
         })
       })
@@ -492,20 +650,30 @@ describe("runSift unit", () => {
       provider_failed: boolean;
       raw_slice_used: boolean;
       raw_slice_strategy: string;
+      main_buckets: Array<{ label: string; root_cause: string }>;
       next_best_action: { note: string };
     };
 
-    expect(parsed.diagnosis_complete).toBe(false);
-    expect(parsed.decision).toBe("zoom");
+    expect(parsed.diagnosis_complete).toBe(true);
+    expect(parsed.decision).toBe("read_source");
     expect(parsed.provider_used).toBe(true);
     expect(parsed.provider_confidence).toBe(0.58);
     expect(parsed.provider_failed).toBe(false);
     expect(parsed.raw_slice_used).toBe(true);
     expect(parsed.raw_slice_strategy).toBe("bucket_evidence");
-    expect(parsed.next_best_action.note).toContain("deeper sift zoom");
+    expect(parsed.main_buckets[0]).toMatchObject({
+      label: "runtime failure",
+      root_cause: "TypeError: refresh token payload is undefined"
+    });
+    expect(parsed.next_best_action.note).toContain("tests/unit/test_auth.py");
     expect(buildPromptMock).toHaveBeenCalledWith(
       expect.objectContaining({
         outputContract: expect.stringContaining('"provider_confidence":number|null')
+      })
+    );
+    expect(buildPromptMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outputContract: expect.stringContaining('"bucket_supplements"')
       })
     );
     expect(buildPromptMock).toHaveBeenCalledWith(
@@ -518,6 +686,63 @@ describe("runSift unit", () => {
         analysisContext: expect.not.stringContaining("remaining_tests=")
       })
     );
+  });
+
+  it("keeps unknown buckets and avoids false complete when provider cannot classify the residual family", async () => {
+    const vitestLikeOutput = [
+      " FAIL  src/auth.test.ts > refresh token > throws on empty payload",
+      " FAIL  src/routes.test.ts > landing page > renders hero",
+      " Test Files  2 failed",
+      "      Tests  2 failed"
+    ].join("\n");
+
+    prepareInputMock.mockReturnValue({
+      raw: vitestLikeOutput,
+      sanitized: vitestLikeOutput,
+      redacted: vitestLikeOutput,
+      truncated: vitestLikeOutput,
+      meta: {
+        originalLength: vitestLikeOutput.length,
+        finalLength: vitestLikeOutput.length,
+        redactionApplied: false,
+        truncatedApplied: false
+      }
+    });
+    buildPromptMock.mockReturnValue({
+      prompt: "PROMPT",
+      responseMode: "json"
+    });
+    createProviderMock.mockReturnValue({
+      name: "openai",
+      generate: vi.fn().mockResolvedValue({
+        text: JSON.stringify({
+          diagnosis_complete: false,
+          raw_needed: false,
+          additional_source_read_likely_low_value: false,
+          read_raw_only_if: null,
+          decision: "zoom",
+          provider_confidence: 0.41,
+          bucket_supplements: [],
+          next_best_action: {
+            code: "insufficient_signal",
+            bucket_index: 1,
+            note: "Take one deeper sift zoom step before raw."
+          }
+        })
+      })
+    });
+
+    const { runSift } = await import("../src/core/run.js");
+    const output = await runSift(
+      makeRequest({
+        policyName: "test-status",
+        presetName: "test-status"
+      })
+    );
+
+    expect(output).toContain("unknown failure family");
+    expect(output).toContain("Decision: zoom");
+    expect(output).not.toContain("Decision: stop and act");
   });
 
   it("returns a structured provider failure decision for incomplete test-status runs", async () => {

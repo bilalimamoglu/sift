@@ -42,6 +42,8 @@ function getDiagnosisCompleteAtLayer(contract: TestStatusDiagnoseContract): "heu
 function logVerboseTestStatusTelemetry(args: {
   request: RunRequest;
   prepared: ReturnType<typeof prepareInput>;
+  heuristicInputChars: number;
+  heuristicInputTruncated: boolean;
   contract: TestStatusDiagnoseContract;
   finalOutput: string;
   rawSliceChars?: number;
@@ -56,6 +58,8 @@ function logVerboseTestStatusTelemetry(args: {
     `${pc.dim("sift")} diagnosis_complete_at_layer=${getDiagnosisCompleteAtLayer(args.contract)}`,
     `${pc.dim("sift")} heuristic_short_circuit=${!args.contract.provider_used && args.contract.diagnosis_complete && !args.contract.raw_needed && !args.contract.provider_failed}`,
     `${pc.dim("sift")} raw_input_chars=${args.request.stdin.length}`,
+    `${pc.dim("sift")} heuristic_input_chars=${args.heuristicInputChars}`,
+    `${pc.dim("sift")} heuristic_input_truncated=${args.heuristicInputTruncated}`,
     `${pc.dim("sift")} prepared_input_chars=${args.prepared.meta.finalLength}`,
     `${pc.dim("sift")} raw_slice_chars=${args.rawSliceChars ?? 0}`,
     `${pc.dim("sift")} provider_input_chars=${args.providerInputChars ?? 0}`,
@@ -89,6 +93,11 @@ function buildDryRunOutput(args: {
   prompt: string;
   responseMode: "text" | "json";
   prepared: ReturnType<typeof prepareInput>;
+  heuristicInput: {
+    length: number;
+    truncatedApplied: boolean;
+    strategy: "full-redacted";
+  };
   heuristicOutput: string | null;
   strategy?: "heuristic" | "provider" | "hybrid";
 }): string {
@@ -108,6 +117,7 @@ function buildDryRunOutput(args: {
       responseMode: args.responseMode,
       policy: args.request.policyName ?? null,
       heuristicOutput: args.heuristicOutput ?? null,
+      heuristicInput: args.heuristicInput,
       input: {
         originalLength: args.prepared.meta.originalLength,
         finalLength: args.prepared.meta.finalLength,
@@ -291,14 +301,25 @@ function buildTestStatusProviderFailureDecision(args: {
 
 export async function runSift(request: RunRequest): Promise<string> {
   const prepared = prepareInput(request.stdin, request.config.input);
+  const heuristicInput = prepared.redacted;
+  const heuristicInputTruncated = false;
+  const heuristicPrepared = {
+    ...prepared,
+    truncated: heuristicInput,
+    meta: {
+      ...prepared.meta,
+      finalLength: heuristicInput.length,
+      truncatedApplied: heuristicInputTruncated
+    }
+  };
   const provider = createProvider(request.config);
   const hasTestStatusSignal =
-    request.policyName === "test-status" && hasRecognizableTestStatusSignal(prepared.truncated);
-  const testStatusAnalysis = hasTestStatusSignal ? analyzeTestStatus(prepared.truncated) : null;
+    request.policyName === "test-status" && hasRecognizableTestStatusSignal(heuristicInput);
+  const testStatusAnalysis = hasTestStatusSignal ? analyzeTestStatus(heuristicInput) : null;
   const testStatusDecision =
     hasTestStatusSignal && testStatusAnalysis
       ? buildTestStatusDiagnoseContract({
-          input: prepared.truncated,
+          input: heuristicInput,
           analysis: testStatusAnalysis,
           resolvedTests: request.testStatusContext?.resolvedTests,
           remainingTests: request.testStatusContext?.remainingTests
@@ -322,7 +343,7 @@ export async function runSift(request: RunRequest): Promise<string> {
       ? testStatusDecision?.contract.diagnosis_complete
         ? testStatusHeuristicOutput
         : null
-      : applyHeuristicPolicy(request.policyName, prepared.truncated, request.detail);
+      : applyHeuristicPolicy(request.policyName, heuristicInput, request.detail);
 
   if (heuristicOutput) {
     if (request.config.runtime.verbose) {
@@ -333,7 +354,7 @@ export async function runSift(request: RunRequest): Promise<string> {
       question: request.question,
       format: request.format,
       goal: request.goal,
-      input: prepared.truncated,
+      input: heuristicInput,
       detail: request.detail,
       policyName: request.policyName,
         outputContract:
@@ -363,6 +384,11 @@ export async function runSift(request: RunRequest): Promise<string> {
         prompt: heuristicPrompt.prompt,
         responseMode: heuristicPrompt.responseMode,
         prepared,
+        heuristicInput: {
+          length: heuristicInput.length,
+          truncatedApplied: heuristicInputTruncated,
+          strategy: "full-redacted"
+        },
         heuristicOutput,
         strategy: "heuristic"
       });
@@ -377,6 +403,8 @@ export async function runSift(request: RunRequest): Promise<string> {
       logVerboseTestStatusTelemetry({
         request,
         prepared,
+        heuristicInputChars: heuristicInput.length,
+        heuristicInputTruncated,
         contract: testStatusDecision.contract,
         finalOutput
       });
@@ -428,15 +456,20 @@ export async function runSift(request: RunRequest): Promise<string> {
 
     if (request.dryRun) {
       return buildDryRunOutput({
-        request,
-        providerName: provider.name,
-        prompt: prompt.prompt,
-        responseMode: prompt.responseMode,
-        prepared: providerPrepared,
-        heuristicOutput: testStatusHeuristicOutput,
-        strategy: "hybrid"
-      });
-    }
+      request,
+      providerName: provider.name,
+      prompt: prompt.prompt,
+      responseMode: prompt.responseMode,
+      prepared: providerPrepared,
+      heuristicInput: {
+        length: heuristicInput.length,
+        truncatedApplied: heuristicInputTruncated,
+        strategy: "full-redacted"
+      },
+      heuristicOutput: testStatusHeuristicOutput,
+      strategy: "hybrid"
+    });
+  }
 
     try {
       const result = await generateWithRetry({
@@ -447,10 +480,11 @@ export async function runSift(request: RunRequest): Promise<string> {
       });
       const supplement = parseTestStatusProviderSupplement(result.text);
       const mergedDecision = buildTestStatusDiagnoseContract({
-        input: prepared.truncated,
+        input: heuristicInput,
         analysis: testStatusAnalysis,
         resolvedTests: request.testStatusContext?.resolvedTests,
         remainingTests: request.testStatusContext?.remainingTests,
+        providerBucketSupplements: supplement.bucket_supplements,
         contractOverrides: {
           diagnosis_complete: supplement.diagnosis_complete,
           raw_needed: supplement.raw_needed,
@@ -473,6 +507,8 @@ export async function runSift(request: RunRequest): Promise<string> {
       logVerboseTestStatusTelemetry({
         request,
         prepared,
+        heuristicInputChars: heuristicInput.length,
+        heuristicInputTruncated,
         contract: mergedDecision.contract,
         finalOutput,
         rawSliceChars: rawSlice.text.length,
@@ -485,7 +521,7 @@ export async function runSift(request: RunRequest): Promise<string> {
       const failureDecision = buildTestStatusProviderFailureDecision({
         request,
         baseDecision: testStatusDecision,
-        input: prepared.truncated,
+        input: heuristicInput,
         analysis: testStatusAnalysis,
         reason,
         rawSliceUsed: rawSlice.used,
@@ -510,6 +546,8 @@ export async function runSift(request: RunRequest): Promise<string> {
       logVerboseTestStatusTelemetry({
         request,
         prepared,
+        heuristicInputChars: heuristicInput.length,
+        heuristicInputTruncated,
         contract: failureDecision.contract,
         finalOutput,
         rawSliceChars: rawSlice.text.length,
@@ -550,6 +588,11 @@ export async function runSift(request: RunRequest): Promise<string> {
       prompt: providerPrompt.prompt,
       responseMode: providerPrompt.responseMode,
       prepared: providerPrepared,
+      heuristicInput: {
+        length: heuristicInput.length,
+        truncatedApplied: heuristicInputTruncated,
+        strategy: "full-redacted"
+      },
       heuristicOutput: testStatusDecision ? testStatusHeuristicOutput : null,
       strategy: testStatusDecision ? "hybrid" : "provider"
     });

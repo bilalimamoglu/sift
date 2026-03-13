@@ -3,6 +3,11 @@ dist
 coverage
 *.tgz
 .DS_Store
+.env
+.env.*
+!.env.example
+!.env.*.example
+.pytest_cache/
 examples/
 sift.config.yaml
 sift.config.yml
@@ -11,3 +16,4 @@ assets/*
 !assets/brand/
 assets/brand/*
 !assets/brand/*.svg
+sift-benchmark-blog.md

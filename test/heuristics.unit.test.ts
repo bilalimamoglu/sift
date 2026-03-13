@@ -180,6 +180,43 @@ describe("heuristic policies", () => {
     );
   });
 
+  it("detects generic env blockers beyond repo-specific literals", () => {
+    const input = [
+      "ERROR tests/cache/test_bootstrap.py::test_cache - KeyError: 'REDIS_URL'",
+      "ERROR tests/api/test_auth.py::test_login - ValidationError: MISSING_API_KEY is not set",
+      "============= 2 errors in 0.10s ============="
+    ].join("\n");
+
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis: analyzeTestStatus(input)
+    });
+
+    expect(decision.contract.main_buckets.map((bucket) => bucket.root_cause)).toEqual(
+      expect.arrayContaining(["missing test env: REDIS_URL", "missing test env: MISSING_API_KEY"])
+    );
+  });
+
+  it("adds conservative unknown buckets when visible counts are not fully explained", () => {
+    const input = [
+      "src/auth.test.ts > refresh token ERROR [ 20%]",
+      "src/routes.test.ts > landing page FAILED [ 40%]",
+      "src/tasks.test.ts > task payload FAILED [ 60%]",
+      "============= 2 failed, 3 errors in 0.10s ============="
+    ].join("\n");
+
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis: analyzeTestStatus(input)
+    });
+
+    expect(decision.contract.diagnosis_complete).toBe(false);
+    expect(decision.contract.decision).toBe("zoom");
+    expect(decision.contract.main_buckets.map((bucket) => bucket.label)).toEqual(
+      expect.arrayContaining(["unknown setup blocker", "unknown failure family"])
+    );
+  });
+
   it("builds a structured diagnose contract with dominant blocker and remaining tests", () => {
     const input = buildMixedFailureOutput();
     const analysis = analyzeTestStatus(input);

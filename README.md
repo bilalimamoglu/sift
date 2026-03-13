@@ -130,6 +130,8 @@ sift exec --preset test-status -- <test command>
 
 If `standard` already names the main failure buckets, counts, and hints, stop there and read code.
 
+If `standard` still includes an unknown bucket or ends with `Decision: zoom`, do one deeper sift pass before you fall back to raw traceback.
+
 Then use this order:
 1. `sift exec --preset test-status -- <test command>`
 2. `sift rerun`
@@ -147,6 +149,8 @@ If you want the older explicit compare shape, `sift exec --preset test-status --
 Most of the time, you do not need JSON. Start with text first.
 
 If `standard` already shows bucket-level root cause, `Anchor`, and `Fix`, do not re-verify the same bucket with raw pytest. At most do one targeted source read before you edit.
+
+If diagnose output still contains an unknown bucket or `Decision: zoom`, take one sift zoom step before raw traceback.
 
 Use diagnose JSON only when automation or machine branching really needs it:
 
