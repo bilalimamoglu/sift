@@ -18,5 +18,13 @@ export function createProvider(config: SiftConfig): LLMProvider {
     });
   }
 
+  if (config.provider.provider === "openrouter") {
+    return new OpenAICompatibleProvider({
+      baseUrl: config.provider.baseUrl,
+      apiKey: config.provider.apiKey,
+      name: "openrouter"
+    });
+  }
+
   throw new Error(`Unsupported provider: ${config.provider.provider}`);
 }

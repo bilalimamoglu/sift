@@ -123,6 +123,38 @@ describe("resolveConfig", () => {
     expect(config.provider.apiKey).toBe("openai-key");
   });
 
+  it("applies OpenRouter defaults when provider is openrouter", async () => {
+    const configPath = await createEmptyConfigFile();
+    const config = resolveConfig({
+      configPath,
+      env: {
+        SIFT_PROVIDER: "openrouter",
+        OPENROUTER_API_KEY: "openrouter-key"
+      }
+    });
+
+    expect(config.provider.provider).toBe("openrouter");
+    expect(config.provider.baseUrl).toBe("https://openrouter.ai/api/v1");
+    expect(config.provider.model).toBe("openrouter/free");
+    expect(config.provider.apiKey).toBe("openrouter-key");
+  });
+
+  it("preserves explicit OpenRouter model and base URL overrides", async () => {
+    const configPath = await createEmptyConfigFile();
+    const config = resolveConfig({
+      configPath,
+      env: {
+        SIFT_PROVIDER: "openrouter",
+        SIFT_MODEL: "anthropic/claude-3.5-haiku",
+        SIFT_BASE_URL: "https://openrouter.ai/api/v1/custom",
+        OPENROUTER_API_KEY: "openrouter-key"
+      }
+    });
+
+    expect(config.provider.baseUrl).toBe("https://openrouter.ai/api/v1/custom");
+    expect(config.provider.model).toBe("anthropic/claude-3.5-haiku");
+  });
+
   it("ignores non-object file config and preserves CLI apiKey precedence", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-config-non-object-"));
     const configPath = path.join(dir, "sift.config.yaml");

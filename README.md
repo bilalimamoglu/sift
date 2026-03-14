@@ -49,6 +49,13 @@ That writes a machine-wide config to:
 
 After that, any terminal on the machine can use `sift`. A repo-local config can still override it later.
 
+To switch between saved native providers without editing YAML:
+
+```bash
+sift config use openai
+sift config use openrouter
+```
+
 If you prefer manual setup, this is the smallest useful OpenAI setup:
 
 ```bash
@@ -56,6 +63,13 @@ export SIFT_PROVIDER=openai
 export SIFT_BASE_URL=https://api.openai.com/v1
 export SIFT_MODEL=gpt-5-nano
 export OPENAI_API_KEY=your_openai_api_key
+```
+
+If you prefer manual setup, this is the smallest useful OpenRouter setup:
+
+```bash
+export SIFT_PROVIDER=openrouter
+export OPENROUTER_API_KEY=your_openrouter_api_key
 ```
 
 Then check it:
@@ -382,6 +396,7 @@ Useful commands:
 
 ```bash
 sift config setup
+sift config use openrouter
 sift config init
 sift config show
 sift config validate
@@ -434,15 +449,24 @@ runtime:
   rawFallback: true
 ```
 
-## OpenAI vs OpenAI-compatible
+## OpenAI vs OpenRouter vs OpenAI-compatible
 
 Use `provider: openai` for `api.openai.com`.
+
+Use `provider: openrouter` for the native OpenRouter path. It defaults to:
+- `baseUrl: https://openrouter.ai/api/v1`
+- `model: openrouter/free`
 
 Use `provider: openai-compatible` for third-party compatible gateways or self-hosted endpoints.
 
 For OpenAI:
 ```bash
 export OPENAI_API_KEY=your_openai_api_key
+```
+
+For OpenRouter:
+```bash
+export OPENROUTER_API_KEY=your_openrouter_api_key
 ```
 
 For third-party compatible endpoints, use either the endpoint-native env var or:

@@ -78,6 +78,14 @@ describe("resolveProviderApiKey", () => {
     expect(apiKey).toBe("openai-key");
   });
 
+  it("uses OPENROUTER_API_KEY for the openrouter provider", () => {
+    const apiKey = resolveProviderApiKey("openrouter", undefined, {
+      OPENROUTER_API_KEY: "openrouter-key"
+    });
+
+    expect(apiKey).toBe("openrouter-key");
+  });
+
   it("uses ANTHROPIC_API_KEY for anthropic-style providers", () => {
     expect(
       resolveProviderApiKey("anthropic", undefined, {
@@ -125,6 +133,10 @@ describe("resolveProviderApiKey", () => {
 
     expect(getProviderApiKeyEnvNames("openai", "https://api.openai.com/v1")).toEqual([
       "OPENAI_API_KEY",
+      "SIFT_PROVIDER_API_KEY"
+    ]);
+    expect(getProviderApiKeyEnvNames("openrouter", "https://openrouter.ai/api/v1")).toEqual([
+      "OPENROUTER_API_KEY",
       "SIFT_PROVIDER_API_KEY"
     ]);
     expect(getProviderApiKeyEnvNames(undefined, undefined)).toEqual([

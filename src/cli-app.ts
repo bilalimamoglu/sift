@@ -4,6 +4,7 @@ import {
   configInit,
   configSetup,
   configShow,
+  configUse,
   configValidate
 } from "./commands/config.js";
 import {
@@ -50,6 +51,7 @@ export interface CliDeps {
   readonly configInit: typeof configInit;
   readonly configSetup: typeof configSetup;
   readonly configShow: typeof configShow;
+  readonly configUse: typeof configUse;
   readonly configValidate: typeof configValidate;
   readonly runDoctor: typeof runDoctor;
   readonly listPresets: typeof listPresets;
@@ -77,6 +79,7 @@ const defaultCliDeps: CliDeps = {
   configInit,
   configSetup,
   configShow,
+  configUse,
   configValidate,
   runDoctor,
   listPresets,
@@ -236,12 +239,15 @@ function shouldKeepPresetPolicy(args: {
 
 function applySharedOptions(command: ReturnType<ReturnType<typeof cac>["command"]>) {
   return command
-    .option("--provider <provider>", "Provider: openai | openai-compatible")
+    .option(
+      "--provider <provider>",
+      "Provider: openai | openai-compatible | openrouter"
+    )
     .option("--model <model>", "Model name")
     .option("--base-url <url>", "Provider base URL")
     .option(
       "--api-key <key>",
-      "Provider API key (or set OPENAI_API_KEY for provider=openai; use SIFT_PROVIDER_API_KEY or endpoint-native envs for openai-compatible)"
+      "Provider API key (or set OPENAI_API_KEY for provider=openai, OPENROUTER_API_KEY for provider=openrouter; use SIFT_PROVIDER_API_KEY or endpoint-native envs for openai-compatible)"
     )
     .option(
       "--json-response-format <mode>",
@@ -989,13 +995,14 @@ export function createCliApp(args: {
     });
 
   cli
-    .command("config <action>", "Config commands: setup | init | show | validate")
-    .usage("config <setup|init|show|validate> [options]")
+    .command("config <action> [provider]", "Config commands: setup | init | show | validate | use")
+    .usage("config <setup|init|show|validate|use> [provider] [options]")
     .example("config setup")
     .example("config setup --global")
     .example("config setup --path ~/.config/sift/config.yaml")
     .example("config init")
     .example("config init --global")
+    .example("config use openrouter")
     .example("config show")
     .example("config validate --config ./sift.config.yaml")
     .option("--path <path>", "Target config path for init or setup")
@@ -1005,7 +1012,7 @@ export function createCliApp(args: {
     )
     .option("--config <path>", "Path to config file")
     .option("--show-secrets", "Show secret values in config show")
-    .action(async (action: string, options: Record<string, unknown>) => {
+    .action(async (action: string, provider: string | undefined, options: Record<string, unknown>) => {
       if (action === "setup") {
         process.exitCode = await deps.configSetup({
           targetPath: options.path as string | undefined,
@@ -1029,6 +1036,15 @@ export function createCliApp(args: {
 
       if (action === "validate") {
         deps.configValidate(options.config as string | undefined);
+        return;
+      }
+
+      if (action === "use") {
+        if (!provider) {
+          throw new Error("Missing provider name.");
+        }
+
+        deps.configUse(provider, options.config as string | undefined, env);
         return;
       }
 

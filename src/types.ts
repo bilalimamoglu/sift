@@ -1,4 +1,13 @@
-export type ProviderName = "openai" | "openai-compatible";
+export type ProviderName = "openai" | "openai-compatible" | "openrouter";
+export type NativeProviderName = "openai" | "openrouter";
+
+export interface ProviderProfile {
+  model?: string;
+  baseUrl?: string;
+  apiKey?: string;
+}
+
+export type ProviderProfiles = Partial<Record<NativeProviderName, ProviderProfile>>;
 
 export type OutputFormat = "brief" | "bullets" | "json" | "verdict";
 export type DetailLevel = "standard" | "focused" | "verbose";
@@ -57,6 +66,7 @@ export interface SiftConfig {
   input: InputConfig;
   runtime: RuntimeConfig;
   presets: Record<string, PresetDefinition>;
+  providerProfiles?: ProviderProfiles;
 }
 
 export interface PartialSiftConfig {
@@ -64,6 +74,7 @@ export interface PartialSiftConfig {
   input?: Partial<InputConfig>;
   runtime?: Partial<RuntimeConfig>;
   presets?: Record<string, PresetDefinition>;
+  providerProfiles?: ProviderProfiles;
 }
 
 export interface GenerateInput {

@@ -18,6 +18,11 @@ describe("README quick start acceptance", () => {
     expect(readme).toContain("~/.config/sift/config.yaml");
     expect(readme).toContain("repo-local config can still override it");
     expect(readme).toContain("any terminal on the machine can use `sift`");
+    expect(readme).toContain("sift config use openrouter");
+    expect(readme).toContain("sift config use openai");
+    expect(readme).toContain("If you prefer manual setup, this is the smallest useful OpenRouter setup");
+    expect(readme).toContain("export SIFT_PROVIDER=openrouter");
+    expect(readme).toContain("export OPENROUTER_API_KEY=your_openrouter_api_key");
     expect(readme).toContain("--show-raw");
     expect(readme).toContain("sift agent install codex");
     expect(readme).toContain("sift agent install claude");

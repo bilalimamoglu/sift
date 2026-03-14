@@ -184,6 +184,65 @@ describe("OpenAICompatibleProvider", () => {
     expect(server.requests[0].response_format).toBeUndefined();
   });
 
+  it("keeps OpenRouter in auto mode without native response_format", async () => {
+    let requestPath = "";
+    server = await createFakeOpenAIServer((_body, _index, request) => {
+      requestPath = request.path;
+      return {
+        body: {
+          choices: [{ message: { content: "{\"status\":\"ok\"}" } }]
+        }
+      };
+    });
+
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: `${server.baseUrl}/v1`,
+      apiKey: "test-key",
+      name: "openrouter"
+    });
+
+    await provider.generate({
+      model: "openrouter/free",
+      prompt: "hello",
+      temperature: 0.1,
+      maxOutputTokens: 50,
+      timeoutMs: 1000,
+      responseMode: "json",
+      jsonResponseFormat: "auto"
+    });
+
+    expect(provider.name).toBe("openrouter");
+    expect(requestPath).toBe("/v1/chat/completions");
+    expect(server.requests[0].response_format).toBeUndefined();
+  });
+
+  it("lets OpenRouter opt into native response_format explicitly", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [{ message: { content: "{\"status\":\"ok\"}" } }]
+      }
+    }));
+
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: server.baseUrl,
+      apiKey: "test-key",
+      name: "openrouter"
+    });
+
+    await provider.generate({
+      model: "openrouter/free",
+      prompt: "hello",
+      temperature: 0.1,
+      maxOutputTokens: 50,
+      timeoutMs: 1000,
+      responseMode: "json",
+      jsonResponseFormat: "on"
+    });
+
+    expect(provider.name).toBe("openrouter");
+    expect(server.requests[0].response_format).toEqual({ type: "json_object" });
+  });
+
   it("does not use native JSON response_format when turned off", async () => {
     server = await createFakeOpenAIServer(() => ({
       body: {

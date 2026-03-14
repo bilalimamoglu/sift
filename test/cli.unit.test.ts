@@ -28,6 +28,7 @@ function createDeps(overrides: Partial<CliDeps> = {}): CliDeps {
     configInit: vi.fn(),
     configSetup: vi.fn().mockResolvedValue(0),
     configShow: vi.fn(),
+    configUse: vi.fn(),
     configValidate: vi.fn(),
     runDoctor: vi.fn().mockReturnValue(0),
     listPresets: vi.fn(),
@@ -631,12 +632,16 @@ describe("cli app unit", () => {
     await runMatched(["config", "show", "--show-secrets"], deps);
     expect(deps.configShow).toHaveBeenCalledWith(undefined, true);
 
+    await runMatched(["config", "use", "openrouter"], deps);
+    expect(deps.configUse).toHaveBeenCalledWith("openrouter", undefined, {});
+
     await runMatched(["config", "validate"], deps);
     expect(deps.configValidate).toHaveBeenCalledWith(undefined);
 
     await expect(runMatched(["config", "mystery"], deps)).rejects.toThrow(
       "Unknown config action: mystery"
     );
+    await expect(runMatched(["config", "use"], deps)).rejects.toThrow("Missing provider name.");
     await expect(runMatched(["agent", "show"], deps)).rejects.toThrow("Missing agent name.");
     await expect(runMatched(["agent", "install"], deps)).rejects.toThrow("Missing agent name.");
     await expect(runMatched(["agent", "remove"], deps)).rejects.toThrow("Missing agent name.");

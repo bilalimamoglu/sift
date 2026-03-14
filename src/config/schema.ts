@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-export const providerNameSchema = z.enum(["openai", "openai-compatible"]);
+export const providerNameSchema = z.enum([
+  "openai",
+  "openai-compatible",
+  "openrouter"
+]);
 export const outputFormatSchema = z.enum([
   "brief",
   "bullets",
@@ -31,6 +35,19 @@ export const providerConfigSchema = z.object({
   maxOutputTokens: z.number().int().positive()
 });
 
+export const providerProfileSchema = z.object({
+  model: z.string().min(1).optional(),
+  baseUrl: z.string().url().optional(),
+  apiKey: z.string().optional()
+});
+
+export const providerProfilesSchema = z
+  .object({
+    openai: providerProfileSchema.optional(),
+    openrouter: providerProfileSchema.optional()
+  })
+  .optional();
+
 export const inputConfigSchema = z.object({
   stripAnsi: z.boolean(),
   redact: z.boolean(),
@@ -58,7 +75,8 @@ export const siftConfigSchema = z.object({
   provider: providerConfigSchema,
   input: inputConfigSchema,
   runtime: runtimeConfigSchema,
-  presets: z.record(presetDefinitionSchema)
+  presets: z.record(presetDefinitionSchema),
+  providerProfiles: providerProfilesSchema
 });
 
 export type SiftConfigSchema = z.infer<typeof siftConfigSchema>;

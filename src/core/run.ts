@@ -22,6 +22,7 @@ import {
 import { buildGenericRawSlice, buildTestStatusRawSlice } from "./rawSlice.js";
 
 const RETRY_DELAY_MS = 300;
+const PROVIDER_PENDING_NOTICE_DELAY_MS = 150;
 
 function estimateTokenCount(text: string): number {
   return Math.max(1, Math.ceil(text.length / 4));
@@ -136,6 +137,28 @@ async function delay(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function startProviderPendingNotice(): () => void {
+  if (!process.stderr.isTTY) {
+    return () => {};
+  }
+
+  const message = "sift waiting for provider...";
+  let shown = false;
+  const timer = setTimeout(() => {
+    shown = true;
+    process.stderr.write(`${message}\r`);
+  }, PROVIDER_PENDING_NOTICE_DELAY_MS);
+
+  return () => {
+    clearTimeout(timer);
+    if (!shown) {
+      return;
+    }
+
+    process.stderr.write(`\r${" ".repeat(message.length)}\r`);
+  };
+}
+
 function withInsufficientHint(args: {
   output: string;
   request: RunRequest;
@@ -169,25 +192,31 @@ async function generateWithRetry(args: {
       jsonResponseFormat: args.request.config.provider.jsonResponseFormat
     });
 
+  const stopPendingNotice = startProviderPendingNotice();
+
   try {
+    try {
+      return await generate();
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "unknown_error";
+
+      if (!isRetriableReason(reason)) {
+        throw error;
+      }
+
+      if (args.request.config.runtime.verbose) {
+        process.stderr.write(
+          `${pc.dim("sift")} retry=1 reason=${reason} delay_ms=${RETRY_DELAY_MS}\n`
+        );
+      }
+
+      await delay(RETRY_DELAY_MS);
+    }
+
     return await generate();
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : "unknown_error";
-
-    if (!isRetriableReason(reason)) {
-      throw error;
-    }
-
-    if (args.request.config.runtime.verbose) {
-      process.stderr.write(
-        `${pc.dim("sift")} retry=1 reason=${reason} delay_ms=${RETRY_DELAY_MS}\n`
-      );
-    }
-
-    await delay(RETRY_DELAY_MS);
+  } finally {
+    stopPendingNotice();
   }
-
-  return generate();
 }
 
 function hasRecognizableTestStatusSignal(input: string): boolean {

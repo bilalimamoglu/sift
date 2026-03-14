@@ -167,6 +167,17 @@ describe("misc core and UI helpers", () => {
         }
       }).name
     ).toBe("openai-compatible");
+    expect(
+      createProvider({
+        ...defaultConfig,
+        provider: {
+          ...defaultConfig.provider,
+          provider: "openrouter",
+          model: "openrouter/free",
+          baseUrl: "https://openrouter.ai/api/v1"
+        }
+      }).name
+    ).toBe("openrouter");
 
     expect(() =>
       createProvider({

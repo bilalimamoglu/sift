@@ -1,3 +1,5 @@
+import type { NativeProviderName } from "../types.js";
+
 const OPENAI_COMPATIBLE_BASE_URL_ENV: Array<{
   prefix: string;
   envName: string;
@@ -8,13 +10,17 @@ const OPENAI_COMPATIBLE_BASE_URL_ENV: Array<{
   { prefix: "https://api.groq.com/openai/", envName: "GROQ_API_KEY" }
 ];
 
+const NATIVE_PROVIDER_API_KEY_ENV: Record<NativeProviderName, string> = {
+  openai: "OPENAI_API_KEY",
+  openrouter: "OPENROUTER_API_KEY"
+};
+
 const PROVIDER_API_KEY_ENV: Record<string, string> = {
   anthropic: "ANTHROPIC_API_KEY",
   claude: "ANTHROPIC_API_KEY",
   groq: "GROQ_API_KEY",
-  openai: "OPENAI_API_KEY",
-  openrouter: "OPENROUTER_API_KEY",
-  together: "TOGETHER_API_KEY"
+  together: "TOGETHER_API_KEY",
+  ...NATIVE_PROVIDER_API_KEY_ENV
 };
 
 function normalizeBaseUrl(baseUrl: string | undefined): string | undefined {
@@ -62,6 +68,12 @@ export function resolveProviderApiKey(
   }
 
   return env.SIFT_PROVIDER_API_KEY;
+}
+
+export function getNativeProviderApiKeyEnvName(
+  provider: NativeProviderName
+): string {
+  return NATIVE_PROVIDER_API_KEY_ENV[provider];
 }
 
 export function getProviderApiKeyEnvNames(

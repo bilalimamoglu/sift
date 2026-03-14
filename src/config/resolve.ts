@@ -4,6 +4,17 @@ import { resolveProviderApiKey } from "./provider-api-key.js";
 import { siftConfigSchema } from "./schema.js";
 import type { PartialSiftConfig, SiftConfig } from "../types.js";
 
+const PROVIDER_DEFAULT_OVERRIDES: Partial<
+  Record<SiftConfig["provider"]["provider"], PartialSiftConfig>
+> = {
+  openrouter: {
+    provider: {
+      model: "openrouter/free",
+      baseUrl: "https://openrouter.ai/api/v1"
+    }
+  }
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -102,13 +113,41 @@ export interface ResolveOptions {
   cliOverrides?: PartialSiftConfig;
 }
 
+function getBaseConfigForProvider(
+  provider: SiftConfig["provider"]["provider"] | undefined
+): SiftConfig {
+  return mergeDefined(defaultConfig, provider ? PROVIDER_DEFAULT_OVERRIDES[provider] : {});
+}
+
+function resolveProvisionalProvider(args: {
+  fileConfig: unknown;
+  nonCredentialEnvConfig: PartialSiftConfig;
+  cliOverrides: PartialSiftConfig | undefined;
+}): SiftConfig["provider"]["provider"] {
+  const provisional = mergeDefined(
+    mergeDefined(
+      mergeDefined(defaultConfig, args.fileConfig),
+      args.nonCredentialEnvConfig
+    ),
+    stripApiKey(args.cliOverrides) ?? {}
+  );
+
+  return provisional.provider.provider;
+}
+
 export function resolveConfig(options: ResolveOptions = {}): SiftConfig {
   const env = options.env ?? process.env;
   const fileConfig = loadRawConfig(options.configPath);
   const nonCredentialEnvConfig = buildNonCredentialEnvOverrides(env);
+  const provisionalProvider = resolveProvisionalProvider({
+    fileConfig,
+    nonCredentialEnvConfig,
+    cliOverrides: options.cliOverrides
+  });
+  const baseConfig = getBaseConfigForProvider(provisionalProvider);
   const contextConfig = mergeDefined(
     mergeDefined(
-      mergeDefined(defaultConfig, fileConfig),
+      mergeDefined(baseConfig, fileConfig),
       nonCredentialEnvConfig
     ),
     stripApiKey(options.cliOverrides) ?? {}
@@ -120,7 +159,7 @@ export function resolveConfig(options: ResolveOptions = {}): SiftConfig {
   const merged = mergeDefined(
     mergeDefined(
       mergeDefined(
-        mergeDefined(defaultConfig, fileConfig),
+        mergeDefined(baseConfig, fileConfig),
         nonCredentialEnvConfig
       ),
       credentialEnvConfig

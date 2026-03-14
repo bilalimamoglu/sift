@@ -1,15 +1,25 @@
-import fs from "node:fs";
 import path from "node:path";
 import { emitKeypressEvents } from "node:readline";
 import { createInterface } from "node:readline/promises";
 import { stderr as defaultStderr, stdin as defaultStdin, stdout as defaultStdout } from "node:process";
 import { getDefaultGlobalConfigPath } from "../constants.js";
-import { defaultConfig } from "../config/defaults.js";
+import { loadEditableConfig } from "../config/editable.js";
 import { findConfigPath } from "../config/load.js";
+import {
+  applyActiveProvider,
+  getProfileProviderState,
+  preserveActiveNativeProviderProfile,
+  getStoredProviderProfile,
+  setStoredProviderProfile
+} from "../config/native-provider.js";
+import { getNativeProviderApiKeyEnvName } from "../config/provider-api-key.js";
 import { writeConfigFile } from "../config/write.js";
-import type { SiftConfig } from "../types.js";
+import type { NativeProviderName, ProviderProfile, SiftConfig } from "../types.js";
 import { createPresentation } from "../ui/presentation.js";
 import { promptSecret, promptSelect } from "../ui/terminal.js";
+
+type SetupProvider = NativeProviderName;
+type ApiKeyChoice = "saved" | "env" | "override";
 
 export interface ConfigSetupIO {
   stdinIsTTY: boolean;
@@ -83,48 +93,59 @@ export function resolveSetupPath(targetPath?: string): string {
   return targetPath ? path.resolve(targetPath) : getDefaultGlobalConfigPath();
 }
 
-function buildOpenAISetupConfig(apiKey: string): SiftConfig {
-  return {
-    ...defaultConfig,
-    provider: {
-      ...defaultConfig.provider,
-      provider: "openai",
-      model: "gpt-5-nano",
-      baseUrl: "https://api.openai.com/v1",
-      apiKey
-    }
-  };
-}
-
 function getSetupPresenter(io: ConfigSetupIO) {
   return createPresentation(io.stdoutIsTTY);
 }
 
-async function promptForProvider(io: ConfigSetupIO): Promise<"openai"> {
+function getProviderLabel(provider: SetupProvider): string {
+  return provider === "openrouter" ? "OpenRouter" : "OpenAI";
+}
+
+async function promptForProvider(io: ConfigSetupIO): Promise<SetupProvider> {
   if (io.select) {
-    const choice = await io.select("Select provider for this machine", ["OpenAI"]);
+    const choice = await io.select("Select provider for this machine", [
+      "OpenAI",
+      "OpenRouter"
+    ]);
     if (choice === "OpenAI") {
       return "openai";
+    }
+
+    if (choice === "OpenRouter") {
+      return "openrouter";
     }
   }
 
   while (true) {
-    const answer = (await io.ask("Provider [OpenAI]: ")).trim().toLowerCase();
+    const answer = (await io.ask("Provider [OpenAI/OpenRouter]: "))
+      .trim()
+      .toLowerCase();
 
     if (answer === "" || answer === "openai") {
       return "openai";
     }
 
-    io.error("Only OpenAI is supported in guided setup right now.\n");
+    if (answer === "openrouter") {
+      return "openrouter";
+    }
+
+    io.error("Only OpenAI and OpenRouter are supported in guided setup right now.\n");
   }
 }
 
-async function promptForApiKey(io: ConfigSetupIO): Promise<string> {
+async function promptForApiKey(
+  io: ConfigSetupIO,
+  provider: SetupProvider
+): Promise<string> {
+  const providerLabel = getProviderLabel(provider);
+  const promptText = `Enter your ${providerLabel} API key (input hidden): `;
+  const visiblePromptText = `Enter your ${providerLabel} API key: `;
+
   while (true) {
     const answer = (
       await (io.secret
-        ? io.secret("Enter your OpenAI API key (input hidden): ")
-        : io.ask("Enter your OpenAI API key: "))
+        ? io.secret(promptText)
+        : io.ask(visiblePromptText))
     ).trim();
 
     if (answer.length > 0) {
@@ -135,23 +156,84 @@ async function promptForApiKey(io: ConfigSetupIO): Promise<string> {
   }
 }
 
-async function promptForOverwrite(io: ConfigSetupIO, targetPath: string): Promise<boolean> {
+async function promptForApiKeyChoice(args: {
+  io: ConfigSetupIO;
+  provider: SetupProvider;
+  envName: string;
+  hasSavedKey: boolean;
+  hasEnvKey: boolean;
+}): Promise<ApiKeyChoice> {
+  const providerLabel = getProviderLabel(args.provider);
+
+  if (!args.hasSavedKey && !args.hasEnvKey) {
+    return "override";
+  }
+
+  if (args.hasSavedKey && args.hasEnvKey) {
+    if (args.io.select) {
+      const choice = await args.io.select(
+        `Found both a saved ${providerLabel} API key and ${args.envName} in your environment`,
+        ["Use saved key", "Use env key", "Override"]
+      );
+
+      if (choice === "Use saved key") {
+        return "saved";
+      }
+
+      if (choice === "Use env key") {
+        return "env";
+      }
+    }
+
+    while (true) {
+      const answer = (await args.io.ask("API key choice [saved/env/override]: "))
+        .trim()
+        .toLowerCase();
+
+      if (answer === "" || answer === "saved") {
+        return "saved";
+      }
+
+      if (answer === "env") {
+        return "env";
+      }
+
+      if (answer === "override") {
+        return "override";
+      }
+
+      args.io.error("Please answer saved, env, or override.\n");
+    }
+  }
+
+  const sourceLabel = args.hasSavedKey ? "saved key" : `${args.envName} from your environment`;
+  if (args.io.select) {
+    const choice = await args.io.select(
+      `Found an existing ${providerLabel} API key via ${sourceLabel}`,
+      ["Use existing key", "Override"]
+    );
+
+    if (choice === "Override") {
+      return "override";
+    }
+
+    return args.hasSavedKey ? "saved" : "env";
+  }
+
   while (true) {
-    const answer = (await io.ask(
-      `Config file already exists at ${targetPath}. Overwrite? [y/N]: `
-    ))
+    const answer = (await args.io.ask("API key choice [existing/override]: "))
       .trim()
       .toLowerCase();
 
-    if (answer === "" || answer === "n" || answer === "no") {
-      return false;
+    if (answer === "" || answer === "existing") {
+      return args.hasSavedKey ? "saved" : "env";
     }
 
-    if (answer === "y" || answer === "yes") {
-      return true;
+    if (answer === "override") {
+      return "override";
     }
 
-    io.error("Please answer y or n.\n");
+    args.io.error("Please answer existing or override.\n");
   }
 }
 
@@ -181,14 +263,107 @@ function writeNextSteps(io: ConfigSetupIO): void {
   io.write(`  ${ui.command("sift exec --preset test-status -- npm test")}\n`);
 }
 
+function writeProviderDefaults(
+  io: ConfigSetupIO,
+  provider: SetupProvider
+): void {
+  const ui = getSetupPresenter(io);
+
+  if (provider === "openrouter") {
+    io.write(`${ui.info("Using OpenRouter defaults for your first run.")}\n`);
+    io.write(`${ui.labelValue("Default model", "openrouter/free")}\n`);
+    io.write(`${ui.labelValue("Default base URL", "https://openrouter.ai/api/v1")}\n`);
+  } else {
+    io.write(`${ui.info("Using OpenAI defaults for your first run.")}\n`);
+    io.write(`${ui.labelValue("Default model", "gpt-5-nano")}\n`);
+    io.write(`${ui.labelValue("Default base URL", "https://api.openai.com/v1")}\n`);
+  }
+
+  io.write(
+    `${ui.note("Want to switch providers later? Run 'sift config use openai' or 'sift config use openrouter'.")}\n`
+  );
+  io.write(
+    `${ui.note("Want to inspect the active values first? Run 'sift config show --show-secrets'.")}\n`
+  );
+}
+
+function materializeProfile(
+  provider: SetupProvider,
+  profile: ProviderProfile | undefined,
+  apiKey?: string
+): ProviderProfile {
+  return {
+    ...getProfileProviderState(provider, profile),
+    ...(apiKey !== undefined ? { apiKey } : {})
+  };
+}
+
+function buildSetupConfig(args: {
+  config: SiftConfig;
+  provider: SetupProvider;
+  apiKeyChoice: ApiKeyChoice;
+  nextApiKey?: string;
+}): SiftConfig {
+  const preservedConfig = preserveActiveNativeProviderProfile(args.config);
+  const storedProfile = getStoredProviderProfile(preservedConfig, args.provider);
+
+  if (args.apiKeyChoice === "saved") {
+    const profile = materializeProfile(
+      args.provider,
+      storedProfile,
+      storedProfile?.apiKey ?? ""
+    );
+    const configWithProfile = setStoredProviderProfile(
+      preservedConfig,
+      args.provider,
+      profile
+    );
+    return applyActiveProvider(
+      configWithProfile,
+      args.provider,
+      profile,
+      profile.apiKey ?? ""
+    );
+  }
+
+  if (args.apiKeyChoice === "env") {
+    const profile = storedProfile
+      ? storedProfile
+      : materializeProfile(args.provider, undefined);
+    const configWithProfile = storedProfile
+      ? preservedConfig
+      : setStoredProviderProfile(preservedConfig, args.provider, profile);
+    return applyActiveProvider(configWithProfile, args.provider, profile, "");
+  }
+
+  const profile = materializeProfile(
+    args.provider,
+    storedProfile,
+    args.nextApiKey ?? ""
+  );
+  const configWithProfile = setStoredProviderProfile(
+    preservedConfig,
+    args.provider,
+    profile
+  );
+  return applyActiveProvider(
+    configWithProfile,
+    args.provider,
+    profile,
+    args.nextApiKey ?? ""
+  );
+}
+
 export async function configSetup(options: {
   targetPath?: string;
   global?: boolean;
   io?: ConfigSetupIO;
+  env?: NodeJS.ProcessEnv;
 } = {}): Promise<number> {
   void options.global;
   const io = options.io ?? createTerminalIO();
   const ui = getSetupPresenter(io);
+  const env = options.env ?? process.env;
 
   try {
     if (!io.stdinIsTTY || !io.stdoutIsTTY) {
@@ -201,34 +376,45 @@ export async function configSetup(options: {
     io.write(`${ui.welcome("Let's keep the expensive model for the interesting bits.")}\n`);
 
     const resolvedPath = resolveSetupPath(options.targetPath);
-
-    if (fs.existsSync(resolvedPath)) {
-      const shouldOverwrite = await promptForOverwrite(io, resolvedPath);
-      if (!shouldOverwrite) {
-        io.write(`${ui.note("Aborted.")}\n`);
-        return 1;
-      }
+    const { config: existingConfig, existed } = loadEditableConfig(resolvedPath);
+    if (existed) {
+      io.write(`${ui.info(`Updating existing config at ${resolvedPath}.`)}\n`);
     }
 
-    await promptForProvider(io);
+    const provider = await promptForProvider(io);
 
-    io.write(`${ui.info("Using OpenAI defaults for your first run.")}\n`);
-    io.write(`${ui.labelValue("Default model", "gpt-5-nano")}\n`);
-    io.write(`${ui.labelValue("Default base URL", "https://api.openai.com/v1")}\n`);
-    io.write(
-      `${ui.note(`Want to switch providers or tweak defaults later? Edit ${resolvedPath}.`)}\n`
-    );
-    io.write(
-      `${ui.note("Want to inspect the active values first? Run 'sift config show --show-secrets'.")}\n`
-    );
+    writeProviderDefaults(io, provider);
 
-    const apiKey = await promptForApiKey(io);
-    const config = buildOpenAISetupConfig(apiKey);
+    const storedProfile = getStoredProviderProfile(existingConfig, provider);
+    const envName = getNativeProviderApiKeyEnvName(provider);
+    const apiKeyChoice = await promptForApiKeyChoice({
+      io,
+      provider,
+      envName,
+      hasSavedKey: Boolean(storedProfile?.apiKey),
+      hasEnvKey: Boolean(env[envName])
+    });
+    const nextApiKey =
+      apiKeyChoice === "override"
+        ? await promptForApiKey(io, provider)
+        : undefined;
+    const config = buildSetupConfig({
+      config: existingConfig,
+      provider,
+      apiKeyChoice,
+      nextApiKey
+    });
     const writtenPath = writeConfigFile({
       targetPath: resolvedPath,
       config,
-      overwrite: true
+      overwrite: existed
     });
+
+    if (apiKeyChoice === "env") {
+      io.write(
+        `${ui.note(`Using ${envName} from the environment. No API key was written to config.`)}\n`
+      );
+    }
 
     writeSetupSuccess(io, writtenPath);
 

@@ -32,7 +32,8 @@ export function runDoctor(config: SiftConfig, configPath?: string | null): numbe
 
   if (
     (config.provider.provider === "openai" ||
-      config.provider.provider === "openai-compatible") &&
+      config.provider.provider === "openai-compatible" ||
+      config.provider.provider === "openrouter") &&
     !config.provider.apiKey
   ) {
     problems.push("Missing provider.apiKey");

@@ -19,9 +19,30 @@ describe("siftConfigSchema", () => {
     expect(parsed.provider.provider).toBe("openai");
   });
 
+  it("accepts the native openrouter provider", () => {
+    const parsed = siftConfigSchema.parse({
+      ...defaultConfig,
+      provider: {
+        ...defaultConfig.provider,
+        provider: "openrouter",
+        model: "openrouter/free",
+        baseUrl: "https://openrouter.ai/api/v1"
+      }
+    });
+
+    expect(parsed.provider.provider).toBe("openrouter");
+  });
+
   it("accepts preset contracts and fallback JSON", () => {
     const parsed = siftConfigSchema.parse({
       ...defaultConfig,
+      providerProfiles: {
+        openrouter: {
+          model: "openrouter/free",
+          baseUrl: "https://openrouter.ai/api/v1",
+          apiKey: "or-key"
+        }
+      },
       presets: {
         custom: {
           question: "Extract issues",
@@ -37,5 +58,6 @@ describe("siftConfigSchema", () => {
 
     expect(parsed.presets.custom?.policy).toBe("audit-critical");
     expect(parsed.presets.custom?.outputContract).toContain("issues");
+    expect(parsed.providerProfiles?.openrouter?.apiKey).toBe("or-key");
   });
 });

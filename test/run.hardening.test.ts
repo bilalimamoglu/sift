@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultConfig } from "../src/config/defaults.js";
 import { runSift } from "../src/core/run.js";
 import type { SiftConfig } from "../src/types.js";
@@ -22,6 +22,21 @@ function makeConfig(baseUrl: string): SiftConfig {
       apiKey: "test-key"
     }
   };
+}
+
+function withPatchedStderrTTY(value: boolean, fn: () => Promise<void>): Promise<void> {
+  const original = process.stderr.isTTY;
+  Object.defineProperty(process.stderr, "isTTY", {
+    configurable: true,
+    value
+  });
+
+  return fn().finally(() => {
+    Object.defineProperty(process.stderr, "isTTY", {
+      configurable: true,
+      value: original
+    });
+  });
 }
 
 describe("runSift hardening", () => {
@@ -231,6 +246,40 @@ describe("runSift hardening", () => {
 
     expect(output).toBe("All tests passed.");
     expect(server.requests).toHaveLength(2);
+  });
+
+  it("shows a tiny pending notice on tty stderr while waiting for the provider", async () => {
+    server = await createFakeOpenAIServer(() => ({
+      delayMs: 250,
+      body: {
+        choices: [{ message: { content: "All tests passed." } }]
+      }
+    }));
+
+    let stderr = "";
+    const stderrWrite = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation((chunk: string | Uint8Array) => {
+        stderr += chunk.toString();
+        return true;
+      });
+
+    try {
+      await withPatchedStderrTTY(true, async () => {
+        const output = await runSift({
+          question: "did tests pass?",
+          format: "brief",
+          stdin: "Ran 12 tests\n12 passed\n",
+          config: makeConfig(server!.baseUrl)
+        });
+
+        expect(output).toBe("All tests passed.");
+      });
+    } finally {
+      stderrWrite.mockRestore();
+    }
+
+    expect(stderr).toContain("sift waiting for provider...");
   });
 
   it("returns a dry-run payload instead of calling the provider", async () => {

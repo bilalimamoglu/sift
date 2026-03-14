@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import YAML from "yaml";
 import { describe, expect, it } from "vitest";
 import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
 import { runCli, runCliAsync } from "./helpers/cli.js";
@@ -15,14 +16,26 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("  \\\\  //");
     expect(result.stdout).toContain("sift [question]");
     expect(result.stdout).toContain("Trim the noise. Keep the signal.");
-    expect(result.stdout).toContain("Provider: openai | openai-compatible");
+    expect(result.stdout).toContain("Provider: openai | openai-compatible | openrouter");
     expect(result.stdout).toContain("SIFT_PROVIDER_API_KEY");
     expect(result.stdout).toContain("OPENAI_API_KEY");
+    expect(result.stdout).toContain("OPENROUTER_API_KEY");
     expect(result.stdout).toContain("--show-raw");
     expect(result.stdout).toContain("--detail <mode>");
     expect(result.stdout).toContain("escalate");
     expect(result.stdout).toContain("rerun");
     expect(result.stdout).toContain("agent <action> [name]");
+    expect(result.stdout).toContain("config <action> [provider]");
+  });
+
+  it("prints config help with the provider switch example", () => {
+    const result = runCli({
+      args: ["config", "--help"]
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("config <setup|init|show|validate|use> [provider] [options]");
+    expect(result.stdout).toContain("config use openrouter");
   });
 
   it("prints exec help with passthrough usage", () => {
@@ -168,6 +181,51 @@ describe("CLI smoke", () => {
     expect(JSON.parse(masked.stdout).provider.apiKey).toBe("***");
     expect(revealed.status).toBe(0);
     expect(JSON.parse(revealed.stdout).provider.apiKey).toBe("env-secret-key");
+  });
+
+  it("supports config use with environment-backed OpenRouter switching", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-use-home-"));
+    const expectedPath = path.join(home, ".config", "sift", "config.yaml");
+
+    const use = runCli({
+      args: ["config", "use", "openrouter"],
+      useDist: true,
+      cwd: home,
+      env: {
+        HOME: home,
+        OPENROUTER_API_KEY: "env-openrouter-key"
+      }
+    });
+
+    const written = YAML.parse(await fs.readFile(expectedPath, "utf8")) as {
+      provider: { provider: string; model: string; baseUrl: string; apiKey: string };
+      providerProfiles?: { openrouter?: { apiKey?: string } };
+    };
+
+    expect(use.status).toBe(0);
+    expect(use.stdout).toContain("Switched active provider to openrouter");
+    expect(use.stdout).toContain("No API key was written to config");
+    expect(written.provider.provider).toBe("openrouter");
+    expect(written.provider.model).toBe("openrouter/free");
+    expect(written.provider.baseUrl).toBe("https://openrouter.ai/api/v1");
+    expect(written.provider.apiKey).toBe("");
+    expect(written.providerProfiles?.openrouter?.apiKey).toBeUndefined();
+  });
+
+  it("fails config use when no saved key or provider env key exists", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-use-fail-home-"));
+
+    const result = runCli({
+      args: ["config", "use", "openrouter"],
+      useDist: true,
+      cwd: home,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Run 'sift config setup' first.");
   });
 
   it("fails when an explicit config path does not exist", () => {
@@ -561,6 +619,25 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("apiKey: set");
   });
 
+  it("accepts OPENROUTER_API_KEY for the openrouter provider defaults", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
+    const result = runCli({
+      args: ["doctor"],
+      useDist: true,
+      cwd,
+      env: {
+        SIFT_PROVIDER: "openrouter",
+        OPENROUTER_API_KEY: "openrouter-key"
+      }
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("provider: openrouter");
+    expect(result.stdout).toContain("apiKey: set");
+    expect(result.stdout).toContain("model: openrouter/free");
+    expect(result.stdout).toContain("baseUrl: https://openrouter.ai/api/v1");
+  });
+
   it("fails doctor when api key is missing for openai-compatible", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-home-"));
@@ -580,5 +657,25 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("apiKey: not set");
     expect(result.stderr).toContain("Missing provider.apiKey");
     expect(result.stderr).toContain("SIFT_PROVIDER_API_KEY");
+  });
+
+  it("fails doctor when api key is missing for openrouter", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-home-"));
+    const result = runCli({
+      args: ["doctor"],
+      useDist: true,
+      cwd,
+      env: {
+        HOME: home,
+        SIFT_PROVIDER: "openrouter"
+      }
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("provider: openrouter");
+    expect(result.stdout).toContain("apiKey: not set");
+    expect(result.stderr).toContain("Missing provider.apiKey");
+    expect(result.stderr).toContain("OPENROUTER_API_KEY");
   });
 });

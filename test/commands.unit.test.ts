@@ -1,10 +1,12 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import YAML from "yaml";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   configInit,
   configShow,
+  configUse,
   configValidate,
   maskConfigSecrets
 } from "../src/commands/config.js";
@@ -145,7 +147,10 @@ describe("command modules", () => {
         "  provider: openai",
         "  model: gpt-5-nano",
         "  baseUrl: https://api.openai.com/v1",
-        "  apiKey: test-secret"
+        "  apiKey: test-secret",
+        "providerProfiles:",
+        "  openrouter:",
+        "    apiKey: openrouter-secret"
       ].join("\n"),
       "utf8"
     );
@@ -156,9 +161,19 @@ describe("command modules", () => {
     const revealed = captureOutput(() => {
       configShow(configPath, true);
     }).stdout;
+    const maskedParsed = JSON.parse(masked) as {
+      provider: { apiKey: string };
+      providerProfiles?: { openrouter?: { apiKey?: string } };
+    };
+    const revealedParsed = JSON.parse(revealed) as {
+      provider: { apiKey: string };
+      providerProfiles?: { openrouter?: { apiKey?: string } };
+    };
 
-    expect(masked).toContain('"apiKey": "***"');
-    expect(revealed).toContain('"apiKey": "test-secret"');
+    expect(maskedParsed.provider.apiKey).toBe("***");
+    expect(revealedParsed.provider.apiKey).toBe("test-secret");
+    expect(maskedParsed.providerProfiles?.openrouter?.apiKey).toBe("***");
+    expect(revealedParsed.providerProfiles?.openrouter?.apiKey).toBe("openrouter-secret");
   });
 
   it("maskConfigSecrets handles arrays and nested non-objects", () => {
@@ -181,6 +196,83 @@ describe("command modules", () => {
       },
       "plain"
     ]);
+  });
+
+  it("configUse switches to a saved provider profile", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sift-config-use-saved-"));
+    const configPath = path.join(tmpDir, "sift.config.yaml");
+    fs.writeFileSync(
+      configPath,
+      [
+        "provider:",
+        "  provider: openai",
+        "  model: gpt-5-nano",
+        "  baseUrl: https://api.openai.com/v1",
+        "  apiKey: active-key",
+        "providerProfiles:",
+        "  openrouter:",
+        "    model: openrouter/free",
+        "    baseUrl: https://openrouter.ai/api/v1",
+        "    apiKey: saved-openrouter-key"
+      ].join("\n"),
+      "utf8"
+    );
+
+    const { stdout } = captureOutput(() => {
+      withPatchedStream(process.stdout, { isTTY: false }, () => {
+        configUse("openrouter", configPath, {});
+      });
+    });
+
+    const updated = YAML.parse(fs.readFileSync(configPath, "utf8")) as SiftConfig;
+
+    expect(stdout).toContain("Switched active provider to openrouter");
+    expect(updated.provider.provider).toBe("openrouter");
+    expect(updated.provider.apiKey).toBe("saved-openrouter-key");
+  });
+
+  it("configUse falls back to environment keys without writing them", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sift-config-use-env-"));
+    const configPath = path.join(tmpDir, "sift.config.yaml");
+    fs.writeFileSync(
+      configPath,
+      [
+        "provider:",
+        "  provider: openai",
+        "  model: gpt-5-nano",
+        "  baseUrl: https://api.openai.com/v1",
+        "  apiKey: saved-openai-key"
+      ].join("\n"),
+      "utf8"
+    );
+
+    const { stdout } = captureOutput(() => {
+      withPatchedStream(process.stdout, { isTTY: false }, () => {
+        configUse("openrouter", configPath, {
+          OPENROUTER_API_KEY: "env-openrouter-key"
+        });
+      });
+    });
+
+    const written = YAML.parse(fs.readFileSync(configPath, "utf8")) as SiftConfig;
+
+    expect(stdout).toContain("Switched active provider to openrouter");
+    expect(stdout).toContain("No API key was written to config");
+    expect(written.provider.provider).toBe("openrouter");
+    expect(written.provider.model).toBe("openrouter/free");
+    expect(written.provider.baseUrl).toBe("https://openrouter.ai/api/v1");
+    expect(written.provider.apiKey).toBe("");
+    expect(written.providerProfiles?.openai?.apiKey).toBe("saved-openai-key");
+    expect(written.providerProfiles?.openrouter?.apiKey).toBeUndefined();
+  });
+
+  it("configUse errors when no saved key or env key exists", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sift-config-use-error-"));
+    const configPath = path.join(tmpDir, "sift.config.yaml");
+
+    expect(() => configUse("openrouter", configPath, {})).toThrow(
+      "Run 'sift config setup' first."
+    );
   });
 
   it("configValidate prints tty and non-tty messages", () => {

@@ -5,6 +5,7 @@ import { REDUCTION_SYSTEM_INSTRUCTION } from "./systemInstruction.js";
 interface OpenAICompatibleProviderOptions {
   baseUrl: string;
   apiKey?: string;
+  name?: string;
 }
 
 function supportsNativeJsonResponseFormat(baseUrl: string, mode: GenerateInput["jsonResponseFormat"]): boolean {
@@ -53,11 +54,12 @@ async function buildOpenAICompatibleError(response: Response): Promise<Error> {
 }
 
 export class OpenAICompatibleProvider implements LLMProvider {
-  readonly name = "openai-compatible";
+  readonly name: string;
   private readonly baseUrl: string;
   private readonly apiKey?: string;
 
   constructor(options: OpenAICompatibleProviderOptions) {
+    this.name = options.name ?? "openai-compatible";
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
     this.apiKey = options.apiKey;
   }
