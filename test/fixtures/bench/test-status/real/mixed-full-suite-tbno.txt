@@ -1,7 +1,7 @@
 ============================= test session starts ==============================
-platform darwin -- Python 3.11.4, pytest-9.0.2, pluggy-1.6.0 -- /Users/bilalimamoglu/miniconda3/bin/python
+platform darwin -- Python 3.11.4, pytest-9.0.2, pluggy-1.6.0 -- /usr/local/bin/python
 cachedir: .pytest_cache
-rootdir: /Users/bilalimamoglu/repos/modela-app/modela-backend
+rootdir: /home/ci/project
 configfile: pytest.ini
 plugins: anyio-4.12.1, cov-6.2.1, asyncio-1.3.0
 asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
@@ -379,7 +379,7 @@ tests/unit/schemas/test_request_provider_field.py::test_provider_field_accepts_c
 tests/unit/scripts/test_backend_quality_gate.py::test_selected_test_groups_defaults_to_all PASSED [ 57%]
 tests/unit/scripts/test_backend_quality_gate.py::test_selected_test_groups_filters_requested_groups PASSED [ 57%]
 tests/unit/scripts/test_cleanup_cognito_test_users.py::test_cleanup_matches_smoke_example_email PASSED [ 58%]
-tests/unit/scripts/test_cleanup_cognito_test_users.py::test_cleanup_matches_smoke_modela_local_email PASSED [ 58%]
+tests/unit/scripts/test_cleanup_cognito_test_users.py::test_cleanup_matches_smoke_test_local_email PASSED [ 58%]
 tests/unit/scripts/test_cleanup_cognito_test_users.py::test_cleanup_does_not_match_regular_example_email PASSED [ 58%]
 tests/unit/scripts/test_cleanup_output_test_artifacts.py::test_classify_fake_output_prefers_is_test_asset_flag PASSED [ 58%]
 tests/unit/scripts/test_cleanup_output_test_artifacts.py::test_classify_fake_output_detects_dev_bypass_and_system_bucket_rows PASSED [ 58%]

@@ -278,6 +278,225 @@ interface GenericBucket {
   source: "heuristic" | "provider" | "unknown";
 }
 
+interface ExtendedBucketSpec {
+  prefix: string;
+  type: FailureBucketType;
+  label: string;
+  genericTitle: string;
+  defaultCoverage: "error" | "failed" | "mixed";
+  rootCauseConfidence: number;
+  dominantPriority?: number;
+  dominantBlocker?: boolean;
+  why: string;
+  fix: string;
+}
+
+const extendedBucketSpecs: readonly ExtendedBucketSpec[] = [
+  {
+    prefix: "snapshot mismatch:",
+    type: "snapshot_mismatch",
+    label: "snapshot mismatch",
+    genericTitle: "Snapshot mismatches",
+    defaultCoverage: "failed",
+    rootCauseConfidence: 0.84,
+    why: "it contains the failing snapshot expectation behind this bucket",
+    fix: "Update the snapshots if these output changes are intentional, then rerun the suite."
+  },
+  {
+    prefix: "timeout:",
+    type: "timeout_failure",
+    label: "timeout",
+    genericTitle: "Timeout failures",
+    defaultCoverage: "mixed",
+    rootCauseConfidence: 0.9,
+    why: "it contains the test or fixture that exceeded the timeout threshold",
+    fix: "Check for deadlocks, slow setup, or increase the timeout threshold before rerunning."
+  },
+  {
+    prefix: "permission:",
+    type: "permission_denied_failure",
+    label: "permission denied",
+    genericTitle: "Permission failures",
+    defaultCoverage: "error",
+    rootCauseConfidence: 0.85,
+    why: "it contains the file, socket, or port access that was denied",
+    fix: "Check file or port permissions in the CI environment before rerunning."
+  },
+  {
+    prefix: "async loop:",
+    type: "async_event_loop_failure",
+    label: "async event loop",
+    genericTitle: "Async event loop failures",
+    defaultCoverage: "mixed",
+    rootCauseConfidence: 0.88,
+    why: "it contains the async setup or coroutine that caused the event loop error",
+    fix: "Check event loop scope and pytest-asyncio configuration before rerunning."
+  },
+  {
+    prefix: "fixture teardown:",
+    type: "fixture_teardown_failure",
+    label: "fixture teardown",
+    genericTitle: "Fixture teardown failures",
+    defaultCoverage: "error",
+    rootCauseConfidence: 0.85,
+    why: "it contains the fixture teardown path that failed after the test body completed",
+    fix: "Inspect the teardown cleanup path and restore idempotent fixture cleanup before rerunning."
+  },
+  {
+    prefix: "db migration:",
+    type: "db_migration_failure",
+    label: "db migration",
+    genericTitle: "DB migration failures",
+    defaultCoverage: "error",
+    rootCauseConfidence: 0.9,
+    why: "it contains the migration or model definition behind the missing table or relation",
+    fix: "Run pending migrations or fix the expected model schema before rerunning."
+  },
+  {
+    prefix: "configuration:",
+    type: "configuration_error",
+    label: "configuration error",
+    genericTitle: "Configuration errors",
+    defaultCoverage: "error",
+    rootCauseConfidence: 0.95,
+    dominantPriority: 4,
+    dominantBlocker: true,
+    why: "it contains the pytest configuration or conftest setup error that blocks the run",
+    fix: "Fix the pytest configuration, CLI usage, or conftest import error before rerunning."
+  },
+  {
+    prefix: "xdist worker crash:",
+    type: "xdist_worker_crash",
+    label: "xdist worker crash",
+    genericTitle: "xdist worker crashes",
+    defaultCoverage: "error",
+    rootCauseConfidence: 0.92,
+    dominantPriority: 3,
+    why: "it contains the worker startup or shared-state path that crashed an xdist worker",
+    fix: "Check shared state, worker startup hooks, or resource contention between workers before rerunning."
+  },
+  {
+    prefix: "type error:",
+    type: "type_error_failure",
+    label: "type error",
+    genericTitle: "Type errors",
+    defaultCoverage: "mixed",
+    rootCauseConfidence: 0.8,
+    why: "it contains the call site or fixture value that triggered the type error",
+    fix: "Inspect the mismatched argument or object shape and rerun the full suite at standard."
+  },
+  {
+    prefix: "resource leak:",
+    type: "resource_leak_warning",
+    label: "resource leak",
+    genericTitle: "Resource leak warnings",
+    defaultCoverage: "mixed",
+    rootCauseConfidence: 0.74,
+    why: "it contains the warning source behind the leaked file, socket, or coroutine",
+    fix: "Close the leaked resource or suppress the warning only if the cleanup is intentional."
+  },
+  {
+    prefix: "django db access:",
+    type: "django_db_access_denied",
+    label: "django db access",
+    genericTitle: "Django DB access failures",
+    defaultCoverage: "error",
+    rootCauseConfidence: 0.95,
+    why: "it needs the @pytest.mark.django_db decorator or fixture permission to access the database",
+    fix: "Add @pytest.mark.django_db to the test or class before rerunning."
+  },
+  {
+    prefix: "network:",
+    type: "network_failure",
+    label: "network failure",
+    genericTitle: "Network failures",
+    defaultCoverage: "error",
+    rootCauseConfidence: 0.88,
+    dominantPriority: 2,
+    why: "it contains the host, URL, or TLS path behind the network failure",
+    fix: "Check DNS, outbound network access, retries, or TLS trust before rerunning."
+  },
+  {
+    prefix: "segfault:",
+    type: "subprocess_crash_segfault",
+    label: "segfault",
+    genericTitle: "Segfault crashes",
+    defaultCoverage: "mixed",
+    rootCauseConfidence: 0.8,
+    why: "it contains the subprocess or native extension path that crashed with SIGSEGV",
+    fix: "Inspect the native extension, subprocess boundary, or incompatible binary before rerunning."
+  },
+  {
+    prefix: "flaky:",
+    type: "flaky_test_detected",
+    label: "flaky test",
+    genericTitle: "Flaky test detections",
+    defaultCoverage: "mixed",
+    rootCauseConfidence: 0.72,
+    why: "it contains the rerun-prone test that behaved inconsistently across attempts",
+    fix: "Stabilize the nondeterministic test or fixture before relying on reruns."
+  },
+  {
+    prefix: "serialization:",
+    type: "serialization_encoding_failure",
+    label: "serialization or encoding",
+    genericTitle: "Serialization or encoding failures",
+    defaultCoverage: "mixed",
+    rootCauseConfidence: 0.78,
+    why: "it contains the serialization or decoding path behind the malformed payload",
+    fix: "Inspect the encoded payload, serializer, or fixture data before rerunning."
+  },
+  {
+    prefix: "file not found:",
+    type: "file_not_found_failure",
+    label: "file not found",
+    genericTitle: "Missing file failures",
+    defaultCoverage: "mixed",
+    rootCauseConfidence: 0.82,
+    why: "it contains the missing file path or fixture artifact required by the test",
+    fix: "Restore the missing file, fixture artifact, or working-directory assumption before rerunning."
+  },
+  {
+    prefix: "memory:",
+    type: "memory_error",
+    label: "memory error",
+    genericTitle: "Memory failures",
+    defaultCoverage: "mixed",
+    rootCauseConfidence: 0.78,
+    why: "it contains the allocation path that exhausted available memory",
+    fix: "Reduce memory pressure or investigate the large allocation before rerunning."
+  },
+  {
+    prefix: "deprecation as error:",
+    type: "deprecation_warning_as_error",
+    label: "deprecation as error",
+    genericTitle: "Deprecation warnings as errors",
+    defaultCoverage: "mixed",
+    rootCauseConfidence: 0.74,
+    why: "it contains the deprecated API or warning filter that is failing the test run",
+    fix: "Update the deprecated call site or relax the warning policy only if that is intentional."
+  },
+  {
+    prefix: "xfail strict:",
+    type: "xfail_strict_unexpected_pass",
+    label: "strict xfail unexpected pass",
+    genericTitle: "Strict xfail unexpected passes",
+    defaultCoverage: "failed",
+    rootCauseConfidence: 0.78,
+    why: "it contains the strict xfail case that unexpectedly passed",
+    fix: "Remove or update the strict xfail expectation if the test is now passing intentionally."
+  }
+];
+
+function findExtendedBucketSpec(reason: string): ExtendedBucketSpec | null {
+  return extendedBucketSpecs.find((spec) => reason.startsWith(spec.prefix)) ?? null;
+}
+
+function extractReasonDetail(reason: string, prefix: string): string | null {
+  const detail = reason.slice(prefix.length).trim();
+  return detail.length > 0 ? detail : null;
+}
+
 function formatCount(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
@@ -351,6 +570,11 @@ function formatTargetSummary(summary: TestStatusTargetSummary): string {
 }
 
 function classifyGenericBucketType(reason: string): FailureBucketType {
+  const extended = findExtendedBucketSpec(reason);
+  if (extended) {
+    return extended.type;
+  }
+
   if (reason.startsWith("missing test env:")) {
     return "shared_environment_blocker";
   }
@@ -410,6 +634,11 @@ function classifyVisibleStatusForLabel(args: {
 }
 
 function inferCoverageFromReason(reason: string): "error" | "failed" | "mixed" {
+  const extended = findExtendedBucketSpec(reason);
+  if (extended) {
+    return extended.defaultCoverage;
+  }
+
   if (
     reason.startsWith("missing test env:") ||
     reason.startsWith("fixture guard:") ||
@@ -491,10 +720,15 @@ function buildGenericBuckets(analysis: TestStatusAnalysis): GenericBucket[] {
       summaryLines: [],
       reason,
       count: 1,
-      confidence:
-        reason.startsWith("assertion failed:") || /^[A-Z][A-Za-z]+(?:Error|Exception):/.test(reason)
+      confidence: (() => {
+        const extended = findExtendedBucketSpec(reason);
+        if (extended) {
+          return Math.max(0.72, Math.min(extended.rootCauseConfidence, 0.82));
+        }
+        return reason.startsWith("assertion failed:") || /^[A-Z][A-Za-z]+(?:Error|Exception):/.test(reason)
           ? 0.74
-          : 0.62,
+          : 0.62;
+      })(),
       representativeItems: [item],
       entities: [],
       hint: undefined,
@@ -514,13 +748,14 @@ function buildGenericBuckets(analysis: TestStatusAnalysis): GenericBucket[] {
 
   for (const bucket of grouped.values()) {
     const title =
-      bucket.type === "assertion_failure"
+      findExtendedBucketSpec(bucket.reason)?.genericTitle ??
+      (bucket.type === "assertion_failure" || bucket.type === "snapshot_mismatch"
         ? "Assertion failures"
         : bucket.type === "import_dependency_failure"
           ? "Import/dependency failures"
           : bucket.type === "collection_failure"
             ? "Collection or fixture failures"
-            : "Runtime failures";
+            : "Runtime failures");
     bucket.headline = `${title}: ${formatCount(bucket.count, "visible failure")} share ${bucket.reason}.`;
     bucket.summaryLines = [bucket.headline];
     bucket.overflowCount = Math.max(bucket.count - bucket.representativeItems.length, 0);
@@ -617,7 +852,11 @@ function inferFailureBucketCoverage(bucket: FailureBucket, analysis: TestStatusA
   }
 
   const claimed = bucket.countClaimed ?? bucket.countVisible;
-  if (bucket.type === "contract_snapshot_drift" || bucket.type === "assertion_failure") {
+  if (
+    bucket.type === "contract_snapshot_drift" ||
+    bucket.type === "assertion_failure" ||
+    bucket.type === "snapshot_mismatch"
+  ) {
     return {
       error,
       failed: Math.max(failed, claimed)
@@ -629,6 +868,13 @@ function inferFailureBucketCoverage(bucket: FailureBucket, analysis: TestStatusA
     bucket.type === "import_dependency_failure" ||
     bucket.type === "collection_failure" ||
     bucket.type === "fixture_guard_failure" ||
+    bucket.type === "permission_denied_failure" ||
+    bucket.type === "fixture_teardown_failure" ||
+    bucket.type === "db_migration_failure" ||
+    bucket.type === "configuration_error" ||
+    bucket.type === "xdist_worker_crash" ||
+    bucket.type === "django_db_access_denied" ||
+    bucket.type === "network_failure" ||
     bucket.type === "service_unavailable" ||
     bucket.type === "db_connection_failure" ||
     bucket.type === "auth_bypass_absent"
@@ -724,6 +970,10 @@ function dominantBucketPriority(bucket: GenericBucket): number {
   if (bucket.reason.startsWith("missing test env:")) {
     return 5;
   }
+  const extended = findExtendedBucketSpec(bucket.reason);
+  if (extended?.dominantPriority !== undefined) {
+    return extended.dominantPriority;
+  }
   if (bucket.type === "shared_environment_blocker") {
     return 4;
   }
@@ -764,6 +1014,7 @@ function prioritizeBuckets(buckets: GenericBucket[]): GenericBucket[] {
 function isDominantBlockerType(type: FailureBucketType): boolean {
   return (
     type === "shared_environment_blocker" ||
+    type === "configuration_error" ||
     type === "import_dependency_failure" ||
     type === "collection_failure"
   );
@@ -772,6 +1023,11 @@ function isDominantBlockerType(type: FailureBucketType): boolean {
 function labelForBucket(bucket: GenericBucket): string {
   if (bucket.labelOverride) {
     return bucket.labelOverride;
+  }
+
+  const extended = findExtendedBucketSpec(bucket.reason);
+  if (extended) {
+    return extended.label;
   }
 
   if (bucket.reason.startsWith("missing test env:")) {
@@ -807,6 +1063,9 @@ function labelForBucket(bucket: GenericBucket): string {
   if (bucket.type === "assertion_failure") {
     return "assertion failure";
   }
+  if (bucket.type === "snapshot_mismatch") {
+    return "snapshot mismatch";
+  }
   if (bucket.type === "collection_failure") {
     return "collection failure";
   }
@@ -825,6 +1084,11 @@ function labelForBucket(bucket: GenericBucket): string {
 function rootCauseConfidenceFor(bucket: GenericBucket): number {
   if (isUnknownBucket(bucket)) {
     return 0.52;
+  }
+
+  const extended = findExtendedBucketSpec(bucket.reason);
+  if (extended) {
+    return extended.rootCauseConfidence;
   }
 
   if (
@@ -892,6 +1156,11 @@ function buildReadTargetWhy(args: {
     return `it contains the ${envVar} setup guard`;
   }
 
+  const extended = findExtendedBucketSpec(args.bucket.reason);
+  if (extended) {
+    return extended.why;
+  }
+
   if (args.bucket.reason.startsWith("fixture guard:")) {
     return "it contains the fixture/setup guard behind this bucket";
   }
@@ -929,6 +1198,10 @@ function buildReadTargetWhy(args: {
     return "it maps to the visible stale snapshot expectation";
   }
 
+  if (args.bucket.type === "snapshot_mismatch") {
+    return "it maps to the visible snapshot mismatch bucket";
+  }
+
   if (args.bucket.type === "import_dependency_failure") {
     return "it is the first visible failing module in this missing dependency bucket";
   }
@@ -944,6 +1217,58 @@ function buildReadTargetWhy(args: {
   return `it maps to the visible ${args.bucketLabel} bucket`;
 }
 
+function buildExtendedBucketSearchHint(
+  bucket: GenericBucket,
+  anchor: FailureBucket["representativeItems"][number]
+): string | null {
+  const extended = findExtendedBucketSpec(bucket.reason);
+  if (!extended) {
+    return null;
+  }
+
+  const detail = extractReasonDetail(bucket.reason, extended.prefix);
+  if (!detail) {
+    return anchor.label.split("::")[1]?.trim() ?? anchor.label ?? null;
+  }
+
+  if (extended.type === "timeout_failure") {
+    const duration = detail.match(/>\s*([0-9]+(?:\.[0-9]+)?s?)/i)?.[1];
+    return duration ?? anchor.label.split("::")[1]?.trim() ?? detail;
+  }
+
+  if (extended.type === "db_migration_failure") {
+    const relation = detail.match(/\b(?:relation|table)\s+([A-Za-z0-9_.-]+)/i)?.[1];
+    return relation ?? detail;
+  }
+
+  if (extended.type === "network_failure") {
+    const url = detail.match(/\bhttps?:\/\/[^\s)'"`]+/i)?.[0];
+    const host = detail.match(/\b(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}\b/)?.[0];
+    return url ?? host ?? detail;
+  }
+
+  if (extended.type === "xdist_worker_crash") {
+    return detail.match(/\bgw\d+\b/)?.[0] ?? detail;
+  }
+
+  if (extended.type === "fixture_teardown_failure") {
+    return detail.replace(/^of\s+/i, "") || anchor.label;
+  }
+
+  if (extended.type === "file_not_found_failure") {
+    const path = detail.match(/['"]([^'"]+)['"]/)?.[1];
+    return path ?? detail;
+  }
+
+  if (extended.type === "permission_denied_failure") {
+    const path = detail.match(/['"]([^'"]+)['"]/)?.[1];
+    const port = detail.match(/\bport\s+(\d+)\b/i)?.[1];
+    return path ?? (port ? `port ${port}` : detail);
+  }
+
+  return detail;
+}
+
 function buildReadTargetSearchHint(
   bucket: GenericBucket,
   anchor: FailureBucket["representativeItems"][number]
@@ -951,6 +1276,11 @@ function buildReadTargetSearchHint(
   const envVar = bucket.reason.match(/^missing test env:\s+([A-Z][A-Z0-9_]{2,})$/)?.[1];
   if (envVar) {
     return envVar;
+  }
+
+  const extendedHint = buildExtendedBucketSearchHint(bucket, anchor);
+  if (extendedHint) {
+    return extendedHint;
   }
 
   if (bucket.type === "contract_snapshot_drift") {
@@ -1117,6 +1447,11 @@ function inferSupplementCoverageKind(args: {
   remainingErrors: number;
   remainingFailed: number;
 }): "error" | "failed" {
+  const extended = findExtendedBucketSpec(args.rootCause);
+  if (extended?.defaultCoverage === "error" || extended?.defaultCoverage === "failed") {
+    return extended.defaultCoverage;
+  }
+
   const normalized = `${args.label} ${args.rootCause}`.toLowerCase();
   if (
     /env|setup|fixture|import|dependency|service|db|database|auth bypass|collection|connection refused/.test(
@@ -1459,6 +1794,11 @@ function buildStandardFixText(args: {
     return args.bucket.hint;
   }
 
+  const extended = findExtendedBucketSpec(args.bucket.reason);
+  if (extended) {
+    return extended.fix;
+  }
+
   const envVar = args.bucket.reason.match(/^missing test env:\s+([A-Z][A-Z0-9_]{2,})$/)?.[1];
   if (envVar) {
     return `Set ${envVar} before rerunning the affected tests.`;
@@ -1495,6 +1835,10 @@ function buildStandardFixText(args: {
 
   if (args.bucket.type === "contract_snapshot_drift") {
     return "Review the visible drift and regenerate the contract snapshots if the changes are intentional.";
+  }
+
+  if (args.bucket.type === "snapshot_mismatch") {
+    return "Update the snapshots if these output changes are intentional, then rerun the full suite at standard.";
   }
 
   if (args.bucket.type === "assertion_failure") {

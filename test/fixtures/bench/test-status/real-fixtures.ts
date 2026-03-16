@@ -20,7 +20,7 @@ export function buildRealFixtures(): BenchFixture[] {
     {
       name: "single-blocker-short-real",
       description:
-        "Real modela-backend: single DB env blocker with pytest-asyncio traceback.",
+        "Real project: single DB env blocker with pytest-asyncio traceback.",
       rawOutput: singleBlockerRaw,
       rawRecipe: [
         {
@@ -38,7 +38,7 @@ export function buildRealFixtures(): BenchFixture[] {
     {
       name: "mixed-full-suite-real",
       description:
-        "Real modela-backend full suite: 124 DB errors + 3 contract drift failures.",
+        "Real project full suite: 124 DB errors + 3 contract drift failures.",
       rawOutput: mixedFullRaw,
       rawRecipe: [
         {
@@ -74,7 +74,7 @@ export function buildRealFixtures(): BenchFixture[] {
     {
       name: "snapshot-drift-only-real",
       description:
-        "Real modela-backend: 3 freeze tests with full assertion diff output.",
+        "Real project: 3 freeze tests with full assertion diff output.",
       rawOutput: snapshotDriftRaw,
       rawRecipe: [
         {

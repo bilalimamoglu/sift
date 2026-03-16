@@ -1,7 +1,13 @@
 name: release
+run-name: release ${{ inputs.version || github.ref_name }}
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: Package version being released, for example 0.3.2
+        required: true
+        type: string
 
 jobs:
   publish:
@@ -30,6 +36,13 @@ jobs:
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Validate requested release version
+        run: |
+          if [ "${{ inputs.version }}" != "${{ steps.pkg.outputs.version }}" ]; then
+            echo "workflow_dispatch input version (${{ inputs.version }}) must match package.json version (${{ steps.pkg.outputs.version }})" >&2
+            exit 1
+          fi
 
       - name: Require successful CI for this commit
         env:
@@ -97,6 +110,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ steps.pkg.outputs.tag }}" \
-            --title "${{ steps.pkg.outputs.tag }}" \
-            --generate-notes
+          NOTES_FILE=""
+          if [ -f "release-notes/${{ steps.pkg.outputs.tag }}.md" ]; then
+            NOTES_FILE="release-notes/${{ steps.pkg.outputs.tag }}.md"
+          elif [ -f "release-notes/${{ steps.pkg.outputs.version }}.md" ]; then
+            NOTES_FILE="release-notes/${{ steps.pkg.outputs.version }}.md"
+          fi
+
+          if [ -n "$NOTES_FILE" ]; then
+            echo "Using release notes from $NOTES_FILE"
+            gh release create "${{ steps.pkg.outputs.tag }}" \
+              --title "${{ steps.pkg.outputs.tag }}" \
+              --notes-file "$NOTES_FILE"
+          else
+            echo "No versioned release notes file found; falling back to generated notes."
+            gh release create "${{ steps.pkg.outputs.tag }}" \
+              --title "${{ steps.pkg.outputs.tag }}" \
+              --generate-notes
+          fi

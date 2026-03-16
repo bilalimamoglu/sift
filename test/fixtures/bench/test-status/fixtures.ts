@@ -182,6 +182,95 @@ function buildMissingModuleCollectionRaw(): string {
   ].join("\n");
 }
 
+function buildVitestSnapshotMismatchRaw(): string {
+  return [
+    " RUN  v2.1.0 /repo",
+    "",
+    " ❯ src/components/button.test.ts > Button > renders primary FAILED [ 50%]",
+    "",
+    "⎯⎯⎯ Failed Tests 1 ⎯⎯⎯",
+    "",
+    " FAIL  src/components/button.test.ts > Button > renders primary",
+    "Error: Snapshot `Button > renders primary` mismatched",
+    "❯ src/components/button.test.ts:42:19",
+    "  40|   const rendered = renderPrimaryButton()",
+    "  41|",
+    "  42|   expect(rendered).toMatchSnapshot()",
+    "     |                   ^",
+    "  43| })",
+    "  44|",
+    "Serialized Error: { expected: '<button class=\"primary\">Save</button>', actual: '<button class=\"primary emphasis\">Save</button>' }",
+    "",
+    " Test Files  1 failed (1)",
+    "      Tests  1 failed | 1 passed (2)",
+    "  Snapshots  1 failed (1)"
+  ].join("\n");
+}
+
+function buildVitestMixedJsRaw(): string {
+  return [
+    " RUN  v2.1.0 /repo",
+    "",
+    " ❯ src/components/button.test.ts > Button > renders primary FAILED [ 25%]",
+    " ❯ src/hooks/timeout.test.ts > useSlowHook > resolves FAILED [ 50%]",
+    " ❯ src/setup/auth.test.ts ERROR [ 75%]",
+    "",
+    "⎯⎯⎯ Failed Tests 2 ⎯⎯⎯",
+    "",
+    " FAIL  src/components/button.test.ts > Button > renders primary",
+    "Error: Snapshot `Button > renders primary` mismatched",
+    "❯ src/components/button.test.ts:42:19",
+    "",
+    " FAIL  src/hooks/timeout.test.ts > useSlowHook > resolves",
+    "Error: Test timed out in 5000ms.",
+    "❯ src/hooks/timeout.test.ts:21:9",
+    "",
+    "⎯⎯⎯ Failed Suites 1 ⎯⎯⎯",
+    "",
+    " FAIL  src/setup/auth.test.ts [ src/setup/auth.test.ts ]",
+    "Error: Failed to resolve import \"@/missing-client\" from \"src/setup/auth.test.ts\". Does the file exist?",
+    "❯ src/setup/auth.test.ts:1:1",
+    "",
+    " Test Files  2 failed | 1 passed (3)",
+    "      Tests  2 failed | 1 passed (3)",
+    "  Snapshots  1 failed (1)"
+  ].join("\n");
+}
+
+function buildJestMixedJsRaw(): string {
+  return [
+    "FAIL src/components/card.test.ts",
+    "  ✕ renders the card",
+    "",
+    "  ● renders the card",
+    "",
+    "    Error: Snapshot `renders the card` mismatched",
+    "    at Object.<anonymous> (src/components/card.test.ts:12:7)",
+    "    Expected: <div class=\"card\">hello</div>",
+    "    Received: <div class=\"card elevated\">hello</div>",
+    "",
+    "      10 |   const card = renderCard()",
+    "      11 |",
+    "    > 12 |   expect(card).toMatchSnapshot()",
+    "         |                ^",
+    "      13 | })",
+    "",
+    "FAIL src/config/setup.test.ts",
+    "  ● Test suite failed to run",
+    "",
+    "    Cannot use import statement outside a module",
+    "",
+    "    Details:",
+    "    /repo/src/config/setup.ts:1",
+    "    import { bootstrap } from './bootstrap'",
+    "    ^^^^^^",
+    "    SyntaxError: Cannot use import statement outside a module",
+    "",
+    "Test Suites: 2 failed, 1 passed, 3 total",
+    "Tests:       1 failed, 2 passed, 3 total"
+  ].join("\n");
+}
+
 export const benchFixtures: BenchFixture[] = [
   {
     name: "single-blocker-short",
@@ -302,6 +391,57 @@ export const benchFixtures: BenchFixture[] = [
     completion: {
       expectedBuckets: ["import_dependency_failure"],
       expectedEntitiesAny: ["botocore", "pydantic", "fastapi", "PIL", "httpx", "numpy"],
+      expectedMaxDetail: "standard"
+    }
+  },
+  {
+    name: "vitest-snapshot-mismatch",
+    description: "Vitest reports a single snapshot mismatch with a traceback anchor.",
+    rawOutput: buildVitestSnapshotMismatchRaw(),
+    rawRecipe: [
+      {
+        command: "npx vitest run src/components/button.test.ts",
+        output: buildVitestSnapshotMismatchRaw()
+      }
+    ],
+    rawRecipeStopAfter: 1,
+    completion: {
+      expectedBuckets: ["snapshot_mismatch"],
+      expectedEntitiesAny: ["Button > renders primary"],
+      expectedMaxDetail: "standard"
+    }
+  },
+  {
+    name: "vitest-mixed-js",
+    description: "Vitest shows a snapshot mismatch, timeout, and missing import in one run.",
+    rawOutput: buildVitestMixedJsRaw(),
+    rawRecipe: [
+      {
+        command: "npx vitest run src/components/button.test.ts src/hooks/timeout.test.ts src/setup/auth.test.ts",
+        output: buildVitestMixedJsRaw()
+      }
+    ],
+    rawRecipeStopAfter: 1,
+    completion: {
+      expectedBuckets: ["import_dependency_failure", "snapshot_mismatch", "timeout_failure"],
+      expectedEntitiesAny: ["@/missing-client", "Button > renders primary"],
+      expectedMaxDetail: "standard"
+    }
+  },
+  {
+    name: "jest-mixed-js",
+    description: "Jest reports a config error and a snapshot mismatch in the same run.",
+    rawOutput: buildJestMixedJsRaw(),
+    rawRecipe: [
+      {
+        command: "npx jest src/components/card.test.ts src/config/setup.test.ts",
+        output: buildJestMixedJsRaw()
+      }
+    ],
+    rawRecipeStopAfter: 1,
+    completion: {
+      expectedBuckets: ["configuration_error", "snapshot_mismatch"],
+      expectedEntitiesAny: ["src/components/card.test.ts"],
       expectedMaxDetail: "standard"
     }
   }

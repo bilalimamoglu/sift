@@ -1,6 +1,6 @@
 {
   "name": "@bilalimamoglu/sift",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Agent-first command-output reduction layer for agents, CI, and automation.",
   "type": "module",
   "bin": {
@@ -15,7 +15,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "scripts": {
     "build": "tsup",

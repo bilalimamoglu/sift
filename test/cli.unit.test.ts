@@ -110,7 +110,7 @@ async function runMatched(
     env: {},
     stdout: process.stdout,
     stderr: process.stderr,
-    version: "0.3.1"
+    version: "0.3.2"
   });
   Object.defineProperty(process.stdout, "isTTY", {
     configurable: true,
@@ -285,7 +285,7 @@ describe("cli app unit", () => {
   });
 
   it("cleans duplicate version text only for string help sections", () => {
-    expect(cleanHelpSectionBody("sift/0.3.1\n\nUsage:\n", "0\\.3\\.1")).toBe(
+    expect(cleanHelpSectionBody("sift/0.3.2\n\nUsage:\n", "0\\.3\\.2")).toBe(
       "\nUsage:\n"
     );
     expect(cleanHelpSectionBody("Usage:\n", "0\\.3\\.0")).toBe("Usage:\n");
@@ -370,10 +370,10 @@ describe("cli app unit", () => {
         env: {},
         stdout: stdoutTty,
         stderr,
-        version: "0.3.1"
+        version: "0.3.2"
       }).outputHelp();
       const help = consoleLog.mock.calls.flat().join("\n");
-      expect(help).toContain("sift/0.3.1");
+      expect(help).toContain("sift/0.3.2");
       expect(help).toContain("Trim the noise. Keep the signal.");
 
       handleCliError(

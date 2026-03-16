@@ -140,7 +140,10 @@ describe("benchmark harness", () => {
       "single-blocker-short",
       "mixed-full-suite",
       "snapshot-drift-only",
-      "missing-module-collection"
+      "missing-module-collection",
+      "vitest-snapshot-mismatch",
+      "vitest-mixed-js",
+      "jest-mixed-js"
     ]);
 
     assertBudgetInvariants(report);
@@ -168,6 +171,9 @@ describe("benchmark harness", () => {
       "mixed-full-suite",
       "snapshot-drift-only",
       "missing-module-collection",
+      "vitest-snapshot-mismatch",
+      "vitest-mixed-js",
+      "jest-mixed-js",
       "single-blocker-short-real",
       "mixed-full-suite-real",
       "snapshot-drift-only-real"

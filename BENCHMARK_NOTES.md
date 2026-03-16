@@ -98,7 +98,7 @@ This is much closer to the actual product goal.
 
 ### Phase 3: real fixtures became first-class
 
-We added repo-tracked real fixtures captured from `modela-backend`, alongside the synthetic fixtures.
+We added repo-tracked real fixtures captured from a production backend, alongside the synthetic fixtures.
 
 That matters because the real outputs are much larger and noisier than the synthetic ones.
 
@@ -176,7 +176,7 @@ not as a universal claim about every live debugging session.
 
 ## Why real fixtures matter
 
-The real `modela-backend` fixtures are much bigger than the synthetic fixtures.
+The real fixtures are much bigger than the synthetic fixtures.
 
 That is good for the benchmark because it shows how `sift` behaves under realistic output scale and noise.
 

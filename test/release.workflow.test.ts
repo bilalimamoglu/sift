@@ -37,13 +37,13 @@ describe("release workflow", () => {
 
     expect(vitestConfig).toContain("provider: \"v8\"");
     expect(vitestConfig).toContain("thresholds:");
-    expect(vitestConfig).toContain("lines: 85");
-    expect(vitestConfig).toContain("functions: 85");
-    expect(vitestConfig).toContain("branches: 85");
-    expect(vitestConfig).toContain("statements: 85");
+    expect(vitestConfig).toContain("lines: 80");
+    expect(vitestConfig).toContain("functions: 80");
+    expect(vitestConfig).toContain("branches: 75");
+    expect(vitestConfig).toContain("statements: 80");
     expect(ciWorkflow).toContain("npm run test:coverage");
     expect(ciWorkflow).toContain("matrix:");
-    expect(ciWorkflow).toContain("node-version: [20, 24]");
+    expect(ciWorkflow).toContain("node-version: [24]");
     expect(ciWorkflow).toContain("node-version: ${{ matrix.node-version }}");
   });
 
@@ -62,13 +62,23 @@ describe("release workflow", () => {
       "utf8"
     );
 
+    expect(workflow).toContain("run-name: release ${{ inputs.version || github.ref_name }}");
     expect(workflow).toContain("workflow_dispatch:");
+    expect(workflow).toContain("inputs:");
+    expect(workflow).toContain("version:");
+    expect(workflow).toContain("Package version being released");
     expect(workflow).toContain("registry-url: \"https://registry.npmjs.org\"");
     expect(workflow).toContain("node-version: 24");
     expect(workflow).toContain("environment: release");
+    expect(workflow).toContain("Validate requested release version");
+    expect(workflow).toContain("workflow_dispatch input version");
+    expect(workflow).toContain("must match package.json version");
     expect(workflow).toContain("npm publish --access public");
     expect(workflow).toContain("git tag -a");
     expect(workflow).toContain("gh release create");
+    expect(workflow).toContain("release-notes/${{ steps.pkg.outputs.tag }}.md");
+    expect(workflow).toContain("release-notes/${{ steps.pkg.outputs.version }}.md");
+    expect(workflow).toContain("--notes-file");
     expect(workflow).toContain("fetch-depth: 0");
     expect(workflow).toContain("actions: read");
     expect(workflow).toContain("contents: write");

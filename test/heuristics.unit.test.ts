@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   analyzeTestStatus,
-  applyHeuristicPolicy
+  applyHeuristicPolicy,
+  classifyFailureReasonForTest
 } from "../src/core/heuristics.js";
 import {
   buildTestStatusDiagnoseContract,
@@ -58,6 +59,505 @@ function buildObservedAnchorOutput(): string {
     "E   RuntimeError: DB-isolated tests require PGTEST_POSTGRES_DSN (or --pgtest-dsn). Refusing to fall back to DATABASE_URL to avoid polluting non-test users."
   ].join("\n");
 }
+
+function buildSingleFailureOutput(args: {
+  status: "FAILED" | "ERROR";
+  label: string;
+  detail: string;
+  summary?: string;
+}): string {
+  return [
+    `${args.status} ${args.label} - ${args.detail}`,
+    `============= ${args.summary ?? (args.status === "ERROR" ? "1 error" : "1 failed")} in 0.10s =============`
+  ].join("\n");
+}
+
+function buildVitestAllPassedOutput(): string {
+  return [
+    " RUN  v2.1.0 /repo",
+    "",
+    " ✓ src/button.test.ts (2 tests) 12ms",
+    " ✓ src/input.test.ts (1 test) 5ms",
+    "",
+    " Test Files  2 passed (2)",
+    "      Tests  3 passed (3)",
+    "   Start at  10:00:00",
+    "   Duration  220ms"
+  ].join("\n");
+}
+
+function buildVitestSnapshotFailureOutput(): string {
+  return [
+    " RUN  v2.1.0 /repo",
+    "",
+    " ❯ src/components/button.test.ts > Button > renders primary FAILED [ 50%]",
+    "",
+    "⎯⎯⎯ Failed Tests 1 ⎯⎯⎯",
+    "",
+    " FAIL  src/components/button.test.ts > Button > renders primary",
+    "Error: Snapshot `Button > renders primary` mismatched",
+    "❯ src/components/button.test.ts:42:19",
+    "  40|   expect(rendered).toMatchSnapshot()",
+    "",
+    " Test Files  1 failed (1)",
+    "      Tests  1 failed | 1 passed (2)",
+    "  Snapshots  1 failed (1)"
+  ].join("\n");
+}
+
+function buildVitestImportBlockerOutput(): string {
+  return [
+    " RUN  v2.1.0 /repo",
+    "",
+    "⎯⎯⎯ Failed Suites 1 ⎯⎯⎯",
+    "",
+    " FAIL  src/setup/auth.test.ts [ src/setup/auth.test.ts ]",
+    "Error: Failed to resolve import \"@/missing-client\" from \"src/setup/auth.test.ts\". Does the file exist?",
+    "❯ src/setup/auth.test.ts:1:1",
+    "",
+    " Test Files  1 failed (1)",
+    "      Tests  no tests"
+  ].join("\n");
+}
+
+function buildVitestWorkerCrashOutput(): string {
+  return [
+    " RUN  v2.1.0 /repo",
+    "",
+    "⎯⎯⎯ Failed Suites 1 ⎯⎯⎯",
+    "",
+    " FAIL  src/workers/render.test.ts [ src/workers/render.test.ts ]",
+    "Error: Worker exited unexpectedly",
+    "❯ src/workers/render.test.ts:3:1",
+    "",
+    " Test Files  1 failed (1)",
+    "      Tests  no tests"
+  ].join("\n");
+}
+
+function buildVitestMixedFailureOutput(): string {
+  return [
+    " RUN  v2.1.0 /repo",
+    "",
+    " ❯ src/components/button.test.ts > Button > renders primary FAILED [ 25%]",
+    " ❯ src/hooks/timeout.test.ts > useSlowHook > resolves FAILED [ 50%]",
+    " ❯ src/setup/auth.test.ts ERROR [ 75%]",
+    "",
+    "⎯⎯⎯ Failed Tests 2 ⎯⎯⎯",
+    "",
+    " FAIL  src/components/button.test.ts > Button > renders primary",
+    "Error: Snapshot `Button > renders primary` mismatched",
+    "❯ src/components/button.test.ts:42:19",
+    "",
+    " FAIL  src/hooks/timeout.test.ts > useSlowHook > resolves",
+    "Error: Test timed out in 5000ms.",
+    "❯ src/hooks/timeout.test.ts:21:9",
+    "",
+    "⎯⎯⎯ Failed Suites 1 ⎯⎯⎯",
+    "",
+    " FAIL  src/setup/auth.test.ts [ src/setup/auth.test.ts ]",
+    "Error: Failed to resolve import \"@/missing-client\" from \"src/setup/auth.test.ts\". Does the file exist?",
+    "❯ src/setup/auth.test.ts:1:1",
+    "",
+    " Test Files  2 failed | 1 passed (3)",
+    "      Tests  2 failed | 1 passed (3)",
+    "  Snapshots  1 failed (1)"
+  ].join("\n");
+}
+
+function buildJestMixedFailureOutput(): string {
+  return [
+    "FAIL src/components/card.test.ts",
+    "  ✕ renders the card",
+    "",
+    "  ● renders the card",
+    "",
+    "    Error: Snapshot `renders the card` mismatched",
+    "    at Object.<anonymous> (src/components/card.test.ts:12:7)",
+    "",
+    "FAIL src/config/setup.test.ts",
+    "  ● Test suite failed to run",
+    "",
+    "    Cannot use import statement outside a module",
+    "",
+    "Test Suites: 2 failed, 1 passed, 3 total",
+    "Tests:       1 failed, 2 passed, 3 total"
+  ].join("\n");
+}
+
+function buildContractVsSnapshotOutput(): string {
+  return [
+    " RUN  v2.1.0 /repo",
+    "",
+    " ❯ tests/contracts/task_matrix_snapshot_freeze.test.ts > task matrix > is frozen FAILED [ 50%]",
+    " ❯ src/components/button.test.ts > Button > renders primary FAILED [100%]",
+    "",
+    "python scripts/update_contract_snapshots.py",
+    "  -             'openai-gpt-image-1.5',",
+    "",
+    "⎯⎯⎯ Failed Tests 2 ⎯⎯⎯",
+    "",
+    " FAIL  tests/contracts/task_matrix_snapshot_freeze.test.ts > task matrix > is frozen",
+    "AssertionError: expected task matrix to stay frozen",
+    "",
+    " FAIL  src/components/button.test.ts > Button > renders primary",
+    "Error: Snapshot `Button > renders primary` mismatched",
+    "",
+    " Test Files  2 failed (2)",
+    "      Tests  2 failed (2)",
+    "  Snapshots  1 failed (1)"
+  ].join("\n");
+}
+
+const directClassificationCases = [
+  {
+    name: "timeout",
+    line: "Failed: Timeout >5.0s",
+    prefix: "timeout:"
+  },
+  {
+    name: "permission denied",
+    line: "PermissionError: [Errno 13] Permission denied: '/tmp/socket'",
+    prefix: "permission:"
+  },
+  {
+    name: "async event loop",
+    line: "RuntimeError: Event loop is closed",
+    prefix: "async loop:"
+  },
+  {
+    name: "fixture teardown",
+    line: "ERROR at teardown of fixture_cache",
+    prefix: "fixture teardown:"
+  },
+  {
+    name: "db migration",
+    line: "psycopg.errors.UndefinedTable: relation \"users\" does not exist",
+    prefix: "db migration:"
+  },
+  {
+    name: "configuration",
+    line: "INTERNALERROR> pluggy._manager.PluginValidationError: bad config",
+    prefix: "configuration:"
+  },
+  {
+    name: "xdist worker crash",
+    line: "worker 'gw0' crashed while running tests",
+    prefix: "xdist worker crash:"
+  },
+  {
+    name: "type error",
+    line: "TypeError: unsupported operand type(s) for +: 'int' and 'NoneType'",
+    prefix: "type error:"
+  },
+  {
+    name: "resource leak",
+    line: "ResourceWarning: unclosed socket <socket.socket fd=12>",
+    prefix: "resource leak:"
+  },
+  {
+    name: "django db access",
+    line: "Database access not allowed, use the \"django_db\" mark",
+    prefix: "django db access:"
+  },
+  {
+    name: "network",
+    line: "requests.exceptions.ConnectionError: Max retries exceeded with url: https://api.example.com",
+    prefix: "network:"
+  },
+  {
+    name: "segfault",
+    line: "Segmentation fault",
+    prefix: "segfault:"
+  },
+  {
+    name: "flaky",
+    line: "RERUN 1 time because the test was flaky",
+    prefix: "flaky:"
+  },
+  {
+    name: "serialization",
+    line: "JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+    prefix: "serialization:"
+  },
+  {
+    name: "file not found",
+    line: "FileNotFoundError: [Errno 2] No such file or directory: '/tmp/data.json'",
+    prefix: "file not found:"
+  },
+  {
+    name: "memory",
+    line: "MemoryError: unable to allocate 2.0 GiB",
+    prefix: "memory:"
+  },
+  {
+    name: "deprecation as error",
+    line: "DeprecationWarning: old_api() is deprecated",
+    prefix: "deprecation as error:"
+  },
+  {
+    name: "strict xfail",
+    line: "XPASS(strict) test started passing unexpectedly",
+    prefix: "xfail strict:"
+  },
+  {
+    name: "snapshot mismatch",
+    line: "Error: Snapshot `Button > renders primary` mismatched",
+    prefix: "snapshot mismatch:"
+  },
+  {
+    name: "vitest timeout",
+    line: "Error: Test timed out in 5000ms.",
+    prefix: "timeout:"
+  },
+  {
+    name: "resolve import",
+    line: "Error: Failed to resolve import \"@/missing-client\" from \"src/setup/auth.test.ts\". Does the file exist?",
+    prefix: "missing module:"
+  },
+  {
+    name: "err module not found",
+    line: "Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'undici' imported from /repo/src/client.ts",
+    prefix: "missing module:"
+  },
+  {
+    name: "esm commonjs mismatch",
+    line: "Named export 'render' not found. The requested module '@testing-library/react' is a CommonJS module",
+    prefix: "configuration:"
+  },
+  {
+    name: "worker exited unexpectedly",
+    line: "Error: Worker exited unexpectedly",
+    prefix: "xdist worker crash:"
+  },
+  {
+    name: "worker memory limit",
+    line: "Worker terminated due to reaching memory limit",
+    prefix: "memory:"
+  },
+  {
+    name: "vitest unhandled",
+    line: "Vitest caught 1 unhandled error during the test run.",
+    prefix: "RuntimeError:"
+  },
+  {
+    name: "localStorage unavailable",
+    line: "localStorage is not available for opaque origins",
+    prefix: "configuration:"
+  },
+  {
+    name: "failed to load config",
+    line: "failed to load config from /repo/vitest.config.ts",
+    prefix: "configuration:"
+  }
+] as const;
+
+const pipelineClassificationCases = [
+  {
+    name: "timeout",
+    input: buildSingleFailureOutput({
+      status: "FAILED",
+      label: "tests/async/test_timeout.py::test_slow",
+      detail: "Failed: Timeout >5.0s"
+    }),
+    label: "timeout",
+    prefix: "timeout:"
+  },
+  {
+    name: "permission denied",
+    input: buildSingleFailureOutput({
+      status: "ERROR",
+      label: "tests/fs/test_permissions.py::test_write",
+      detail: "PermissionError: [Errno 13] Permission denied: '/tmp/output.txt'"
+    }),
+    label: "permission denied",
+    prefix: "permission:"
+  },
+  {
+    name: "async event loop",
+    input: buildSingleFailureOutput({
+      status: "ERROR",
+      label: "tests/async/test_loop.py::test_closed_loop",
+      detail: "RuntimeError: Event loop is closed"
+    }),
+    label: "async event loop",
+    prefix: "async loop:"
+  },
+  {
+    name: "fixture teardown",
+    input: buildSingleFailureOutput({
+      status: "ERROR",
+      label: "tests/fixtures/test_cleanup.py::test_tempdir",
+      detail: "ERROR at teardown of fixture_cache"
+    }),
+    label: "fixture teardown",
+    prefix: "fixture teardown:"
+  },
+  {
+    name: "db migration",
+    input: buildSingleFailureOutput({
+      status: "ERROR",
+      label: "tests/db/test_users.py::test_query",
+      detail: "psycopg.errors.UndefinedTable: relation \"users\" does not exist"
+    }),
+    label: "db migration",
+    prefix: "db migration:"
+  },
+  {
+    name: "configuration",
+    input: [
+      "collecting ... collected 0 items / 1 error",
+      "INTERNALERROR> pluggy._manager.PluginValidationError: bad config",
+      "============= 1 error in 0.01s ============="
+    ].join("\n"),
+    label: "configuration error",
+    prefix: "configuration:"
+  },
+  {
+    name: "xdist worker crash",
+    input: buildSingleFailureOutput({
+      status: "ERROR",
+      label: "tests/parallel/test_jobs.py::test_worker_state",
+      detail: "worker 'gw0' crashed while running tests"
+    }),
+    label: "xdist worker crash",
+    prefix: "xdist worker crash:"
+  },
+  {
+    name: "type error",
+    input: buildSingleFailureOutput({
+      status: "FAILED",
+      label: "tests/unit/test_types.py::test_coerce",
+      detail: "TypeError: unsupported operand type(s) for +: 'int' and 'NoneType'"
+    }),
+    label: "type error",
+    prefix: "type error:"
+  },
+  {
+    name: "resource leak",
+    input: buildSingleFailureOutput({
+      status: "ERROR",
+      label: "tests/io/test_streams.py::test_reader",
+      detail: "ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/data.txt'>"
+    }),
+    label: "resource leak",
+    prefix: "resource leak:"
+  },
+  {
+    name: "django db access",
+    input: buildSingleFailureOutput({
+      status: "ERROR",
+      label: "tests/django/test_models.py::test_insert",
+      detail: "Database access not allowed, use the \"django_db\" mark"
+    }),
+    label: "django db access",
+    prefix: "django db access:"
+  },
+  {
+    name: "network",
+    input: buildSingleFailureOutput({
+      status: "ERROR",
+      label: "tests/http/test_client.py::test_fetch",
+      detail: "requests.exceptions.ConnectionError: Max retries exceeded with url: https://api.example.com"
+    }),
+    label: "network failure",
+    prefix: "network:"
+  },
+  {
+    name: "segfault",
+    input: buildSingleFailureOutput({
+      status: "ERROR",
+      label: "tests/native/test_extension.py::test_render",
+      detail: "Segmentation fault"
+    }),
+    label: "segfault",
+    prefix: "segfault:"
+  },
+  {
+    name: "flaky",
+    input: buildSingleFailureOutput({
+      status: "FAILED",
+      label: "tests/flaky/test_retry.py::test_eventual_consistency",
+      detail: "RERUN 1 time because the test was flaky"
+    }),
+    label: "flaky test",
+    prefix: "flaky:"
+  },
+  {
+    name: "serialization",
+    input: buildSingleFailureOutput({
+      status: "FAILED",
+      label: "tests/json/test_decode.py::test_invalid_payload",
+      detail: "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+    }),
+    label: "serialization or encoding",
+    prefix: "serialization:"
+  },
+  {
+    name: "file not found",
+    input: buildSingleFailureOutput({
+      status: "FAILED",
+      label: "tests/fs/test_loader.py::test_fixture_file",
+      detail: "FileNotFoundError: [Errno 2] No such file or directory: '/tmp/data.json'"
+    }),
+    label: "file not found",
+    prefix: "file not found:"
+  },
+  {
+    name: "memory",
+    input: buildSingleFailureOutput({
+      status: "ERROR",
+      label: "tests/perf/test_memory.py::test_large_alloc",
+      detail: "MemoryError: unable to allocate 2.0 GiB"
+    }),
+    label: "memory error",
+    prefix: "memory:"
+  },
+  {
+    name: "deprecation as error",
+    input: buildSingleFailureOutput({
+      status: "FAILED",
+      label: "tests/warnings/test_deprecations.py::test_old_api",
+      detail: "DeprecationWarning: old_api() is deprecated"
+    }),
+    label: "deprecation as error",
+    prefix: "deprecation as error:"
+  },
+  {
+    name: "strict xfail",
+    input: buildSingleFailureOutput({
+      status: "FAILED",
+      label: "tests/xfail/test_status.py::test_known_bug",
+      detail: "XPASS(strict) test started passing unexpectedly"
+    }),
+    label: "strict xfail unexpected pass",
+    prefix: "xfail strict:"
+  },
+  {
+    name: "vitest snapshot mismatch",
+    input: buildVitestSnapshotFailureOutput(),
+    label: "snapshot mismatch",
+    prefix: "snapshot mismatch:"
+  },
+  {
+    name: "vitest import blocker",
+    input: buildVitestImportBlockerOutput(),
+    label: "import dependency failure",
+    prefix: "missing module:"
+  },
+  {
+    name: "vitest worker crash",
+    input: buildVitestWorkerCrashOutput(),
+    label: "xdist worker crash",
+    prefix: "xdist worker crash:"
+  },
+  {
+    name: "jest snapshot mismatch",
+    input: buildJestMixedFailureOutput(),
+    label: "configuration error",
+    prefix: "configuration:"
+  }
+] as const;
 
 describe("heuristic policies", () => {
   it("returns null when no policy is active", () => {
@@ -180,6 +680,120 @@ describe("heuristic policies", () => {
     );
   });
 
+  for (const testCase of directClassificationCases) {
+    it(`classifies ${testCase.name} via direct helper`, () => {
+      const classification = classifyFailureReasonForTest(testCase.line);
+      expect(classification?.reason).toMatch(new RegExp(`^${testCase.prefix}`));
+    });
+  }
+
+  for (const testCase of pipelineClassificationCases) {
+    it(`classifies ${testCase.name} through the diagnose pipeline`, () => {
+      const analysis = analyzeTestStatus(testCase.input);
+      const decision = buildTestStatusDiagnoseContract({
+        input: testCase.input,
+        analysis
+      });
+
+      expect(decision.contract.main_buckets[0]).toMatchObject({
+        label: testCase.label
+      });
+      expect(decision.contract.main_buckets[0]?.root_cause).toMatch(
+        new RegExp(`^${testCase.prefix}`)
+      );
+    });
+  }
+
+  it("renders bucket-specific titles for new runtime families in standard output", () => {
+    const timeoutOutput = applyHeuristicPolicy(
+      "test-status",
+      buildSingleFailureOutput({
+        status: "FAILED",
+        label: "tests/async/test_timeout.py::test_slow",
+        detail: "Failed: Timeout >5.0s"
+      })
+    );
+    const networkOutput = applyHeuristicPolicy(
+      "test-status",
+      buildSingleFailureOutput({
+        status: "ERROR",
+        label: "tests/http/test_client.py::test_fetch",
+        detail: "requests.exceptions.ConnectionError: Max retries exceeded with url: https://api.example.com"
+      })
+    );
+
+    expect(timeoutOutput).toContain(
+      "Timeout failures: 1 test exceeded the configured timeout threshold."
+    );
+    expect(networkOutput).toContain("Network failures: 1 visible failure share network:");
+  });
+
+  it("keeps tier 1 bucket ordering from stealing existing env and service buckets", () => {
+    const input = [
+      "ERROR tests/env/test_bootstrap.py::test_env - KeyError: 'REDIS_URL'",
+      "FAILED tests/async/test_timeout.py::test_slow - Failed: Timeout >5.0s",
+      "ERROR tests/http/test_health.py::test_ready - 503 Service Unavailable",
+      "============= 1 failed, 2 errors in 0.10s ============="
+    ].join("\n");
+
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis: analyzeTestStatus(input)
+    });
+
+    expect(decision.contract.main_buckets.map((bucket) => bucket.root_cause)).toEqual(
+      expect.arrayContaining([
+        "missing test env: REDIS_URL",
+        expect.stringMatching(/^timeout:/),
+        "service unavailable: dependency service is unavailable"
+      ])
+    );
+  });
+
+  it("keeps tier 2 bucket ordering from stealing import and fixture buckets", () => {
+    const input = [
+      "ERROR tests/network/test_client.py::test_fetch - requests.exceptions.ConnectionError: Max retries exceeded with url: https://api.example.com",
+      "ERROR tests/django/test_models.py::test_insert - Database access not allowed, use the \"django_db\" mark",
+      "ERROR tests/fixtures/test_bootstrap.py::test_env - FixtureLookupError: capsys fixture not available",
+      "============= 3 errors in 0.10s ============="
+    ].join("\n");
+
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis: analyzeTestStatus(input)
+    });
+
+    expect(decision.contract.main_buckets.map((bucket) => bucket.root_cause)).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^network:/),
+        "django db access: Database access not allowed, use the \"django_db\" mark",
+        "fixture guard: capsys"
+      ])
+    );
+  });
+
+  it("keeps tier 3 bucket ordering from stealing assertion buckets", () => {
+    const input = [
+      "FAILED tests/fs/test_loader.py::test_fixture_file - FileNotFoundError: [Errno 2] No such file or directory: '/tmp/data.json'",
+      "FAILED tests/xfail/test_status.py::test_known_bug - XPASS(strict) test started passing unexpectedly",
+      "FAILED tests/core/test_response.py::test_response - AssertionError: expected 200 to equal 201",
+      "============= 3 failed in 0.10s ============="
+    ].join("\n");
+
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis: analyzeTestStatus(input)
+    });
+
+    expect(decision.contract.main_buckets.map((bucket) => bucket.root_cause)).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^file not found:/),
+        expect.stringMatching(/^xfail strict:/),
+        "assertion failed: expected 200 to equal 201"
+      ])
+    );
+  });
+
   it("detects generic env blockers beyond repo-specific literals", () => {
     const input = [
       "ERROR tests/cache/test_bootstrap.py::test_cache - KeyError: 'REDIS_URL'",
@@ -214,6 +828,127 @@ describe("heuristic policies", () => {
     expect(decision.contract.decision).toBe("zoom");
     expect(decision.contract.main_buckets.map((bucket) => bucket.label)).toEqual(
       expect.arrayContaining(["unknown setup blocker", "unknown failure family"])
+    );
+  });
+
+  it("detects vitest and jest runners through analyzeTestStatus", () => {
+    expect(analyzeTestStatus(buildMixedFailureOutput()).runner).toBe("pytest");
+    expect(analyzeTestStatus(buildVitestAllPassedOutput()).runner).toBe("vitest");
+    expect(analyzeTestStatus(buildJestMixedFailureOutput()).runner).toBe("jest");
+    expect(analyzeTestStatus("plain failure text without a runner footer").runner).toBe("unknown");
+  });
+
+  it("parses vitest and jest summary counts", () => {
+    const vitest = analyzeTestStatus(buildVitestSnapshotFailureOutput());
+    const jest = analyzeTestStatus(buildJestMixedFailureOutput());
+
+    expect(vitest).toMatchObject({
+      failed: 1,
+      passed: 1,
+      snapshotFailures: 1
+    });
+    expect(jest).toMatchObject({
+      failed: 1,
+      passed: 2
+    });
+  });
+
+  it("extracts vitest anchors and snapshot mismatch buckets", () => {
+    const input = buildVitestSnapshotFailureOutput();
+    const analysis = analyzeTestStatus(input);
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis
+    });
+
+    expect(analysis.inlineItems[0]).toMatchObject({
+      label: "src/components/button.test.ts > Button > renders primary",
+      file: "src/components/button.test.ts",
+      line: 42,
+      anchor_kind: "traceback"
+    });
+    expect(analysis.buckets[0]?.type).toBe("snapshot_mismatch");
+    expect(decision.contract.main_buckets[0]).toMatchObject({
+      label: "snapshot mismatch"
+    });
+    expect(decision.standardText).toContain(
+      "Update the snapshots if these output changes are intentional."
+    );
+  });
+
+  it("creates a dedicated vitest import blocker bucket", () => {
+    const input = buildVitestImportBlockerOutput();
+    const analysis = analyzeTestStatus(input);
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis
+    });
+
+    expect(analysis.buckets.map((bucket) => bucket.type)).toContain("import_dependency_failure");
+    expect(decision.contract.main_buckets[0]).toMatchObject({
+      label: "import dependency failure"
+    });
+    expect(decision.contract.main_buckets[0]?.root_cause).toMatch(/^missing module:/);
+  });
+
+  it("parses mixed vitest failures into multiple buckets", () => {
+    const input = buildVitestMixedFailureOutput();
+    const analysis = analyzeTestStatus(input);
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis
+    });
+
+    expect(analysis.visibleFailedLabels).toEqual(
+      expect.arrayContaining([
+        "src/components/button.test.ts > Button > renders primary",
+        "src/hooks/timeout.test.ts > useSlowHook > resolves"
+      ])
+    );
+    expect(analysis.visibleErrorLabels).toContain("src/setup/auth.test.ts");
+    expect(analysis.buckets.map((bucket) => bucket.type)).toEqual(
+      expect.arrayContaining(["import_dependency_failure", "snapshot_mismatch", "timeout_failure"])
+    );
+    expect(decision.contract.main_buckets.map((bucket) => bucket.label)).toEqual(
+      expect.arrayContaining(["import dependency failure", "snapshot mismatch", "timeout"])
+    );
+  });
+
+  it("keeps generic snapshot mismatches out of contract drift buckets", () => {
+    const input = buildContractVsSnapshotOutput();
+    const analysis = analyzeTestStatus(input);
+
+    expect(analysis.buckets.map((bucket) => bucket.type)).toEqual(
+      expect.arrayContaining(["contract_snapshot_drift", "snapshot_mismatch"])
+    );
+
+    const contractBucket = analysis.buckets.find((bucket) => bucket.type === "contract_snapshot_drift");
+    const snapshotBucket = analysis.buckets.find((bucket) => bucket.type === "snapshot_mismatch");
+
+    expect(contractBucket?.representativeItems.map((item) => item.label)).toEqual(
+      expect.arrayContaining(["tests/contracts/task_matrix_snapshot_freeze.test.ts > task matrix > is frozen"])
+    );
+    expect(snapshotBucket?.representativeItems.map((item) => item.label)).toEqual(
+      expect.arrayContaining(["src/components/button.test.ts > Button > renders primary"])
+    );
+    expect(contractBucket?.representativeItems.map((item) => item.label)).not.toContain(
+      "src/components/button.test.ts > Button > renders primary"
+    );
+  });
+
+  it("parses mixed jest failures into configuration and snapshot buckets", () => {
+    const input = buildJestMixedFailureOutput();
+    const analysis = analyzeTestStatus(input);
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis
+    });
+
+    expect(analysis.buckets.map((bucket) => bucket.type)).toEqual(
+      expect.arrayContaining(["configuration_error", "snapshot_mismatch"])
+    );
+    expect(decision.contract.main_buckets.map((bucket) => bucket.label)).toEqual(
+      expect.arrayContaining(["configuration error", "snapshot mismatch"])
     );
   });
 

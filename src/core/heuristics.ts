@@ -35,6 +35,100 @@ function getCount(input: string, label: string): number {
   return lastMatch ? Number(lastMatch[1]) : 0;
 }
 
+type TestRunner = "pytest" | "vitest" | "jest" | "unknown";
+
+interface TestStatusCounts {
+  passed: number;
+  failed: number;
+  errors: number;
+  skipped: number;
+  snapshotFailures?: number;
+}
+
+function detectTestRunner(input: string): TestRunner {
+  if (
+    /^\s*Test Files?\s+(?:\d+\s+failed\s*\|\s*)?\d+\s+passed/m.test(input) ||
+    /^\s*Tests?\s+(?:\d+\s+failed\s*\|\s*)?\d+\s+passed/m.test(input) ||
+    /^\s*Snapshots?\s+(?:\d+\s+failed\s*\|\s*)?\d+\s+passed/m.test(input) ||
+    /⎯{2,}\s+Failed Tests?\s+\d+\s+⎯{2,}/.test(input)
+  ) {
+    return "vitest";
+  }
+
+  if (
+    /^\s*Test Suites:\s+\d+\s+failed,\s+\d+\s+passed(?:,\s+\d+\s+total)?/m.test(input) ||
+    /^\s*Tests:\s+\d+\s+failed,\s+\d+\s+passed(?:,\s+\d+\s+total)?/m.test(input)
+  ) {
+    return "jest";
+  }
+
+  if (
+    /\bpytest\b/i.test(input) ||
+    /^\s*=+.*\b\d+\s+failed\b.*=+\s*$/m.test(input) ||
+    /\bcollected\s+\d+\s+items\b/i.test(input)
+  ) {
+    return "pytest";
+  }
+
+  return "unknown";
+}
+
+function extractVitestLineCount(input: string, label: string, metric: string): number | null {
+  const matcher = new RegExp(`^\\s*${label}\\s+(.+)$`, "gmi");
+  const lines = [...input.matchAll(matcher)];
+  const line = lines.at(-1)?.[1];
+  if (!line) {
+    return null;
+  }
+
+  const metricMatch = line.match(new RegExp(`(\\d+)\\s+${metric}`, "i"));
+  return metricMatch ? Number(metricMatch[1]) : null;
+}
+
+function extractJestLineCount(input: string, label: string, metric: string): number | null {
+  const matcher = new RegExp(`^\\s*${label}:\\s+(.+)$`, "gmi");
+  const lines = [...input.matchAll(matcher)];
+  const line = lines.at(-1)?.[1];
+  if (!line) {
+    return null;
+  }
+
+  const metricMatch = line.match(new RegExp(`(\\d+)\\s+${metric}`, "i"));
+  return metricMatch ? Number(metricMatch[1]) : null;
+}
+
+function extractTestStatusCounts(input: string, runner: TestRunner): TestStatusCounts {
+  if (runner === "vitest") {
+    return {
+      passed: extractVitestLineCount(input, "Tests?", "passed") ?? getCount(input, "passed"),
+      failed: extractVitestLineCount(input, "Tests?", "failed") ?? getCount(input, "failed"),
+      errors:
+        extractVitestLineCount(input, "Errors?", "error") ??
+        extractVitestLineCount(input, "Errors?", "errors") ??
+        Math.max(getCount(input, "errors"), getCount(input, "error")),
+      skipped: extractVitestLineCount(input, "Tests?", "skipped") ?? getCount(input, "skipped"),
+      snapshotFailures:
+        extractVitestLineCount(input, "Snapshots?", "failed") ?? undefined
+    };
+  }
+
+  if (runner === "jest") {
+    return {
+      passed: extractJestLineCount(input, "Tests", "passed") ?? getCount(input, "passed"),
+      failed: extractJestLineCount(input, "Tests", "failed") ?? getCount(input, "failed"),
+      errors: Math.max(getCount(input, "errors"), getCount(input, "error")),
+      skipped: extractJestLineCount(input, "Tests", "skipped") ?? getCount(input, "skipped")
+    };
+  }
+
+  return {
+    passed: getCount(input, "passed"),
+    failed: getCount(input, "failed"),
+    errors: Math.max(getCount(input, "errors"), getCount(input, "error")),
+    skipped: getCount(input, "skipped")
+  };
+}
+
 function formatCount(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
@@ -80,6 +174,12 @@ interface FailureClassification {
   group: string;
 }
 
+interface JsFailureBlock {
+  label: string;
+  status: "failed" | "error";
+  detailLines: string[];
+}
+
 function emptyAnchor(): Pick<
   FocusedFailureItem,
   "file" | "line" | "anchor_kind" | "anchor_confidence"
@@ -97,7 +197,8 @@ function normalizeAnchorFile(value: string): string {
 }
 
 function inferFileFromLabel(label: string): string | null {
-  const candidate = cleanFailureLabel(label).split("::")[0]?.trim();
+  const cleaned = cleanFailureLabel(label);
+  const candidate = cleaned.split("::")[0]?.split(" > ")[0]?.trim();
   if (!candidate) {
     return null;
   }
@@ -168,6 +269,16 @@ function parseObservedAnchor(
     };
   }
 
+  const vitestTraceback = normalized.match(/^\s*❯\s+([^:\s][^:]*\.[A-Za-z0-9]+):(\d+)(?::\d+)?/);
+  if (vitestTraceback) {
+    return {
+      file: normalizeAnchorFile(vitestTraceback[1]!),
+      line: Number(vitestTraceback[2]),
+      anchor_kind: "traceback",
+      anchor_confidence: 1
+    };
+  }
+
   return null;
 }
 
@@ -202,6 +313,10 @@ function isLowValueInternalReason(normalized: string): boolean {
 }
 
 function scoreFailureReason(reason: string): number {
+  if (reason.startsWith("configuration:")) {
+    return 6;
+  }
+
   if (reason.startsWith("missing test env:")) {
     return 6;
   }
@@ -210,8 +325,39 @@ function scoreFailureReason(reason: string): number {
     return 5;
   }
 
+  if (reason.startsWith("snapshot mismatch:")) {
+    return 4;
+  }
+
   if (reason.startsWith("assertion failed:")) {
     return 4;
+  }
+
+  if (
+    reason.startsWith("timeout:") ||
+    reason.startsWith("async loop:") ||
+    reason.startsWith("django db access:") ||
+    reason.startsWith("db migration:")
+  ) {
+    return 3;
+  }
+
+  if (
+    reason.startsWith("permission:") ||
+    reason.startsWith("xdist worker crash:") ||
+    reason.startsWith("network:") ||
+    reason.startsWith("segfault:") ||
+    reason.startsWith("memory:") ||
+    reason.startsWith("type error:") ||
+    reason.startsWith("serialization:") ||
+    reason.startsWith("file not found:") ||
+    reason.startsWith("deprecation as error:") ||
+    reason.startsWith("xfail strict:") ||
+    reason.startsWith("resource leak:") ||
+    reason.startsWith("flaky:") ||
+    reason.startsWith("fixture teardown:")
+  ) {
+    return 2;
   }
 
   if (/^[A-Z][A-Za-z]+(?:Error|Exception):/.test(reason)) {
@@ -223,6 +369,19 @@ function scoreFailureReason(reason: string): number {
   }
 
   return 1;
+}
+
+function buildClassifiedReason(prefix: string, detail: string): string {
+  return `${prefix}: ${detail}`.slice(0, 120);
+}
+
+function buildExcerptDetail(value: string, fallback: string): string {
+  const trimmed = value.trim().replace(/\s+/g, " ");
+  return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function sharedBlockerThreshold(reason: string): number {
+  return reason.startsWith("configuration:") ? 1 : 3;
 }
 
 function extractEnvBlockerName(normalized: string): string | null {
@@ -355,6 +514,248 @@ function classifyFailureReason(
     };
   }
 
+  const snapshotMismatch = normalized.match(
+    /((?:Error:\s*)?Snapshot\b.+\bmismatched\b[^$]*|Snapshot comparison failed[^$]*)/i
+  );
+  if (snapshotMismatch) {
+    return {
+      reason: buildClassifiedReason(
+        "snapshot mismatch",
+        buildExcerptDetail(snapshotMismatch[1] ?? normalized, "snapshot output changed")
+      ),
+      group: "snapshot mismatches"
+    };
+  }
+
+  const timeoutFailure = normalized.match(
+    /(Failed:\s*Timeout\s*>[^,;]+|asyncio\.exceptions\.TimeoutError:\s*.+|TimeoutError:\s*.+|(?:Test|Hook)\s+timed out in\s+\d+(?:\.\d+)?m?s[^$]*|(?:\[vitest-(?:worker|pool)\]:\s*)?Timeout[^$]*)$/i
+  );
+  if (timeoutFailure) {
+    return {
+      reason: buildClassifiedReason(
+        "timeout",
+        buildExcerptDetail(timeoutFailure[1] ?? normalized, "test exceeded timeout threshold")
+      ),
+      group: "timeout failures"
+    };
+  }
+
+  const asyncLoopFailure = normalized.match(
+    /(Event loop is closed|no current event loop|coroutine .* was never awaited|coroutine was never awaited)/i
+  );
+  if (asyncLoopFailure) {
+    return {
+      reason: buildClassifiedReason(
+        "async loop",
+        buildExcerptDetail(asyncLoopFailure[1] ?? normalized, "async event loop failure")
+      ),
+      group: "async event loop failures"
+    };
+  }
+
+  const permissionFailure = normalized.match(
+    /(PermissionError:\s*\[Errno 13\][^$]*|Address already in use)/i
+  );
+  if (permissionFailure) {
+    return {
+      reason: buildClassifiedReason(
+        "permission",
+        buildExcerptDetail(permissionFailure[1] ?? normalized, "permission denied or resource locked")
+      ),
+      group: "permission or locked resource failures"
+    };
+  }
+
+  const xdistWorkerCrash = normalized.match(
+    /(worker ['"][^'"]+['"] crashed|node down:\s*[^,;]+|WorkerLost[^,;]*|Worker exited unexpectedly[^,;]*|worker exited unexpectedly[^,;]*)/i
+  );
+  if (xdistWorkerCrash) {
+    return {
+      reason: buildClassifiedReason(
+        "xdist worker crash",
+        buildExcerptDetail(xdistWorkerCrash[1] ?? normalized, "pytest-xdist worker crashed")
+      ),
+      group: "xdist worker crashes"
+    };
+  }
+
+  if (/Worker terminated due to reaching memory limit/i.test(normalized)) {
+    return {
+      reason: "memory: Worker terminated due to reaching memory limit",
+      group: "memory exhaustion failures"
+    };
+  }
+
+  if (/Database access not allowed, use the ["']django_db["'] mark/i.test(normalized)) {
+    return {
+      reason: "django db access: Database access not allowed, use the \"django_db\" mark",
+      group: "django database marker failures"
+    };
+  }
+
+  const networkFailure = normalized.match(
+    /(Max retries exceeded[^,;]*|gaierror[^,;]*|SSLCertVerificationError[^,;]*|Network is unreachable)/i
+  );
+  if (networkFailure) {
+    return {
+      reason: buildClassifiedReason(
+        "network",
+        buildExcerptDetail(networkFailure[1] ?? normalized, "network dependency failure")
+      ),
+      group: "network dependency failures"
+    };
+  }
+
+  const relationMigration = normalized.match(/relation ["'`]([^"'`]+)["'`] does not exist/i);
+  if (relationMigration) {
+    return {
+      reason: buildClassifiedReason("db migration", `relation ${relationMigration[1]} does not exist`),
+      group: "database migration or schema failures"
+    };
+  }
+
+  const noSuchTable = normalized.match(/no such table(?::)?\s*([A-Za-z0-9_.-]+)/i);
+  if (noSuchTable) {
+    return {
+      reason: buildClassifiedReason("db migration", `no such table ${noSuchTable[1]}`),
+      group: "database migration or schema failures"
+    };
+  }
+
+  if (/InconsistentMigrationHistory/i.test(normalized)) {
+    return {
+      reason: "db migration: InconsistentMigrationHistory",
+      group: "database migration or schema failures"
+    };
+  }
+
+  if (/(Segmentation fault|SIGSEGV|\bexit 139\b)/i.test(normalized)) {
+    return {
+      reason: buildClassifiedReason(
+        "segfault",
+        buildExcerptDetail(normalized, "subprocess crashed with SIGSEGV")
+      ),
+      group: "subprocess crash failures"
+    };
+  }
+
+  if (/(MemoryError\b|\bexit 137\b|OOMKilled|OutOfMemory)/i.test(normalized)) {
+    return {
+      reason: buildClassifiedReason(
+        "memory",
+        buildExcerptDetail(normalized, "process exhausted available memory")
+      ),
+      group: "memory exhaustion failures"
+    };
+  }
+
+  const typeErrorFailure = normalized.match(/TypeError:\s*(.+)$/i);
+  if (typeErrorFailure) {
+    return {
+      reason: buildClassifiedReason(
+        "type error",
+        buildExcerptDetail(typeErrorFailure[1] ?? normalized, "TypeError")
+      ),
+      group: "type errors"
+    };
+  }
+
+  const serializationFailure = normalized.match(
+    /\b(UnicodeDecodeError|JSONDecodeError|PicklingError):\s*(.+)$/i
+  );
+  if (serializationFailure) {
+    return {
+      reason: buildClassifiedReason(
+        "serialization",
+        `${serializationFailure[1]}: ${buildExcerptDetail(serializationFailure[2] ?? "", serializationFailure[1] ?? "serialization failure")}`
+      ),
+      group: "serialization and encoding failures"
+    };
+  }
+
+  const fileNotFoundFailure = normalized.match(/FileNotFoundError:\s*(.+)$/i);
+  if (fileNotFoundFailure) {
+    return {
+      reason: buildClassifiedReason(
+        "file not found",
+        buildExcerptDetail(fileNotFoundFailure[1] ?? normalized, "missing file during test execution")
+      ),
+      group: "missing file failures"
+    };
+  }
+
+  const deprecationFailure = normalized.match(
+    /\b(DeprecationWarning|FutureWarning|PytestRemovedIn9Warning):\s*(.+)$/i
+  );
+  if (deprecationFailure) {
+    return {
+      reason: buildClassifiedReason(
+        "deprecation as error",
+        `${deprecationFailure[1]}: ${buildExcerptDetail(deprecationFailure[2] ?? "", deprecationFailure[1] ?? "warning treated as error")}`
+      ),
+      group: "warnings treated as errors"
+    };
+  }
+
+  const strictXfail = normalized.match(/XPASS\(strict\)\s*:?\s*(.+)?$/i);
+  if (strictXfail) {
+    return {
+      reason: buildClassifiedReason(
+        "xfail strict",
+        buildExcerptDetail(strictXfail[1] ?? normalized, "strict xfail unexpectedly passed")
+      ),
+      group: "strict xfail expectation failures"
+    };
+  }
+
+  const resourceLeak = normalized.match(
+    /(PytestUnraisableExceptionWarning[^,;]*|ResourceWarning:\s*unclosed[^,;]*)/i
+  );
+  if (resourceLeak) {
+    return {
+      reason: buildClassifiedReason(
+        "resource leak",
+        buildExcerptDetail(resourceLeak[1] ?? normalized, "resource leak warning promoted to failure")
+      ),
+      group: "resource leak warnings"
+    };
+  }
+
+  const flakyFailure = normalized.match(/\b(RERUN|[0-9]+\s+rerun|Flaky test passed)\b[^$]*/i);
+  if (flakyFailure) {
+    return {
+      reason: buildClassifiedReason(
+        "flaky",
+        buildExcerptDetail(flakyFailure[0] ?? normalized, "test required reruns before passing")
+      ),
+      group: "flaky test detections"
+    };
+  }
+
+  const teardownFailure = normalized.match(/ERROR at teardown of\s+(.+)$/i);
+  if (teardownFailure) {
+    return {
+      reason: buildClassifiedReason(
+        "fixture teardown",
+        buildExcerptDetail(teardownFailure[1] ?? normalized, "fixture teardown failed")
+      ),
+      group: "fixture teardown failures"
+    };
+  }
+
+  const configurationFailure = normalized.match(
+    /(INTERNALERROR>.+|ConftestImportFailure[^,;]*|UsageError:\s*.+|ERROR:\s*usage:\s*.+|pytest:\s*error:\s*.+|Cannot use import statement outside a module[^$]*|Named export.+not found.+CommonJS[^$]*|failed to load config from.+|localStorage is not available[^$]*|No test suite found in file.+|No test found in suite.+)$/i
+  );
+  if (configurationFailure) {
+    return {
+      reason: buildClassifiedReason(
+        "configuration",
+        buildExcerptDetail(configurationFailure[1] ?? normalized, "test configuration error")
+      ),
+      group: "test configuration failures"
+    };
+  }
+
   const pythonMissingModule = normalized.match(
     /ModuleNotFoundError:\s+No module named ['"]([^'"]+)['"]/i
   );
@@ -377,11 +778,44 @@ function classifyFailureReason(
     };
   }
 
+  const importResolutionFailure = normalized.match(/Failed to resolve import ['"]([^'"]+)['"]/i);
+  if (importResolutionFailure) {
+    return {
+      reason: `missing module: ${importResolutionFailure[1]}`,
+      group: options.duringCollection
+        ? "import/dependency errors during collection"
+        : "missing dependency/module errors"
+    };
+  }
+
+  const esmModuleFailure =
+    normalized.match(/ERR_MODULE_NOT_FOUND[^'"`]*['"`]([^'"`]+)['"`]/i) ??
+    normalized.match(/Cannot find package ['"`]([^'"`]+)['"`]/i);
+  if (esmModuleFailure) {
+    return {
+      reason: `missing module: ${esmModuleFailure[1]}`,
+      group: options.duringCollection
+        ? "import/dependency errors during collection"
+        : "missing dependency/module errors"
+    };
+  }
+
   const assertionFailure = normalized.match(/AssertionError:\s*(.+)$/i);
   if (assertionFailure) {
     return {
       reason: `assertion failed: ${assertionFailure[1]}`.slice(0, 120),
       group: "assertion failures"
+    };
+  }
+
+  const vitestUnhandled = normalized.match(/Vitest caught\s+\d+\s+unhandled errors?/i);
+  if (vitestUnhandled) {
+    return {
+      reason: `RuntimeError: ${buildExcerptDetail(vitestUnhandled[0] ?? normalized, "Vitest caught unhandled errors")}`.slice(
+        0,
+        120
+      ),
+      group: "runtime failures"
     };
   }
 
@@ -414,6 +848,17 @@ function classifyFailureReason(
   };
 }
 
+export function classifyFailureReasonForTest(
+  line: string,
+  options?: {
+    duringCollection?: boolean;
+  }
+): FailureClassification | null {
+  return classifyFailureReason(line, {
+    duringCollection: options?.duringCollection ?? false
+  });
+}
+
 function pushFocusedFailureItem(items: FocusedFailureItem[], candidate: FocusedFailureItem): void {
   if (items.some((item) => item.label === candidate.label && item.reason === candidate.reason)) {
     return;
@@ -442,6 +887,175 @@ function chooseStrongestFailureItems(items: FocusedFailureItem[]): FocusedFailur
   return order.map((label) => strongest.get(label)!);
 }
 
+function isJsTestFile(value: string): boolean {
+  return /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(value.trim());
+}
+
+function extractJsTestFile(value: string): string | null {
+  const match = value.match(/([A-Za-z0-9_./-]+\.(?:test|spec)\.[cm]?[jt]sx?)/i);
+  return match ? normalizeAnchorFile(match[1]!) : null;
+}
+
+function normalizeJsFailureLabel(label: string): string {
+  return cleanFailureLabel(label)
+    .replace(/^[❯×]\s*/, "")
+    .replace(/\s+\[[^\]]+\]\s*$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function classifyFailureLines(args: {
+  lines: string[];
+  duringCollection: boolean;
+}): {
+  classification: FailureClassification;
+  observedAnchor: Pick<
+    FocusedFailureItem,
+    "file" | "line" | "anchor_kind" | "anchor_confidence"
+  > | null;
+} | null {
+  let observedAnchor: Pick<
+    FocusedFailureItem,
+    "file" | "line" | "anchor_kind" | "anchor_confidence"
+  > | null = null;
+  let strongest:
+    | {
+        classification: FailureClassification;
+        score: number;
+        observedAnchor: Pick<
+          FocusedFailureItem,
+          "file" | "line" | "anchor_kind" | "anchor_confidence"
+        > | null;
+      }
+    | null = null;
+
+  for (const line of args.lines) {
+    observedAnchor = parseObservedAnchor(line) ?? observedAnchor;
+    const classification = classifyFailureReason(line, {
+      duringCollection: args.duringCollection
+    });
+    if (!classification) {
+      continue;
+    }
+
+    const score = scoreFailureReason(classification.reason);
+    if (!strongest || score > strongest.score) {
+      strongest = {
+        classification,
+        score,
+        observedAnchor: parseObservedAnchor(line) ?? observedAnchor
+      };
+    }
+  }
+
+  if (!strongest) {
+    return null;
+  }
+
+  return {
+    classification: strongest.classification,
+    observedAnchor: strongest.observedAnchor ?? observedAnchor
+  };
+}
+
+function collectJsFailureBlocks(input: string): JsFailureBlock[] {
+  const blocks: JsFailureBlock[] = [];
+  let current: JsFailureBlock | null = null;
+  let section: "failed_tests" | "failed_suites" | null = null;
+  let currentFile: string | null = null;
+
+  const flushCurrent = () => {
+    if (!current) {
+      return;
+    }
+
+    blocks.push(current);
+    current = null;
+  };
+
+  for (const rawLine of input.split("\n")) {
+    const line = rawLine.trimEnd();
+    const trimmed = line.trim();
+
+    if (/⎯{2,}\s+Failed Tests?\s+\d+\s+⎯{2,}/.test(line)) {
+      flushCurrent();
+      section = "failed_tests";
+      continue;
+    }
+
+    if (/⎯{2,}\s+Failed Suites?\s+\d+\s+⎯{2,}/.test(line)) {
+      flushCurrent();
+      section = "failed_suites";
+      continue;
+    }
+
+    if (section && /^⎯{2,}.+⎯{2,}\s*$/.test(line)) {
+      flushCurrent();
+      section = null;
+      continue;
+    }
+
+    const progress = line.match(
+      /^(.+?\.(?:test|spec)\.[cm]?[jt]sx?(?:\s+>.+?)?)\s+(FAILED|ERROR)\s+\[[^\]]+\]\s*$/
+    );
+    if (progress) {
+      flushCurrent();
+      const label = normalizeJsFailureLabel(progress[1]!);
+      current = {
+        label,
+        status: progress[2] === "ERROR" ? "error" : "failed",
+        detailLines: []
+      };
+      currentFile = extractJsTestFile(label);
+      continue;
+    }
+
+    const failHeader = line.match(/^\s*FAIL\s+(.+)$/);
+    if (failHeader) {
+      const label = normalizeJsFailureLabel(failHeader[1]!);
+      if (extractJsTestFile(label)) {
+        flushCurrent();
+        current = {
+          label,
+          status: section === "failed_suites" || !label.includes(" > ") ? "error" : "failed",
+          detailLines: []
+        };
+        currentFile = extractJsTestFile(label);
+        continue;
+      }
+    }
+
+    const failedTest = line.match(/^\s*×\s+(.+)$/);
+    if (failedTest && (section === "failed_tests" || extractJsTestFile(failedTest[1]!))) {
+      flushCurrent();
+      const candidate = normalizeJsFailureLabel(failedTest[1]!);
+      const file = extractJsTestFile(candidate) ?? currentFile;
+      const label =
+        file && !extractJsTestFile(candidate) ? `${file} > ${candidate}` : candidate;
+      current = {
+        label,
+        status: "failed",
+        detailLines: []
+      };
+      currentFile = extractJsTestFile(label) ?? currentFile;
+      continue;
+    }
+
+    if (/^\s*(?:Tests?|Snapshots?|Test Files?|Test Suites?)\b/.test(line)) {
+      flushCurrent();
+      section = null;
+      continue;
+    }
+
+    if (current && trimmed.length > 0) {
+      current.detailLines.push(line);
+    }
+  }
+
+  flushCurrent();
+  return blocks;
+}
+
 function collectCollectionFailureItems(input: string): FocusedFailureItem[] {
   const items: FocusedFailureItem[] = [];
   const lines = input.split("\n");
@@ -453,6 +1067,28 @@ function collectCollectionFailureItems(input: string): FocusedFailureItem[] {
   > | null = null;
 
   for (const line of lines) {
+    const standaloneCollectionLabel =
+      line.match(/No test suite found in file\s+(.+)$/i)?.[1] ??
+      line.match(/No test found in suite\s+(.+)$/i)?.[1] ??
+      line.match(/failed to load config from\s+(.+)$/i)?.[1];
+    if (standaloneCollectionLabel) {
+      const classification = classifyFailureReason(line, {
+        duringCollection: true
+      });
+      if (classification) {
+        pushFocusedFailureItem(items, {
+          label: cleanFailureLabel(standaloneCollectionLabel),
+          reason: classification.reason,
+          group: classification.group,
+          ...resolveAnchorForLabel({
+            label: cleanFailureLabel(standaloneCollectionLabel),
+            observedAnchor: parseObservedAnchor(line)
+          })
+        });
+      }
+      continue;
+    }
+
     const collecting = line.match(/^_+\s+ERROR collecting\s+(.+?)\s+_+\s*$/);
     if (collecting) {
       if (currentLabel && pendingGenericReason) {
@@ -554,6 +1190,26 @@ function collectInlineFailureItems(input: string): FocusedFailureItem[] {
     });
   }
 
+  for (const block of collectJsFailureBlocks(input)) {
+    const resolved = classifyFailureLines({
+      lines: block.detailLines,
+      duringCollection: block.status === "error"
+    });
+    if (!resolved) {
+      continue;
+    }
+
+    pushFocusedFailureItem(items, {
+      label: block.label,
+      reason: resolved.classification.reason,
+      group: resolved.classification.group,
+      ...resolveAnchorForLabel({
+        label: block.label,
+        observedAnchor: resolved.observedAnchor
+      })
+    });
+  }
+
   return items;
 }
 
@@ -595,6 +1251,27 @@ function collectInlineFailureItemsWithStatus(input: string): StatusFailureItem[]
     });
   }
 
+  for (const block of collectJsFailureBlocks(input)) {
+    const resolved = classifyFailureLines({
+      lines: block.detailLines,
+      duringCollection: block.status === "error"
+    });
+    if (!resolved) {
+      continue;
+    }
+
+    items.push({
+      label: block.label,
+      reason: resolved.classification.reason,
+      group: resolved.classification.group,
+      status: block.status,
+      ...resolveAnchorForLabel({
+        label: block.label,
+        observedAnchor: resolved.observedAnchor
+      })
+    });
+  }
+
   return items;
 }
 
@@ -602,12 +1279,24 @@ function collectStandaloneErrorClassifications(input: string): FailureClassifica
   const classifications: FailureClassification[] = [];
 
   for (const line of input.split("\n")) {
-    const standalone = line.match(/^\s*E\s+(.+)$/);
-    if (!standalone) {
+    const trimmed = line.trim();
+    if (!trimmed) {
       continue;
     }
 
-    const classification = classifyFailureReason(standalone[1]!, {
+    const standalone = line.match(/^\s*E\s+(.+)$/);
+    const candidate =
+      standalone?.[1] ??
+      (/^(INTERNALERROR>|ConftestImportFailure\b|UsageError:|ERROR:\s*usage:|pytest:\s*error:)/i.test(
+        trimmed
+      )
+        ? trimmed
+        : null);
+    if (!candidate) {
+      continue;
+    }
+
+    const classification = classifyFailureReason(candidate, {
       duringCollection: false
     });
     if (!classification || classification.reason === "import error during collection") {
@@ -776,10 +1465,29 @@ interface VisibleFailureLabel {
 export type FailureBucketType =
   | "shared_environment_blocker"
   | "fixture_guard_failure"
+  | "timeout_failure"
+  | "permission_denied_failure"
+  | "async_event_loop_failure"
+  | "fixture_teardown_failure"
+  | "db_migration_failure"
+  | "configuration_error"
+  | "xdist_worker_crash"
+  | "type_error_failure"
+  | "resource_leak_warning"
+  | "django_db_access_denied"
+  | "network_failure"
+  | "subprocess_crash_segfault"
+  | "flaky_test_detected"
+  | "serialization_encoding_failure"
+  | "file_not_found_failure"
+  | "memory_error"
+  | "deprecation_warning_as_error"
+  | "xfail_strict_unexpected_pass"
   | "service_unavailable"
   | "db_connection_failure"
   | "auth_bypass_absent"
   | "contract_snapshot_drift"
+  | "snapshot_mismatch"
   | "import_dependency_failure"
   | "collection_failure"
   | "assertion_failure"
@@ -804,10 +1512,12 @@ export interface FailureBucket {
 }
 
 export interface TestStatusAnalysis {
+  runner: TestRunner;
   passed: number;
   failed: number;
   errors: number;
   skipped: number;
+  snapshotFailures?: number;
   noTestsCollected: boolean;
   interrupted: boolean;
   collectionErrorCount?: number;
@@ -863,6 +1573,10 @@ function collectFailureLabels(input: string): VisibleFailureLabel[] {
     }
   }
 
+  for (const block of collectJsFailureBlocks(input)) {
+    pushLabel(block.label, block.status);
+  }
+
   return labels;
 }
 
@@ -891,6 +1605,78 @@ function classifyBucketTypeFromReason(reason: string): FailureBucketType {
     return "fixture_guard_failure";
   }
 
+  if (reason.startsWith("timeout:")) {
+    return "timeout_failure";
+  }
+
+  if (reason.startsWith("permission:")) {
+    return "permission_denied_failure";
+  }
+
+  if (reason.startsWith("async loop:")) {
+    return "async_event_loop_failure";
+  }
+
+  if (reason.startsWith("fixture teardown:")) {
+    return "fixture_teardown_failure";
+  }
+
+  if (reason.startsWith("db migration:")) {
+    return "db_migration_failure";
+  }
+
+  if (reason.startsWith("configuration:")) {
+    return "configuration_error";
+  }
+
+  if (reason.startsWith("xdist worker crash:")) {
+    return "xdist_worker_crash";
+  }
+
+  if (reason.startsWith("type error:")) {
+    return "type_error_failure";
+  }
+
+  if (reason.startsWith("resource leak:")) {
+    return "resource_leak_warning";
+  }
+
+  if (reason.startsWith("django db access:")) {
+    return "django_db_access_denied";
+  }
+
+  if (reason.startsWith("network:")) {
+    return "network_failure";
+  }
+
+  if (reason.startsWith("segfault:")) {
+    return "subprocess_crash_segfault";
+  }
+
+  if (reason.startsWith("flaky:")) {
+    return "flaky_test_detected";
+  }
+
+  if (reason.startsWith("serialization:")) {
+    return "serialization_encoding_failure";
+  }
+
+  if (reason.startsWith("file not found:")) {
+    return "file_not_found_failure";
+  }
+
+  if (reason.startsWith("memory:")) {
+    return "memory_error";
+  }
+
+  if (reason.startsWith("deprecation as error:")) {
+    return "deprecation_warning_as_error";
+  }
+
+  if (reason.startsWith("xfail strict:")) {
+    return "xfail_strict_unexpected_pass";
+  }
+
   if (reason.startsWith("service unavailable:")) {
     return "service_unavailable";
   }
@@ -901,6 +1687,10 @@ function classifyBucketTypeFromReason(reason: string): FailureBucketType {
 
   if (reason.startsWith("auth bypass absent:")) {
     return "auth_bypass_absent";
+  }
+
+  if (reason.startsWith("snapshot mismatch:")) {
+    return "snapshot_mismatch";
   }
 
   if (reason.startsWith("missing module:")) {
@@ -924,10 +1714,6 @@ function synthesizeSharedBlockerBucket(args: {
   visibleErrorItems: StatusFailureItem[];
   errorStatusLabels: string[];
 }): FailureBucket | null {
-  if (args.errors === 0) {
-    return null;
-  }
-
   const visibleReasonGroups = new Map<
     string,
     {
@@ -953,7 +1739,7 @@ function synthesizeSharedBlockerBucket(args: {
   }
 
   const top = [...visibleReasonGroups.entries()]
-    .filter(([, entry]) => entry.count >= 3)
+    .filter(([reason, entry]) => entry.count >= sharedBlockerThreshold(reason))
     .sort((left, right) => right[1].count - left[1].count)[0];
 
   const standaloneReasonGroups = new Map<
@@ -978,7 +1764,7 @@ function synthesizeSharedBlockerBucket(args: {
   }
 
   const standaloneTop = [...standaloneReasonGroups.entries()]
-    .filter(([, entry]) => entry.count >= 3)
+    .filter(([reason, entry]) => entry.count >= sharedBlockerThreshold(reason))
     .sort((left, right) => right[1].count - left[1].count)[0];
 
   const visibleTopReason = top?.[0];
@@ -1039,6 +1825,12 @@ function synthesizeSharedBlockerBucket(args: {
   let hint: string | undefined;
   if (envVar) {
     hint = `Set ${envVar} (or pass --pgtest-dsn) before rerunning DB-isolated tests.`;
+  } else if (effectiveReason.startsWith("configuration:")) {
+    hint = "Fix the pytest configuration or conftest import error before rerunning the suite.";
+  } else if (effectiveReason.startsWith("xdist worker crash:")) {
+    hint = "Check shared state, worker startup, or resource contention between xdist workers before rerunning.";
+  } else if (effectiveReason.startsWith("network:")) {
+    hint = "Restore DNS, TLS, or outbound network access for the affected dependency before rerunning.";
   } else if (effectiveReason.startsWith("fixture guard:")) {
     hint = "Unblock the required fixture or setup guard before rerunning the affected tests.";
   } else if (effectiveReason.startsWith("db refused:")) {
@@ -1054,6 +1846,12 @@ function synthesizeSharedBlockerBucket(args: {
   let headline: string;
   if (envVar) {
     headline = `Shared blocker: ${atLeastPrefix}${countText} errors require ${envVar} for DB-isolated tests.`;
+  } else if (effectiveReason.startsWith("configuration:")) {
+    headline = `Shared blocker: ${atLeastPrefix}${countText} visible failure${countText === 1 ? "" : "s"} are caused by a pytest configuration error.`;
+  } else if (effectiveReason.startsWith("xdist worker crash:")) {
+    headline = `Shared blocker: ${atLeastPrefix}${countText} errors are caused by xdist worker crashes.`;
+  } else if (effectiveReason.startsWith("network:")) {
+    headline = `Shared blocker: ${atLeastPrefix}${countText} errors are caused by a network dependency failure.`;
   } else if (effectiveReason.startsWith("fixture guard:")) {
     headline = `Shared blocker: ${atLeastPrefix}${countText} errors are gated by the same fixture/setup guard.`;
   } else if (effectiveReason.startsWith("db refused:")) {
@@ -1088,13 +1886,23 @@ function synthesizeSharedBlockerBucket(args: {
 function synthesizeImportDependencyBucket(args: {
   errors: number;
   visibleErrorItems: StatusFailureItem[];
+  inlineItems: FocusedFailureItem[];
 }): FailureBucket | null {
-  if (args.errors === 0) {
-    return null;
-  }
+  const visibleImportItems = args.visibleErrorItems.filter((item) =>
+    item.reason.startsWith("missing module:")
+  );
+  const inlineImportItems = chooseStrongestFailureItems(
+    args.inlineItems.filter((item) => item.reason.startsWith("missing module:"))
+  );
+  const importItems =
+    visibleImportItems.length > 0
+      ? visibleImportItems
+      : inlineImportItems.map((item) => ({
+          ...item,
+          status: "failed" as const
+        }));
 
-  const importItems = args.visibleErrorItems.filter((item) => item.reason.startsWith("missing module:"));
-  if (importItems.length < 2) {
+  if (importItems.length === 0) {
     return null;
   }
 
@@ -1115,7 +1923,7 @@ function synthesizeImportDependencyBucket(args: {
   const headlineCount = countClaimed ?? importItems.length;
   const headline = countClaimed
     ? `Import/dependency blocker: ${headlineCount} errors are caused by missing dependencies during test collection.`
-    : `Import/dependency blocker: at least ${headlineCount} visible errors are caused by missing dependencies during test collection.`;
+    : `Import/dependency blocker: at least ${headlineCount} visible failure${headlineCount === 1 ? "" : "s"} are caused by missing dependencies during test collection.`;
   const summaryLines = [headline];
 
   if (modules.length > 0) {
@@ -1127,7 +1935,10 @@ function synthesizeImportDependencyBucket(args: {
     headline,
     countVisible: importItems.length,
     countClaimed,
-    reason: "missing dependencies during test collection",
+    reason:
+      modules.length === 1
+        ? `missing module: ${modules[0]}`
+        : "missing dependencies during test collection",
     representativeItems: importItems.slice(0, 4).map((item) => ({
       label: item.label,
       reason: item.reason,
@@ -1150,7 +1961,7 @@ function synthesizeImportDependencyBucket(args: {
 }
 
 function isContractDriftLabel(label: string): boolean {
-  return /(freeze|snapshot|contract|manifest|openapi|golden)/i.test(label);
+  return /(freeze|contract|manifest|openapi|golden)/i.test(label);
 }
 
 function looksLikeTaskKey(value: string): boolean {
@@ -1320,14 +2131,92 @@ function synthesizeContractDriftBucket(args: {
   };
 }
 
+function synthesizeSnapshotMismatchBucket(args: {
+  inlineItems: FocusedFailureItem[];
+  snapshotFailures?: number;
+}): FailureBucket | null {
+  const snapshotItems = chooseStrongestFailureItems(
+    args.inlineItems.filter((item) => item.reason.startsWith("snapshot mismatch:"))
+  );
+  if (snapshotItems.length === 0) {
+    return null;
+  }
+
+  const countClaimed =
+    args.snapshotFailures && args.snapshotFailures >= snapshotItems.length
+      ? args.snapshotFailures
+      : undefined;
+  const countText = countClaimed ?? snapshotItems.length;
+  const summaryLines = [
+    `Snapshot mismatches: ${formatCount(countText, "snapshot expectation")} ${countText === 1 ? "is" : "are"} out of date with current output.`
+  ];
+
+  return {
+    type: "snapshot_mismatch",
+    headline: summaryLines[0]!,
+    countVisible: snapshotItems.length,
+    countClaimed,
+    reason: "snapshot mismatch: snapshot expectations differ from current output",
+    representativeItems: snapshotItems.slice(0, 4),
+    entities: snapshotItems
+      .map((item) => item.label.split(" > ").slice(1).join(" > ").trim() || item.label)
+      .slice(0, 6),
+    hint: "Update the snapshots if these output changes are intentional.",
+    confidence: countClaimed ? 0.92 : 0.8,
+    summaryLines,
+    overflowCount: Math.max((countClaimed ?? snapshotItems.length) - Math.min(snapshotItems.length, 4), 0),
+    overflowLabel: "snapshot failures"
+  };
+}
+
+function synthesizeTimeoutBucket(args: {
+  inlineItems: FocusedFailureItem[];
+}): FailureBucket | null {
+  const timeoutItems = chooseStrongestFailureItems(
+    args.inlineItems.filter((item) => item.reason.startsWith("timeout:"))
+  );
+  if (timeoutItems.length === 0) {
+    return null;
+  }
+
+  const summaryLines = [
+    `Timeout failures: ${formatCount(timeoutItems.length, "test")} exceeded the configured timeout threshold.`
+  ];
+
+  return {
+    type: "timeout_failure",
+    headline: summaryLines[0]!,
+    countVisible: timeoutItems.length,
+    countClaimed: timeoutItems.length,
+    reason:
+      timeoutItems.length === 1
+        ? timeoutItems[0]!.reason
+        : "timeout: tests exceeded the configured timeout threshold",
+    representativeItems: timeoutItems.slice(0, 4),
+    entities: timeoutItems
+      .map((item) => item.label.split(" > ").slice(1).join(" > ").trim() || item.label)
+      .slice(0, 6),
+    hint: "Check for deadlocks, slow setup, or increase the timeout threshold before rerunning.",
+    confidence: 0.84,
+    summaryLines,
+    overflowCount: Math.max(timeoutItems.length - Math.min(timeoutItems.length, 4), 0),
+    overflowLabel: "timeout failures"
+  };
+}
+
 export function analyzeTestStatus(input: string): TestStatusAnalysis {
-  const passed = getCount(input, "passed");
-  const failed = getCount(input, "failed");
-  const errors = Math.max(getCount(input, "errors"), getCount(input, "error"));
-  const skipped = getCount(input, "skipped");
+  const runner = detectTestRunner(input);
+  const counts = extractTestStatusCounts(input, runner);
+  const passed = counts.passed;
+  const failed = counts.failed;
+  const errors = counts.errors;
+  const skipped = counts.skipped;
   const collectionErrors = input.match(/(\d+)\s+errors?\s+during collection/i);
   const noTestsCollected =
-    /\bcollected\s+0\s+items\b/i.test(input) || /\bno tests ran\b/i.test(input);
+    /\bcollected\s+0\s+items\b/i.test(input) ||
+    /\bno tests ran\b/i.test(input) ||
+    /No test suite found in file/i.test(input) ||
+    /No test found in suite/i.test(input);
   const interrupted =
     /\binterrupted\b/i.test(input) || /\bKeyboardInterrupt\b/i.test(input);
   const collectionItems = chooseStrongestFailureItems(collectCollectionFailureItems(input));
@@ -1361,7 +2250,8 @@ export function analyzeTestStatus(input: string): TestStatusAnalysis {
   if (!sharedBlocker) {
     const importDependencyBucket = synthesizeImportDependencyBucket({
       errors,
-      visibleErrorItems
+      visibleErrorItems,
+      inlineItems
     });
     if (importDependencyBucket) {
       buckets.push(importDependencyBucket);
@@ -1376,11 +2266,28 @@ export function analyzeTestStatus(input: string): TestStatusAnalysis {
     buckets.push(contractDrift);
   }
 
+  const snapshotMismatch = synthesizeSnapshotMismatchBucket({
+    inlineItems,
+    snapshotFailures: counts.snapshotFailures
+  });
+  if (snapshotMismatch) {
+    buckets.push(snapshotMismatch);
+  }
+
+  const timeoutBucket = synthesizeTimeoutBucket({
+    inlineItems
+  });
+  if (timeoutBucket) {
+    buckets.push(timeoutBucket);
+  }
+
   return {
+    runner,
     passed,
     failed,
     errors,
     skipped,
+    snapshotFailures: counts.snapshotFailures,
     noTestsCollected,
     interrupted,
     collectionErrorCount: collectionErrors ? Number(collectionErrors[1]) : undefined,

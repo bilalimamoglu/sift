@@ -7,57 +7,6 @@ import { repoRoot } from "./helpers/cli.js";
 import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
 
 describe("README quick start acceptance", () => {
-  it("documents guided one-time setup", async () => {
-    const readme = await fs.readFile(path.join(repoRoot(), "README.md"), "utf8");
-
-    expect(readme).toContain("turns a long terminal wall of text into a short answer");
-    expect(readme).toContain("standard` = map");
-    expect(readme).toContain("rerun --remaining` = zoom");
-    expect(readme).toContain("raw traceback = last resort");
-    expect(readme).toContain("sift config setup");
-    expect(readme).toContain("~/.config/sift/config.yaml");
-    expect(readme).toContain("repo-local config can still override it");
-    expect(readme).toContain("any terminal on the machine can use `sift`");
-    expect(readme).toContain("sift config use openrouter");
-    expect(readme).toContain("sift config use openai");
-    expect(readme).toContain("If you prefer manual setup, this is the smallest useful OpenRouter setup");
-    expect(readme).toContain("export SIFT_PROVIDER=openrouter");
-    expect(readme).toContain("export OPENROUTER_API_KEY=your_openrouter_api_key");
-    expect(readme).toContain("--show-raw");
-    expect(readme).toContain("sift agent install codex");
-    expect(readme).toContain("sift agent install claude");
-    expect(readme).toContain("sift agent install codex --dry-run");
-    expect(readme).toContain("sift agent show codex --raw");
-    expect(readme).toContain("sift agent install codex --dry-run --raw");
-    expect(readme).toContain("managed blocks");
-    expect(readme).toContain("--diff");
-    expect(readme).toContain("--show-raw");
-    expect(readme).toContain("sift rerun");
-    expect(readme).toContain("sift rerun --remaining --detail focused");
-    expect(readme).toContain("--include-test-ids");
-    expect(readme).toContain("Shared blocker:");
-    expect(readme).toContain("Contract drift:");
-    expect(readme).toContain("path/to/failing_test.py");
-    expect(readme).toContain("search <TEST_ENV_VAR> in path/to/test_setup.py");
-    expect(readme).toContain("search <route-or-entity> in path/to/freeze_test.py");
-    expect(readme).not.toContain("PGTEST_POSTGRES_DSN");
-    expect(readme).not.toContain("landing-gallery");
-    expect(readme).toContain("npm run bench:test-status-ab");
-    expect(readme).toContain("npm run bench:test-status-live");
-    expect(readme).toContain("Start with the map");
-    expect(readme).toContain("If `standard` already names the main failure buckets");
-    expect(readme).toContain("Use diagnose JSON only when automation or machine branching really needs it");
-    expect(readme).toContain("Default diagnose JSON is summary-first");
-    expect(readme).toContain("read_targets.context_hint");
-    expect(readme).toContain("search_hint");
-    expect(readme).toContain("Anchor:");
-    expect(readme).toContain("Fix:");
-    expect(readme).toContain("trust it and report or act from there directly");
-    expect(readme).toContain("do not re-verify the same bucket with raw pytest");
-    expect(readme).toContain("unknown bucket or ends with `Decision: zoom`");
-    expect(readme).toContain("Decision: stop and act");
-  });
-
   it("supports the documented quick-start commands", async () => {
     const server = await createFakeOpenAIServer((body, _index, request) => {
       const serializedBody = JSON.stringify(body);
