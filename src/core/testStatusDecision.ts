@@ -1606,13 +1606,21 @@ function buildUnknownBucket(args: {
   const reason = isError
     ? "unknown setup blocker: setup failures share a repeated but unclassified pattern"
     : "unknown failure family: failing tests share a repeated but unclassified pattern";
+  const firstConcreteSignal =
+    anchor &&
+    anchor.reason !== reason &&
+    anchor.reason !== "setup failures share a repeated but unclassified pattern" &&
+    anchor.reason !== "failing tests share a repeated but unclassified pattern"
+      ? `First concrete signal: ${anchor.reason}`
+      : null;
 
   return {
     type: "unknown_failure",
     headline: `${label}: ${formatCount(args.count, "visible failure")} share a repeated but unclassified pattern.`,
     summaryLines: [
-      `${label}: ${formatCount(args.count, "visible failure")} share a repeated but unclassified pattern.`
-    ],
+      `${label}: ${formatCount(args.count, "visible failure")} share a repeated but unclassified pattern.`,
+      firstConcreteSignal
+    ].filter((value): value is string => Boolean(value)),
     reason,
     count: args.count,
     confidence: 0.45,
@@ -1763,6 +1771,7 @@ function renderBucketHeadline(bucket: TestStatusDiagnoseBucket): string {
 
 interface StandardBucketSupport {
   headline: string;
+  firstConcreteSignalText: string | null;
   anchorText: string | null;
   fixText: string | null;
 }
@@ -1865,6 +1874,8 @@ function buildStandardBucketSupport(args: {
     headline: args.bucket.summaryLines[0]
       ? `- ${args.bucket.summaryLines[0]}`
       : renderBucketHeadline(args.contractBucket),
+    firstConcreteSignalText:
+      args.bucket.source === "unknown" ? args.bucket.summaryLines[1] ?? null : null,
     anchorText: buildStandardAnchorText(args.readTarget),
     fixText: buildStandardFixText({
       bucket: args.bucket,
@@ -1895,6 +1906,9 @@ function renderStandard(args: {
         )
       });
       lines.push(support.headline);
+      if (support.firstConcreteSignalText) {
+        lines.push(`- ${support.firstConcreteSignalText}`);
+      }
       if (support.anchorText) {
         lines.push(`- Anchor: ${support.anchorText}`);
       }

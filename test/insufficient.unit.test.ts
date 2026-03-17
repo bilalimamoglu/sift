@@ -74,4 +74,29 @@ describe("insufficient signal helpers", () => {
       "Hint: the captured output did not contain a clear answer for this preset."
     );
   });
+
+  it("adds a runner-aware preset suggestion for non-test-status insufficient output", () => {
+    expect(
+      buildInsufficientSignalOutput({
+        presetName: "lint-failures",
+        originalLength: 20,
+        truncatedApplied: false,
+        recognizedRunner: "pytest"
+      })
+    ).toContain(
+      "Hint: captured output looks like pytest test output; try --preset test-status."
+    );
+  });
+
+  it("does not add a runner-aware preset suggestion for test-status", () => {
+    expect(
+      buildInsufficientSignalOutput({
+        presetName: "test-status",
+        originalLength: 100,
+        truncatedApplied: false,
+        exitCode: 0,
+        recognizedRunner: "pytest"
+      })
+    ).not.toContain("try --preset test-status");
+  });
 });

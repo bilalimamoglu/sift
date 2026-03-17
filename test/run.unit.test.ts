@@ -568,6 +568,43 @@ describe("runSift unit", () => {
     );
   });
 
+  it("adds a runner-aware preset suggestion to insufficient text responses", async () => {
+    const pytestLikeOutput = [
+      "FAILED tests/unit/test_auth.py::test_refresh - TypeError: refresh token payload is undefined",
+      "============================== 1 failed in 0.10s =============================="
+    ].join("\n");
+
+    prepareInputMock.mockReturnValue({
+      raw: pytestLikeOutput,
+      sanitized: pytestLikeOutput,
+      redacted: pytestLikeOutput,
+      truncated: pytestLikeOutput,
+      meta: {
+        originalLength: pytestLikeOutput.length,
+        finalLength: pytestLikeOutput.length,
+        redactionApplied: false,
+        truncatedApplied: false
+      }
+    });
+    createProviderMock.mockReturnValue({
+      name: "openai",
+      generate: vi
+        .fn()
+        .mockResolvedValue({ text: "Insufficient signal in the provided input." })
+    });
+    const { runSift } = await import("../src/core/run.js");
+
+    await expect(
+      runSift(makeRequest({ presetName: "lint-failures", policyName: "lint-failures" }))
+    ).resolves.toBe(
+      [
+        "Insufficient signal in the provided input.",
+        "Hint: the captured output did not contain a clear answer for this preset.",
+        "Hint: captured output looks like pytest test output; try --preset test-status."
+      ].join("\n")
+    );
+  });
+
   it("uses provider follow-up for incomplete test-status diagnosis and merges the supplement contract", async () => {
     const incompleteTestStatus = [
       "=========================== short test summary info ============================",
@@ -799,5 +836,164 @@ describe("runSift unit", () => {
     expect(parsed.provider_failed).toBe(true);
     expect(parsed.provider_confidence).toBeNull();
     expect(parsed.next_best_action.note).toContain("Provider follow-up failed (HTTP 503)");
+  });
+
+  it("prefers source reading when provider follow-up fails after a concrete known bucket", async () => {
+    vi.resetModules();
+
+    const buildTestStatusDiagnoseContractMock = vi.fn();
+    const buildTestStatusPublicDiagnoseContractMock = vi.fn((args: {
+      contract: unknown;
+    }) => args.contract);
+
+    vi.doMock("../src/core/testStatusDecision.js", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("../src/core/testStatusDecision.js")>();
+      return {
+        ...actual,
+        buildTestStatusAnalysisContext: vi.fn(() => "analysis-context"),
+        buildTestStatusDiagnoseContract: buildTestStatusDiagnoseContractMock,
+        buildTestStatusPublicDiagnoseContract: buildTestStatusPublicDiagnoseContractMock
+      };
+    });
+
+    const pytestLikeOutput = [
+      "FAILED tests/unit/test_auth.py::test_refresh - TypeError: refresh token payload is undefined",
+      "============================== 1 failed in 0.10s =============================="
+    ].join("\n");
+
+    prepareInputMock.mockReturnValue({
+      raw: pytestLikeOutput,
+      sanitized: pytestLikeOutput,
+      redacted: pytestLikeOutput,
+      truncated: pytestLikeOutput,
+      meta: {
+        originalLength: pytestLikeOutput.length,
+        finalLength: pytestLikeOutput.length,
+        redactionApplied: false,
+        truncatedApplied: false
+      }
+    });
+    buildPromptMock.mockReturnValue({
+      prompt: "PROMPT",
+      responseMode: "json"
+    });
+    createProviderMock.mockReturnValue({
+      name: "openai",
+      generate: vi.fn().mockRejectedValue(new Error("HTTP 503"))
+    });
+
+    const baseContract = {
+      status: "insufficient" as const,
+      diagnosis_complete: false,
+      raw_needed: true,
+      additional_source_read_likely_low_value: false,
+      read_raw_only_if: "focused detail still needed",
+      decision: "zoom" as const,
+      dominant_blocker_bucket_index: 1,
+      provider_used: false,
+      provider_confidence: null,
+      provider_failed: false,
+      raw_slice_used: false,
+      raw_slice_strategy: "bucket_evidence" as const,
+      resolved_tests: [],
+      remaining_tests: ["tests/unit/test_auth.py::test_refresh"],
+      main_buckets: [
+        {
+          bucket_index: 1,
+          label: "runtime failure",
+          count: 1,
+          root_cause: "TypeError: refresh token payload is undefined",
+          evidence: ["tests/unit/test_auth.py::test_refresh -> TypeError: refresh token payload is undefined"],
+          bucket_confidence: 0.55,
+          root_cause_confidence: 0.55,
+          dominant: true,
+          secondary_visible_despite_blocker: false,
+          mini_diff: null
+        }
+      ],
+      read_targets: [
+        {
+          file: "tests/unit/test_auth.py",
+          line: 21,
+          why: "it contains the failing setup for the refresh token payload",
+          bucket_index: 1,
+          context_hint: {
+            start_line: 18,
+            end_line: 24,
+            search_hint: null
+          }
+        }
+      ],
+      next_best_action: {
+        code: "insufficient_signal" as const,
+        bucket_index: 1,
+        note: "Use one deeper sift pass before raw."
+      }
+    };
+
+    buildTestStatusDiagnoseContractMock
+      .mockReturnValueOnce({
+        contract: baseContract,
+        standardText: "base standard",
+        focusedText: "base focused",
+        verboseText: "base verbose"
+      })
+      .mockReturnValueOnce({
+        contract: {
+          ...baseContract,
+          provider_used: true,
+          provider_failed: true,
+          raw_needed: false,
+          decision: "read_source",
+          next_best_action: {
+            code: "read_source_for_bucket",
+            bucket_index: 1,
+            note:
+              "Provider follow-up failed (HTTP 503). The heuristic anchor is concrete enough to inspect source for the current bucket before reading raw traceback."
+          }
+        },
+        standardText: "provider failure standard",
+        focusedText: "provider failure focused",
+        verboseText: "provider failure verbose"
+      });
+
+    const { runSift } = await import("../src/core/run.js");
+    const output = await runSift(
+      makeRequest({
+        policyName: "test-status",
+        presetName: "test-status",
+        goal: "diagnose",
+        format: "json"
+      })
+    );
+    const parsed = JSON.parse(output) as {
+      provider_failed: boolean;
+      raw_needed: boolean;
+      decision: string;
+      next_best_action: { code: string; note: string };
+    };
+
+    expect(buildTestStatusDiagnoseContractMock).toHaveBeenCalledTimes(2);
+    expect(buildTestStatusDiagnoseContractMock.mock.calls[1]?.[0]).toMatchObject({
+      contractOverrides: {
+        decision: "read_source",
+        raw_needed: false,
+        read_raw_only_if: null,
+        provider_failed: true,
+        next_best_action: {
+          code: "read_source_for_bucket",
+          bucket_index: 1
+        }
+      }
+    });
+    expect(parsed.provider_failed).toBe(true);
+    expect(parsed.raw_needed).toBe(false);
+    expect(parsed.decision).toBe("read_source");
+    expect(parsed.next_best_action.code).toBe("read_source_for_bucket");
+    expect(parsed.next_best_action.note).toContain(
+      "heuristic anchor is concrete enough to inspect source"
+    );
+
+    vi.doUnmock("../src/core/testStatusDecision.js");
   });
 });

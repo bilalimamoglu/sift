@@ -3,7 +3,7 @@ import type { RunRequest } from "../types.js";
 import { createProvider } from "../providers/factory.js";
 import { buildPrompt } from "../prompts/buildPrompt.js";
 import { buildFallbackOutput } from "./fallback.js";
-import { analyzeTestStatus, applyHeuristicPolicy } from "./heuristics.js";
+import { analyzeTestStatus, applyHeuristicPolicy, detectTestRunner } from "./heuristics.js";
 import {
   buildInsufficientSignalOutput,
   isInsufficientSignalOutput
@@ -171,7 +171,8 @@ function withInsufficientHint(args: {
   return buildInsufficientSignalOutput({
     presetName: args.request.presetName,
     originalLength: args.prepared.meta.originalLength,
-    truncatedApplied: args.prepared.meta.truncatedApplied
+    truncatedApplied: args.prepared.meta.truncatedApplied,
+    recognizedRunner: detectTestRunner(args.prepared.redacted)
   });
 }
 
@@ -293,6 +294,41 @@ function buildTestStatusProviderFailureDecision(args: {
   rawSliceUsed: boolean;
   rawSliceStrategy: ReturnType<typeof buildTestStatusRawSlice>["strategy"];
 }): ReturnType<typeof buildTestStatusDiagnoseContract> {
+  const concreteReadTarget = args.baseDecision.contract.read_targets.find((target) =>
+    Boolean(target.file)
+  );
+  const hasUnknownBucket = args.baseDecision.contract.main_buckets.some((bucket) =>
+    bucket.root_cause.startsWith("unknown ")
+  );
+  if (concreteReadTarget && !hasUnknownBucket) {
+    return buildTestStatusDiagnoseContract({
+      input: args.input,
+      analysis: args.analysis,
+      resolvedTests: args.baseDecision.contract.resolved_tests,
+      remainingTests: args.baseDecision.contract.remaining_tests,
+      contractOverrides: {
+        ...args.baseDecision.contract,
+        diagnosis_complete: false,
+        raw_needed: false,
+        additional_source_read_likely_low_value: false,
+        read_raw_only_if: null,
+        decision: "read_source",
+        provider_used: true,
+        provider_confidence: null,
+        provider_failed: true,
+        raw_slice_used: args.rawSliceUsed,
+        raw_slice_strategy: args.rawSliceStrategy,
+        next_best_action: {
+          code: "read_source_for_bucket",
+          bucket_index:
+            args.baseDecision.contract.dominant_blocker_bucket_index ??
+            concreteReadTarget.bucket_index,
+          note: `Provider follow-up failed (${args.reason}). The heuristic anchor is concrete enough to inspect source for the current bucket before reading raw traceback.`
+        }
+      }
+    });
+  }
+
   const shouldZoomFirst = args.request.detail !== "verbose";
 
   return buildTestStatusDiagnoseContract({

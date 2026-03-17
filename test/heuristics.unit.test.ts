@@ -831,6 +831,84 @@ describe("heuristic policies", () => {
     );
   });
 
+  it("maps setup override failures into configuration errors without changing generic type-error behavior", () => {
+    expect(
+      classifyFailureReasonForTest(
+        "AttributeError: property 'scene_references_dir' of 'Settings' object has no setter"
+      )
+    ).toMatchObject({
+      reason: expect.stringMatching(/^configuration: invalid test setup override/),
+      group: "test configuration failures"
+    });
+
+    expect(
+      classifyFailureReasonForTest(
+        "TypeError: monkeypatch settings override failed for preview_dir"
+      )
+    ).toMatchObject({
+      reason: expect.stringMatching(/^configuration: invalid test setup override/),
+      group: "test configuration failures"
+    });
+
+    expect(classifyFailureReasonForTest("TypeError: refresh token payload is undefined")).toMatchObject(
+      {
+        reason: "type error: refresh token payload is undefined",
+        group: "type errors"
+      }
+    );
+  });
+
+  it("classifies property-setter setup failures as configuration errors", () => {
+    const input = [
+      "============================= test session starts ==============================",
+      "collecting ... collected 2 items",
+      "tests/unit/services/test_scene_reference_preview.py::test_generate_scene_reference_preview_returns_relative_url_in_local_mode ERROR [ 50%]",
+      "tests/unit/services/test_scene_reference_preview.py::test_generate_scene_reference_preview_uses_preview_dir ERROR [100%]",
+      "E   AttributeError: property 'scene_references_dir' of 'Settings' object has no setter",
+      "E   AttributeError: property 'scene_references_dir' of 'Settings' object has no setter",
+      "============================== 2 errors in 0.12s =============================="
+    ].join("\n");
+
+    const analysis = analyzeTestStatus(input);
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis
+    });
+
+    expect(analysis.buckets.map((bucket) => bucket.type)).toContain("configuration_error");
+    expect(decision.contract.main_buckets[0]).toMatchObject({
+      label: "configuration error"
+    });
+    expect(decision.contract.main_buckets[0]?.root_cause).toMatch(
+      /^configuration: invalid test setup override/
+    );
+  });
+
+  it("shows the first concrete signal for unknown buckets in every text detail", () => {
+    const input = [
+      "src/auth.test.ts > refresh token ERROR [ 20%]",
+      "E   custom setup override exploded in helper layer",
+      "src/routes.test.ts > landing page FAILED [ 40%]",
+      "src/tasks.test.ts > task payload FAILED [ 60%]",
+      "============= 2 failed, 3 errors in 0.10s ============="
+    ].join("\n");
+
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis: analyzeTestStatus(input)
+    });
+
+    expect(decision.standardText).toContain(
+      "First concrete signal: custom setup override exploded in helper layer"
+    );
+    expect(decision.focusedText).toContain(
+      "First concrete signal: custom setup override exploded in helper layer"
+    );
+    expect(decision.verboseText).toContain(
+      "First concrete signal: custom setup override exploded in helper layer"
+    );
+  });
+
   it("detects vitest and jest runners through analyzeTestStatus", () => {
     expect(analyzeTestStatus(buildMixedFailureOutput()).runner).toBe("pytest");
     expect(analyzeTestStatus(buildVitestAllPassedOutput()).runner).toBe("vitest");

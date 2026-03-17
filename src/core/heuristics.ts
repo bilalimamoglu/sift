@@ -35,7 +35,7 @@ function getCount(input: string, label: string): number {
   return lastMatch ? Number(lastMatch[1]) : 0;
 }
 
-type TestRunner = "pytest" | "vitest" | "jest" | "unknown";
+export type TestRunner = "pytest" | "vitest" | "jest" | "unknown";
 
 interface TestStatusCounts {
   passed: number;
@@ -45,7 +45,7 @@ interface TestStatusCounts {
   snapshotFailures?: number;
 }
 
-function detectTestRunner(input: string): TestRunner {
+export function detectTestRunner(input: string): TestRunner {
   if (
     /^\s*Test Files?\s+(?:\d+\s+failed\s*\|\s*)?\d+\s+passed/m.test(input) ||
     /^\s*Tests?\s+(?:\d+\s+failed\s*\|\s*)?\d+\s+passed/m.test(input) ||
@@ -646,6 +646,39 @@ function classifyFailureReason(
         buildExcerptDetail(normalized, "process exhausted available memory")
       ),
       group: "memory exhaustion failures"
+    };
+  }
+
+  const propertySetterOverrideFailure = normalized.match(
+    /AttributeError:\s*(property ['"][^'"]+['"] of ['"][^'"]+['"] object has no setter|can't set attribute|readonly attribute|read-only attribute)/i
+  );
+  if (propertySetterOverrideFailure) {
+    return {
+      reason: buildClassifiedReason(
+        "configuration",
+        `invalid test setup override (${buildExcerptDetail(
+          `AttributeError: ${propertySetterOverrideFailure[1] ?? normalized}`,
+          "AttributeError: can't set attribute"
+        )})`
+      ),
+      group: "test configuration failures"
+    };
+  }
+
+  const setupOverrideFailure = normalized.match(/\b(AttributeError|TypeError):\s*(.+)$/i);
+  if (
+    setupOverrideFailure &&
+    /(monkeypatch|patch|fixture|settings|conftest)/i.test(normalized)
+  ) {
+    return {
+      reason: buildClassifiedReason(
+        "configuration",
+        `invalid test setup override (${buildExcerptDetail(
+          `${setupOverrideFailure[1]}: ${setupOverrideFailure[2] ?? ""}`,
+          `${setupOverrideFailure[1]}`
+        )})`
+      ),
+      group: "test configuration failures"
     };
   }
 

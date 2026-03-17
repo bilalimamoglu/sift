@@ -4,7 +4,7 @@ import pc from "picocolors";
 import { CAPTURE_OMITTED_MARKER } from "../constants.js";
 import type { OutputFormat, RunRequest, SiftConfig } from "../types.js";
 import { evaluateGate, supportsFailOnPreset } from "./gate.js";
-import { analyzeTestStatus } from "./heuristics.js";
+import { analyzeTestStatus, detectTestRunner } from "./heuristics.js";
 import {
   buildInsufficientSignalOutput,
   isInsufficientSignalOutput
@@ -284,7 +284,8 @@ export async function runExec(request: ExecRequest): Promise<number> {
           presetName: request.presetName,
           originalLength: capture.getTotalChars(),
           truncatedApplied: capture.wasTruncated(),
-          exitCode
+          exitCode,
+          recognizedRunner: detectTestRunner(capturedOutput)
         });
       }
 
@@ -364,7 +365,8 @@ export async function runExec(request: ExecRequest): Promise<number> {
           presetName: request.presetName,
           originalLength: capture.getTotalChars(),
           truncatedApplied: capture.wasTruncated(),
-          exitCode
+          exitCode,
+          recognizedRunner: detectTestRunner(capturedOutput)
         });
       }
 
@@ -407,7 +409,8 @@ export async function runExec(request: ExecRequest): Promise<number> {
         presetName: request.presetName,
         originalLength: capture.getTotalChars(),
         truncatedApplied: capture.wasTruncated(),
-        exitCode
+        exitCode,
+        recognizedRunner: detectTestRunner(capturedOutput)
       });
     }
 

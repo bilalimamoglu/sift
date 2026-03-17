@@ -1,0 +1,21 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.4, pytest-9.0.2
+collecting ... collected 2 items
+tests/unit/services/test_scene_reference_preview.py::test_generate_scene_reference_preview_returns_relative_url_in_local_mode ERROR [ 50%]
+tests/unit/services/test_scene_reference_preview.py::test_generate_scene_reference_preview_uses_preview_dir ERROR [100%]
+
+==================================== ERRORS ====================================
+_ ERROR at setup of test_generate_scene_reference_preview_returns_relative_url_in_local_mode _
+tests/unit/services/test_scene_reference_preview.py:24: in settings_override
+    monkeypatch.setattr(settings, "scene_references_dir", tmp_path / "scene-references")
+E   AttributeError: property 'scene_references_dir' of 'Settings' object has no setter
+
+_ ERROR at setup of test_generate_scene_reference_preview_uses_preview_dir _
+tests/unit/services/test_scene_reference_preview.py:24: in settings_override
+    monkeypatch.setattr(settings, "scene_references_dir", tmp_path / "scene-references")
+E   AttributeError: property 'scene_references_dir' of 'Settings' object has no setter
+
+=========================== short test summary info ============================
+ERROR tests/unit/services/test_scene_reference_preview.py::test_generate_scene_reference_preview_returns_relative_url_in_local_mode - AttributeError: property 'scene_references_dir' of 'Settings' object has no setter
+ERROR tests/unit/services/test_scene_reference_preview.py::test_generate_scene_reference_preview_uses_preview_dir - AttributeError: property 'scene_references_dir' of 'Settings' object has no setter
+============================== 2 errors in 0.12s ==============================

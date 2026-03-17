@@ -5,6 +5,7 @@ export interface InsufficientHintInput {
   originalLength: number;
   truncatedApplied: boolean;
   exitCode?: number;
+  recognizedRunner?: "pytest" | "vitest" | "jest" | "unknown";
 }
 
 export function isInsufficientSignalOutput(output: string): boolean {
@@ -36,5 +37,14 @@ export function buildInsufficientSignalOutput(
     hint = "Hint: the captured output did not contain a clear answer for this preset.";
   }
 
-  return `${INSUFFICIENT_SIGNAL_TEXT}\n${hint}`;
+  const presetSuggestion =
+    input.recognizedRunner &&
+    input.recognizedRunner !== "unknown" &&
+    input.presetName !== "test-status"
+      ? `Hint: captured output looks like ${input.recognizedRunner} test output; try --preset test-status.`
+      : null;
+
+  return [INSUFFICIENT_SIGNAL_TEXT, hint, presetSuggestion]
+    .filter((value): value is string => Boolean(value))
+    .join("\n");
 }

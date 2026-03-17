@@ -156,7 +156,8 @@ describe("benchmark harness", () => {
     expect(report.fixtures.map((fixture) => fixture.name)).toEqual([
       "single-blocker-short-real",
       "mixed-full-suite-real",
-      "snapshot-drift-only-real"
+      "snapshot-drift-only-real",
+      "property-setter-setup-error-real"
     ]);
 
     assertBudgetInvariants(report);
@@ -176,7 +177,8 @@ describe("benchmark harness", () => {
       "jest-mixed-js",
       "single-blocker-short-real",
       "mixed-full-suite-real",
-      "snapshot-drift-only-real"
+      "snapshot-drift-only-real",
+      "property-setter-setup-error-real"
     ]);
 
     assertBudgetInvariants(report);

@@ -15,6 +15,7 @@ export function buildRealFixtures(): BenchFixture[] {
   const openApiDiff = load("openapi-diff.txt");
   const manifestTbshort = load("manifest-tbshort.txt");
   const snapshotDriftRaw = load("snapshot-drift-only.txt");
+  const propertySetterSetupErrorRaw = load("property-setter-setup-error.txt");
 
   return [
     {
@@ -92,6 +93,24 @@ export function buildRealFixtures(): BenchFixture[] {
       completion: {
         expectedBuckets: ["contract_snapshot_drift"],
         expectedEntitiesAny: ["openai-gpt-image-1.5", "/api/v1/admin/landing-gallery"],
+        expectedMaxDetail: "standard"
+      }
+    },
+    {
+      name: "property-setter-setup-error-real",
+      description:
+        "Real project: repeated setup override failure when patching a computed settings property.",
+      rawOutput: propertySetterSetupErrorRaw,
+      rawRecipe: [
+        {
+          command:
+            "python -m pytest tests/unit/services/test_scene_reference_preview.py",
+          output: propertySetterSetupErrorRaw
+        }
+      ],
+      rawRecipeStopAfter: 1,
+      completion: {
+        expectedBuckets: ["configuration_error"],
         expectedMaxDetail: "standard"
       }
     }
