@@ -43,6 +43,7 @@ function createDeps(overrides: Partial<CliDeps> = {}): CliDeps {
     evaluateGate: vi.fn().mockReturnValue({ shouldFail: true }),
     readStdin: vi.fn().mockResolvedValue("stdin"),
     runSift: vi.fn().mockResolvedValue("Reduced answer"),
+    runSiftWithStats: vi.fn().mockResolvedValue({ output: "Reduced answer", stats: null }),
     runWatch: vi.fn().mockResolvedValue("Watch answer"),
     looksLikeWatchStream: vi.fn().mockReturnValue(false),
     getPreset: vi.fn().mockImplementation((_config, name: string) => {
@@ -402,7 +403,7 @@ describe("cli app unit", () => {
       expect(deps.resolveConfig).toHaveBeenCalled();
       expect(deps.getPreset).toHaveBeenCalledWith(defaultConfig, "infra-risk");
       expect(deps.readStdin).toHaveBeenCalled();
-      expect(deps.runSift).toHaveBeenCalled();
+      expect(deps.runSiftWithStats).toHaveBeenCalled();
       expect(deps.assertSupportedFailOnPreset).toHaveBeenCalledWith("infra-risk");
       expect(process.exitCode).toBe(1);
       expect(streams.stdout).toContain("Reduced answer");
@@ -426,12 +427,72 @@ describe("cli app unit", () => {
     }
   });
 
+  it("emits a stats footer for direct pipe mode on tty stderr", async () => {
+    const deps = createDeps({
+      runSiftWithStats: vi.fn().mockResolvedValue({
+        output: "Reduced answer",
+        stats: {
+          layer: "heuristic",
+          providerCalled: false,
+          totalTokens: null,
+          durationMs: 47,
+          presetName: undefined
+        }
+      })
+    });
+    const streams = captureStreams();
+
+    try {
+      await runMatched(["what changed?"], deps, { stderrIsTTY: true });
+      expect(streams.stdout).toContain("Reduced answer");
+      expect(streams.stderr).toContain("[sift: heuristic • LLM skipped • summary 47ms]");
+    } finally {
+      streams.restore();
+    }
+  });
+
+  it("suppresses the stats footer when quiet is set or watch mode is used", async () => {
+    const quietDeps = createDeps({
+      runSiftWithStats: vi.fn().mockResolvedValue({
+        output: "Reduced answer",
+        stats: {
+          layer: "provider",
+          providerCalled: true,
+          totalTokens: 380,
+          durationMs: 1200,
+          presetName: undefined
+        }
+      })
+    });
+    const quietStreams = captureStreams();
+
+    try {
+      await runMatched(["what changed?", "--quiet"], quietDeps, { stderrIsTTY: true });
+      expect(quietStreams.stderr).toBe("");
+    } finally {
+      quietStreams.restore();
+    }
+
+    const watchDeps = createDeps({
+      looksLikeWatchStream: vi.fn().mockReturnValue(true)
+    });
+    const watchStreams = captureStreams();
+
+    try {
+      await runMatched(["what changed?"], watchDeps, { stderrIsTTY: true });
+      expect(watchStreams.stdout).toContain("Watch answer");
+      expect(watchStreams.stderr).toBe("");
+    } finally {
+      watchStreams.restore();
+    }
+  });
+
   it("drops preset policy when the output format is explicitly overridden", async () => {
     const deps = createDeps();
 
     await runMatched(["preset", "test-status", "--format", "json"], deps);
 
-    expect(deps.runSift).toHaveBeenCalledWith(
+    expect(deps.runSiftWithStats).toHaveBeenCalledWith(
       expect.objectContaining({
         format: "json",
         presetName: "test-status",
@@ -660,7 +721,7 @@ describe("cli app unit", () => {
     expect(deps.showPreset).toHaveBeenCalledWith(defaultConfig, "infra-risk", true);
 
     await runMatched(["preset", "infra-risk", "--format", "verdict"], deps);
-    expect(deps.runSift).toHaveBeenCalledWith(
+    expect(deps.runSiftWithStats).toHaveBeenCalledWith(
       expect.objectContaining({
         policyName: "infra-risk",
         format: "verdict"
@@ -673,7 +734,7 @@ describe("cli app unit", () => {
     );
 
     await runMatched(["what changed?"], deps);
-    expect(deps.runSift).toHaveBeenCalled();
+    expect(deps.runSiftWithStats).toHaveBeenCalled();
 
     await expect(runMatched([], deps)).rejects.toThrow("Missing question.");
   });

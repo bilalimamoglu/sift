@@ -224,6 +224,23 @@ interface EslintSummary {
   fixableProblems: number | null;
 }
 
+type BuildFailureCategory =
+  | "module-resolution"
+  | "missing-export"
+  | "undefined-identifier"
+  | "syntax"
+  | "type"
+  | "wrapper"
+  | "generic";
+
+interface BuildFailureMatch {
+  message: string;
+  file: string | null;
+  line: number | null;
+  column: number | null;
+  category: BuildFailureCategory;
+}
+
 interface FocusedFailureItem {
   label: string;
   reason: string;
@@ -3235,6 +3252,316 @@ function lintFailuresHeuristic(input: string): string | null {
   return bullets.join("\n");
 }
 
+function stripAnsiText(input: string): string {
+  return input.replace(/\u001b\[[0-9;]*m/g, "");
+}
+
+function normalizeBuildPath(file: string): string {
+  return file.replace(/\\/g, "/").replace(/^\.\//, "").trim();
+}
+
+function trimTrailingSentencePunctuation(input: string): string {
+  return input.replace(/[.:]+$/, "").trim();
+}
+
+function containsKnownBuildFailureSignal(input: string): boolean {
+  return (
+    /^ERROR in /m.test(input) ||
+    /^(?:[✘✗]\s*)?\[ERROR\]\s+/m.test(input) ||
+    /^error(?:\[E\d+\])?:\s+/m.test(input) ||
+    /^.+?\.go:\d+:\d+:\s+\S+/m.test(input) ||
+    /^.+?\.(?:c|cc|cpp|cxx|h|hpp|m|mm):\d+:\d+:\s*error:\s+/m.test(input) ||
+    /\berror\s+TS\d+:/m.test(input) ||
+    /^\s*npm ERR!/m.test(input) ||
+    /\bERR_PNPM_/m.test(input) ||
+    /^\s*error Command failed/m.test(input)
+  );
+}
+
+function detectExplicitBuildSuccess(input: string): boolean {
+  if (containsKnownBuildFailureSignal(input)) {
+    return false;
+  }
+
+  return (
+    /\bcompiled successfully\b/i.test(input) ||
+    /^\s*Build succeeded\.?\s*$/im.test(input) ||
+    /\bcompiled with 0 errors?\b/i.test(input)
+  );
+}
+
+function inferBuildFailureCategory(message: string): BuildFailureCategory {
+  if (
+    /module not found|can't resolve|could not resolve|cannot find module|no required module provides package/i.test(
+      message
+    )
+  ) {
+    return "module-resolution";
+  }
+
+  if (/no matching export|does not provide an export named|missing export/i.test(message)) {
+    return "missing-export";
+  }
+
+  if (
+    /cannot find name|cannot find value|not found in this scope|undefined:|undeclared identifier/i.test(
+      message
+    )
+  ) {
+    return "undefined-identifier";
+  }
+
+  if (/syntax error|unexpected token|expected ['"`;)]|expected .* after expression/i.test(message)) {
+    return "syntax";
+  }
+
+  if (
+    /\bTS\d+\b/.test(message) ||
+    /type .* is not assignable|type error|no matching overload/i.test(message)
+  ) {
+    return "type";
+  }
+
+  return "generic";
+}
+
+function buildFailureSuggestion(category: BuildFailureCategory): string {
+  switch (category) {
+    case "module-resolution":
+      return "Install the missing package or fix the import path.";
+    case "missing-export":
+      return "Check the export name in the source module.";
+    case "undefined-identifier":
+      return "Define or import the missing identifier.";
+    case "syntax":
+      return "Fix the syntax error at the indicated location.";
+    case "type":
+      return "Fix the type error at the indicated location.";
+    case "wrapper":
+      return "Check the underlying build tool output above.";
+    default:
+      return "Fix the first reported error and rebuild.";
+  }
+}
+
+function formatBuildFailureOutput(match: BuildFailureMatch): string {
+  const message = trimTrailingSentencePunctuation(match.message);
+  const suggestion = buildFailureSuggestion(match.category);
+  const displayFile = match.file ? compactDisplayFile(match.file) : null;
+
+  if (displayFile && match.line !== null) {
+    return `Build failed: ${message} in ${displayFile}:${match.line}. Fix: ${suggestion}`;
+  }
+
+  if (displayFile) {
+    return `Build failed: ${message} in ${displayFile}. Fix: ${suggestion}`;
+  }
+
+  return `Build failed: ${message}. Fix: ${suggestion}`;
+}
+
+function extractWebpackBuildFailure(input: string): BuildFailureMatch | null {
+  const lines = stripAnsiText(input).split("\n").map((line) => line.trimEnd());
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index]?.match(/^ERROR in (.+?)(?:\s+(\d+):(\d+))?$/);
+    if (!match) {
+      continue;
+    }
+
+    let message = "Compilation error";
+    for (let cursor = index + 1; cursor < Math.min(lines.length, index + 6); cursor += 1) {
+      const candidate = lines[cursor]?.trim();
+      if (!candidate) {
+        continue;
+      }
+
+      if (/^ERROR in /.test(candidate) || /compiled with \d+ errors?/i.test(candidate)) {
+        break;
+      }
+
+      if (/^(?:>|\|)|^\d+\s+\|/.test(candidate)) {
+        continue;
+      }
+
+      message = candidate;
+      break;
+    }
+
+    return {
+      message,
+      file: normalizeBuildPath(match[1]!),
+      line: match[2] ? Number(match[2]) : null,
+      column: match[3] ? Number(match[3]) : null,
+      category: inferBuildFailureCategory(message)
+    };
+  }
+
+  return null;
+}
+
+function extractEsbuildBuildFailure(input: string): BuildFailureMatch | null {
+  const lines = stripAnsiText(input).split("\n").map((line) => line.trimEnd());
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index]?.match(/^(?:[✘✗]\s*)?\[ERROR\]\s*(.+)$/);
+    if (!match) {
+      continue;
+    }
+
+    const message = match[1]!.replace(/^\[vite\]\s*/i, "").trim();
+    let file: string | null = null;
+    let line: number | null = null;
+    let column: number | null = null;
+
+    for (let cursor = index + 1; cursor < Math.min(lines.length, index + 6); cursor += 1) {
+      const locationMatch = lines[cursor]?.trim().match(/^(.+?):(\d+):(\d+):$/);
+      if (!locationMatch) {
+        continue;
+      }
+
+      file = normalizeBuildPath(locationMatch[1]!);
+      line = Number(locationMatch[2]);
+      column = Number(locationMatch[3]);
+      break;
+    }
+
+    return {
+      message,
+      file,
+      line,
+      column,
+      category: inferBuildFailureCategory(message)
+    };
+  }
+
+  return null;
+}
+
+function extractCargoBuildFailure(input: string): BuildFailureMatch | null {
+  if (
+    !/^error(?:\[E\d+\])?:\s+/m.test(input) ||
+    !(/^\s*-->\s+/m.test(input) || /could not compile/i.test(input))
+  ) {
+    return null;
+  }
+
+  const lines = stripAnsiText(input).split("\n").map((line) => line.trimEnd());
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index]?.match(/^error(?:\[(E\d+)\])?:\s+(.+)$/);
+    if (!match) {
+      continue;
+    }
+
+    const code = match[1];
+    const locationMatch = lines
+      .slice(index + 1, index + 7)
+      .join("\n")
+      .match(/^\s*-->\s+(.+?):(\d+):(\d+)/m);
+
+    return {
+      message: code ? `${code}: ${match[2]!.trim()}` : match[2]!.trim(),
+      file: locationMatch ? normalizeBuildPath(locationMatch[1]!) : null,
+      line: locationMatch ? Number(locationMatch[2]) : null,
+      column: locationMatch ? Number(locationMatch[3]) : null,
+      category: inferBuildFailureCategory(match[2]!)
+    };
+  }
+
+  return null;
+}
+
+function extractCompilerStyleBuildFailure(input: string): BuildFailureMatch | null {
+  const lines = stripAnsiText(input).split("\n").map((line) => line.trimEnd());
+
+  for (const rawLine of lines) {
+    let match = rawLine.match(
+      /^(.+?\.(?:c|cc|cpp|cxx|h|hpp|m|mm)):([0-9]+):([0-9]+):\s*error:\s+(.+)$/
+    );
+    if (match) {
+      return {
+        message: match[4]!.trim(),
+        file: normalizeBuildPath(match[1]!),
+        line: Number(match[2]),
+        column: Number(match[3]),
+        category: inferBuildFailureCategory(match[4]!)
+      };
+    }
+
+    match = rawLine.match(/^(.+?\.go):([0-9]+):([0-9]+):\s+(.+)$/);
+    if (match && !/^\s*warning:/i.test(match[4]!)) {
+      return {
+        message: match[4]!.trim(),
+        file: normalizeBuildPath(match[1]!),
+        line: Number(match[2]),
+        column: Number(match[3]),
+        category: inferBuildFailureCategory(match[4]!)
+      };
+    }
+  }
+
+  return null;
+}
+
+function extractTscBuildFailure(input: string): BuildFailureMatch | null {
+  const diagnostics = parseTscErrors(input);
+  const first = diagnostics[0];
+  if (!first) {
+    return null;
+  }
+
+  return {
+    message: `${first.code}: ${first.message}`,
+    file: first.file,
+    line: first.line,
+    column: first.column,
+    category: inferBuildFailureCategory(`${first.code}: ${first.message}`)
+  };
+}
+
+function extractWrapperBuildFailure(input: string): BuildFailureMatch | null {
+  if (!/^\s*npm ERR!|\bERR_PNPM_|^\s*error Command failed/m.test(input)) {
+    return null;
+  }
+
+  const npmCommandMatch = input.match(/^\s*npm ERR!\s+.*?\bbuild:\s+`([^`]+)`/m);
+  const genericCommandMatch = input.match(/^\s*.+?\s+build:\s+`([^`]+)`/m);
+  const command = npmCommandMatch?.[1] ?? genericCommandMatch?.[1] ?? null;
+
+  return {
+    message: command ? `build script \`${command}\` failed` : "the build script failed",
+    file: null,
+    line: null,
+    column: null,
+    category: "wrapper"
+  };
+}
+
+function buildFailureHeuristic(input: string): string | null {
+  if (input.trim().length === 0) {
+    return null;
+  }
+
+  if (detectExplicitBuildSuccess(input)) {
+    return "Build succeeded.";
+  }
+
+  const match =
+    extractWebpackBuildFailure(input) ??
+    extractEsbuildBuildFailure(input) ??
+    extractCargoBuildFailure(input) ??
+    extractCompilerStyleBuildFailure(input) ??
+    extractTscBuildFailure(input) ??
+    extractWrapperBuildFailure(input);
+
+  if (!match) {
+    return null;
+  }
+
+  return formatBuildFailureOutput(match);
+}
+
 export function applyHeuristicPolicy(
   policyName: PromptPolicyName | undefined,
   input: string,
@@ -3262,6 +3589,10 @@ export function applyHeuristicPolicy(
 
   if (policyName === "lint-failures") {
     return lintFailuresHeuristic(input);
+  }
+
+  if (policyName === "build-failure") {
+    return buildFailureHeuristic(input);
   }
 
   return null;

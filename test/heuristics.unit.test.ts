@@ -409,6 +409,99 @@ function buildEslintZeroProblems(): string {
   return "\u2716 0 problems (0 errors, 0 warnings)";
 }
 
+function buildWebpackModuleNotFound(): string {
+  return [
+    "ERROR in ./src/components/App.tsx 12:5",
+    "Module not found: Error: Can't resolve './Missing' in '/app/src/components'",
+    "webpack 5.90.0 compiled with 1 error in 1810 ms"
+  ].join("\n");
+}
+
+function buildWebpackLoaderFailure(): string {
+  return [
+    "ERROR in ./src/index.ts",
+    "Module build failed (from ./node_modules/ts-loader/index.js):",
+    "Error: TypeScript compilation failed",
+    "webpack 5.90.0 compiled with 1 error in 1900 ms"
+  ].join("\n");
+}
+
+function buildEsbuildResolveError(): string {
+  return [
+    "✘ [ERROR] Could not resolve \"missing-package\"",
+    "",
+    "    src/app.ts:3:21:",
+    "      3 │ import { foo } from \"missing-package\"",
+    "        ╵                      ~~~~~~~~~~~~~~~~~",
+    "",
+    "1 error"
+  ].join("\n");
+}
+
+function buildViteWrappedEsbuildError(): string {
+  return [
+    "✘ [ERROR] [vite] No matching export in \"src/utils.ts\" for import \"bar\"",
+    "",
+    "    src/app.ts:5:10:",
+    "      5 │ import { bar } from \"./utils\"",
+    "        ╵           ~~~",
+    "",
+    "1 error"
+  ].join("\n");
+}
+
+function buildCargoCompileError(): string {
+  return [
+    "error[E0425]: cannot find value `foo` in this scope",
+    " --> src/main.rs:10:5",
+    "  |",
+    "10 |     foo();",
+    "  |     ^^^ not found in this scope",
+    "",
+    "error: could not compile `my-crate` (bin \"my-crate\") due to 1 previous error"
+  ].join("\n");
+}
+
+function buildGoCompilerError(): string {
+  return "./main.go:10:2: undefined: foo";
+}
+
+function buildGccCompilerError(): string {
+  return "src/main.c:10:5: error: use of undeclared identifier 'foo'";
+}
+
+function buildTscBuildFailure(): string {
+  return [
+    "src/app.ts(4,12): error TS2322: Type 'string' is not assignable to type 'number'.",
+    "Found 1 error."
+  ].join("\n");
+}
+
+function buildNpmWrapperOnlyFailure(): string {
+  return [
+    "npm ERR! code ELIFECYCLE",
+    "npm ERR! errno 1",
+    "npm ERR! my-app@1.0.0 build: `webpack --mode production`",
+    "npm ERR! Exit status 1"
+  ].join("\n");
+}
+
+function buildBuildSuccess(): string {
+  return "webpack 5.90.0 compiled successfully in 1810 ms";
+}
+
+function buildMultipleBuildErrors(): string {
+  return [
+    "✘ [ERROR] Could not resolve \"missing-package\"",
+    "",
+    "    src/app.ts:3:21:",
+    "",
+    "✘ [ERROR] No matching export in \"src/utils.ts\" for import \"bar\"",
+    "",
+    "    src/other.ts:8:5:"
+  ].join("\n");
+}
+
 const directClassificationCases = [
   {
     name: "timeout",
@@ -1570,6 +1663,90 @@ describe("heuristic policies", () => {
       )
     ).toBeNull();
     expect(applyHeuristicPolicy("lint-failures", "random shell noise")).toBeNull();
+  });
+
+  it("summarizes webpack module resolution failures as brief prose", () => {
+    const output = applyHeuristicPolicy("build-failure", buildWebpackModuleNotFound());
+
+    expect(output).toBe(
+      "Build failed: Module not found: Error: Can't resolve './Missing' in '/app/src/components' in src/components/App.tsx:12. Fix: Install the missing package or fix the import path."
+    );
+  });
+
+  it("keeps webpack loader failures brief and actionable", () => {
+    const output = applyHeuristicPolicy("build-failure", buildWebpackLoaderFailure());
+
+    expect(output).toBe(
+      "Build failed: Module build failed (from ./node_modules/ts-loader/index.js) in src/index.ts. Fix: Fix the first reported error and rebuild."
+    );
+  });
+
+  it("summarizes esbuild resolve failures from the first error block", () => {
+    const output = applyHeuristicPolicy("build-failure", buildEsbuildResolveError());
+
+    expect(output).toBe(
+      'Build failed: Could not resolve "missing-package" in src/app.ts:3. Fix: Install the missing package or fix the import path.'
+    );
+  });
+
+  it("handles vite-wrapped esbuild errors without surfacing the wrapper prefix", () => {
+    const output = applyHeuristicPolicy("build-failure", buildViteWrappedEsbuildError());
+
+    expect(output).toBe(
+      'Build failed: No matching export in "src/utils.ts" for import "bar" in src/app.ts:5. Fix: Check the export name in the source module.'
+    );
+  });
+
+  it("summarizes cargo compiler failures with file anchors", () => {
+    const output = applyHeuristicPolicy("build-failure", buildCargoCompileError());
+
+    expect(output).toBe(
+      "Build failed: E0425: cannot find value `foo` in this scope in src/main.rs:10. Fix: Define or import the missing identifier."
+    );
+  });
+
+  it("summarizes go compiler failures", () => {
+    const output = applyHeuristicPolicy("build-failure", buildGoCompilerError());
+
+    expect(output).toBe(
+      "Build failed: undefined: foo in main.go:10. Fix: Define or import the missing identifier."
+    );
+  });
+
+  it("summarizes gcc-style compiler failures", () => {
+    const output = applyHeuristicPolicy("build-failure", buildGccCompilerError());
+
+    expect(output).toBe(
+      "Build failed: use of undeclared identifier 'foo' in src/main.c:10. Fix: Define or import the missing identifier."
+    );
+  });
+
+  it("reuses the tsc parser for build-failure output", () => {
+    const output = applyHeuristicPolicy("build-failure", buildTscBuildFailure());
+
+    expect(output).toBe(
+      "Build failed: TS2322: Type 'string' is not assignable to type 'number' in src/app.ts:4. Fix: Fix the type error at the indicated location."
+    );
+  });
+
+  it("falls back to wrapper-only guidance when no concrete build tool error is visible", () => {
+    const output = applyHeuristicPolicy("build-failure", buildNpmWrapperOnlyFailure());
+
+    expect(output).toBe(
+      "Build failed: build script `webpack --mode production` failed. Fix: Check the underlying build tool output above."
+    );
+  });
+
+  it("returns explicit build success and null for unrelated noise", () => {
+    expect(applyHeuristicPolicy("build-failure", buildBuildSuccess())).toBe("Build succeeded.");
+    expect(applyHeuristicPolicy("build-failure", "random shell noise")).toBeNull();
+  });
+
+  it("keeps only the first concrete build root cause when multiple errors are visible", () => {
+    const output = applyHeuristicPolicy("build-failure", buildMultipleBuildErrors());
+
+    expect(output).toContain('Build failed: Could not resolve "missing-package"');
+    expect(output).not.toContain('No matching export in "src/utils.ts"');
   });
 
   it("keeps audit-critical and infra-risk heuristics intact", () => {

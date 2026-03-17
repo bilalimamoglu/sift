@@ -1,5 +1,5 @@
 import pc from "picocolors";
-import type { RunRequest } from "../types.js";
+import type { RunRequest, UsageInfo } from "../types.js";
 import { createProvider } from "../providers/factory.js";
 import { buildPrompt } from "../prompts/buildPrompt.js";
 import { buildFallbackOutput } from "./fallback.js";
@@ -20,9 +20,16 @@ import {
   type TestStatusDiagnoseContract
 } from "./testStatusDecision.js";
 import { buildGenericRawSlice, buildTestStatusRawSlice } from "./rawSlice.js";
+import type { RunResult, RunStats } from "./stats.js";
 
 const RETRY_DELAY_MS = 300;
 const PROVIDER_PENDING_NOTICE_DELAY_MS = 150;
+
+interface RunStatsRecorder {
+  heuristic(): void;
+  provider(usage?: UsageInfo): void;
+  fallback(): void;
+}
 
 function estimateTokenCount(text: string): number {
   return Math.max(1, Math.ceil(text.length / 4));
@@ -364,7 +371,7 @@ function buildTestStatusProviderFailureDecision(args: {
   });
 }
 
-export async function runSift(request: RunRequest): Promise<string> {
+async function runSiftCore(request: RunRequest, recorder?: RunStatsRecorder): Promise<string> {
   const prepared = prepareInput(request.stdin, request.config.input);
   const heuristicInput = prepared.redacted;
   const heuristicInputTruncated = false;
@@ -474,6 +481,7 @@ export async function runSift(request: RunRequest): Promise<string> {
         finalOutput
       });
     }
+    recorder?.heuristic();
     return finalOutput;
   }
 
@@ -580,6 +588,7 @@ export async function runSift(request: RunRequest): Promise<string> {
         providerInputChars: providerPrepared.truncated.length,
         providerOutputChars: result.text.length
       });
+      recorder?.provider(result.usage);
       return finalOutput;
     } catch (error) {
       const reason = error instanceof Error ? error.message : "unknown_error";
@@ -618,6 +627,7 @@ export async function runSift(request: RunRequest): Promise<string> {
         rawSliceChars: rawSlice.text.length,
         providerInputChars: providerPrepared.truncated.length
       });
+      recorder?.fallback();
       return finalOutput;
     }
   }
@@ -681,6 +691,7 @@ export async function runSift(request: RunRequest): Promise<string> {
       throw new Error("Model output rejected by quality gate");
     }
 
+    recorder?.provider(result.usage);
     return withInsufficientHint({
       output: normalizeOutput(result.text, providerPrompt.responseMode),
       request,
@@ -689,6 +700,7 @@ export async function runSift(request: RunRequest): Promise<string> {
   } catch (error) {
     const reason = error instanceof Error ? error.message : "unknown_error";
 
+    recorder?.fallback();
     return withInsufficientHint({
       output: buildFallbackOutput({
         format: request.format,
@@ -701,4 +713,51 @@ export async function runSift(request: RunRequest): Promise<string> {
       prepared: providerPrepared
     });
   }
+}
+
+export async function runSift(request: RunRequest): Promise<string> {
+  return runSiftCore(request);
+}
+
+export async function runSiftWithStats(request: RunRequest): Promise<RunResult> {
+  if (request.dryRun) {
+    return {
+      output: await runSiftCore(request),
+      stats: null
+    };
+  }
+
+  const startedAt = Date.now();
+  let layer: RunStats["layer"] = "fallback";
+  let providerCalled = false;
+  let totalTokens: number | null = null;
+
+  const output = await runSiftCore(request, {
+    heuristic() {
+      layer = "heuristic";
+      providerCalled = false;
+      totalTokens = null;
+    },
+    provider(usage) {
+      layer = "provider";
+      providerCalled = true;
+      totalTokens = usage?.totalTokens ?? null;
+    },
+    fallback() {
+      layer = "fallback";
+      providerCalled = true;
+      totalTokens = null;
+    }
+  });
+
+  return {
+    output,
+    stats: {
+      layer,
+      providerCalled,
+      totalTokens,
+      durationMs: Date.now() - startedAt,
+      presetName: request.presetName
+    }
+  };
 }

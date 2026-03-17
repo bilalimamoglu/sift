@@ -14,9 +14,9 @@ import {
   type ExecRequest
 } from "../src/core/exec.js";
 
-const { spawnMock, runSiftMock } = vi.hoisted(() => ({
+const { spawnMock, runSiftWithStatsMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
-  runSiftMock: vi.fn()
+  runSiftWithStatsMock: vi.fn()
 }));
 
 vi.mock("node:child_process", () => ({
@@ -24,7 +24,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 vi.mock("../src/core/run.js", () => ({
-  runSift: runSiftMock
+  runSiftWithStats: runSiftWithStatsMock
 }));
 
 class FakeStream extends EventEmitter {}
@@ -67,7 +67,7 @@ describe("runExec unit", () => {
     stdout = "";
     stderr = "";
     spawnMock.mockReset();
-    runSiftMock.mockReset();
+    runSiftWithStatsMock.mockReset();
     vi.spyOn(os, "homedir").mockReturnValue(homeDir);
     vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
       stdout += chunk.toString();
@@ -155,7 +155,7 @@ describe("runExec unit", () => {
   it("spawns argv commands and runs the provider path", async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);
-    runSiftMock.mockResolvedValue("Reduced answer");
+    runSiftWithStatsMock.mockResolvedValue({ output: "Reduced answer", stats: null });
 
     const { runExec } = await import("../src/core/exec.js");
     const pending = runExec(makeRequest());
@@ -168,7 +168,7 @@ describe("runExec unit", () => {
       cwd: process.cwd(),
       stdio: ["inherit", "pipe", "pipe"]
     });
-    expect(runSiftMock).toHaveBeenCalledWith(
+    expect(runSiftWithStatsMock).toHaveBeenCalledWith(
       expect.objectContaining({
         stdin: "raw output"
       })
@@ -179,7 +179,7 @@ describe("runExec unit", () => {
   it("caches non-interactive test-status runs for later escalation", async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);
-    runSiftMock.mockResolvedValue("Reduced answer");
+    runSiftWithStatsMock.mockResolvedValue({ output: "Reduced answer", stats: null });
     const statePath = getDefaultTestStatusStatePath(homeDir);
     const rawOutput = [
       "=================== short test summary info ===================",
@@ -216,7 +216,7 @@ describe("runExec unit", () => {
     const firstChild = new FakeChild();
     const secondChild = new FakeChild();
     spawnMock.mockReturnValueOnce(firstChild).mockReturnValueOnce(secondChild);
-    runSiftMock.mockResolvedValue("Reduced answer");
+    runSiftWithStatsMock.mockResolvedValue({ output: "Reduced answer", stats: null });
     const firstRaw = readRealFixture("snapshot-drift-only.txt");
     const secondRaw = readRealFixture("single-blocker-short.txt");
 
@@ -254,7 +254,7 @@ describe("runExec unit", () => {
   it("keeps exec working when cache writes fail", async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);
-    runSiftMock.mockResolvedValue("Reduced answer");
+    runSiftWithStatsMock.mockResolvedValue({ output: "Reduced answer", stats: null });
     const writeSpy = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {
       throw new Error("disk full");
     });
@@ -293,7 +293,7 @@ describe("runExec unit", () => {
   it("prints captured raw output to stderr and appends a newline when needed", async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);
-    runSiftMock.mockResolvedValue("Reduced answer");
+    runSiftWithStatsMock.mockResolvedValue({ output: "Reduced answer", stats: null });
 
     const { runExec } = await import("../src/core/exec.js");
     const pending = runExec(
@@ -313,7 +313,7 @@ describe("runExec unit", () => {
   it("prints verbose execution metadata and preserves signal exits", async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);
-    runSiftMock.mockResolvedValue("Reduced answer");
+    runSiftWithStatsMock.mockResolvedValue({ output: "Reduced answer", stats: null });
 
     const { runExec } = await import("../src/core/exec.js");
     const pending = runExec(
@@ -338,7 +338,7 @@ describe("runExec unit", () => {
     await expect(pending).resolves.toBe(143);
     expect(stderr).toContain("exec mode=argv");
     expect(stderr).toContain("capture_truncated=true");
-    expect(runSiftMock).toHaveBeenCalledWith(
+    expect(runSiftWithStatsMock).toHaveBeenCalledWith(
       expect.objectContaining({
         stdin: expect.stringContaining("...[captured output omitted]...")
       })
@@ -348,7 +348,7 @@ describe("runExec unit", () => {
   it("spawns shell commands when requested", async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);
-    runSiftMock.mockResolvedValue("Shell answer");
+    runSiftWithStatsMock.mockResolvedValue({ output: "Shell answer", stats: null });
 
     const { runExec } = await import("../src/core/exec.js");
     const pending = runExec(
@@ -371,7 +371,10 @@ describe("runExec unit", () => {
   it("rewrites insufficient output with exec-aware hints", async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);
-    runSiftMock.mockResolvedValue("Insufficient signal in the provided input.");
+    runSiftWithStatsMock.mockResolvedValue({
+      output: "Insufficient signal in the provided input.",
+      stats: null
+    });
 
     const { runExec } = await import("../src/core/exec.js");
     const pending = runExec(
@@ -394,7 +397,7 @@ describe("runExec unit", () => {
   it("uses the bash fallback for shell mode and handles buffer chunks", async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);
-    runSiftMock.mockResolvedValue("Shell answer");
+    runSiftWithStatsMock.mockResolvedValue({ output: "Shell answer", stats: null });
     const originalShell = process.env.SHELL;
     delete process.env.SHELL;
     try {
@@ -422,7 +425,7 @@ describe("runExec unit", () => {
         stdio: ["inherit", "pipe", "pipe"]
       });
       expect(stderr).toContain("exec mode=shell");
-      expect(runSiftMock).toHaveBeenCalledWith(
+      expect(runSiftWithStatsMock).toHaveBeenCalledWith(
         expect.objectContaining({
           stdin: "hi"
         })
@@ -448,7 +451,7 @@ describe("runExec unit", () => {
     child.emit("close", 0, null);
 
     await expect(pending).resolves.toBe(0);
-    expect(runSiftMock).not.toHaveBeenCalled();
+    expect(runSiftWithStatsMock).not.toHaveBeenCalled();
     expect(stdout).toContain("No type errors.");
   });
 
@@ -478,6 +481,133 @@ describe("runExec unit", () => {
     expect(stderr).toContain("exec_shortcut=typecheck-summary");
   });
 
+  it("emits a heuristic footer on tty stderr for reduced exec output", async () => {
+    const child = new FakeChild();
+    const originalStderrIsTTY = process.stderr.isTTY;
+    spawnMock.mockReturnValue(child);
+    runSiftWithStatsMock.mockResolvedValue({
+      output: "Reduced answer",
+      stats: {
+        layer: "heuristic",
+        providerCalled: false,
+        totalTokens: null,
+        durationMs: 47,
+        presetName: "build-failure"
+      }
+    });
+    Object.defineProperty(process.stderr, "isTTY", {
+      configurable: true,
+      value: true
+    });
+
+    try {
+      const { runExec } = await import("../src/core/exec.js");
+      const pending = runExec(makeRequest({ presetName: "build-failure" }));
+
+      child.stdout.emit("data", "raw output");
+      child.emit("close", 0, null);
+
+      await expect(pending).resolves.toBe(0);
+      expect(stderr).toContain("[sift: heuristic • LLM skipped • summary 47ms]");
+    } finally {
+      Object.defineProperty(process.stderr, "isTTY", {
+        configurable: true,
+        value: originalStderrIsTTY
+      });
+    }
+  });
+
+  it("emits a provider footer with usage tokens on tty stderr", async () => {
+    const child = new FakeChild();
+    const originalStderrIsTTY = process.stderr.isTTY;
+    spawnMock.mockReturnValue(child);
+    runSiftWithStatsMock.mockResolvedValue({
+      output: "Provider answer",
+      stats: {
+        layer: "provider",
+        providerCalled: true,
+        totalTokens: 380,
+        durationMs: 1200,
+        presetName: undefined
+      }
+    });
+    Object.defineProperty(process.stderr, "isTTY", {
+      configurable: true,
+      value: true
+    });
+
+    try {
+      const { runExec } = await import("../src/core/exec.js");
+      const pending = runExec(makeRequest());
+
+      child.stdout.emit("data", "raw output");
+      child.emit("close", 0, null);
+
+      await expect(pending).resolves.toBe(0);
+      expect(stderr).toContain("[sift: provider • LLM used • 380 tokens • summary 1.2s]");
+    } finally {
+      Object.defineProperty(process.stderr, "isTTY", {
+        configurable: true,
+        value: originalStderrIsTTY
+      });
+    }
+  });
+
+  it("suppresses the footer when quiet is enabled or stderr is not a tty", async () => {
+    const child = new FakeChild();
+    spawnMock.mockReturnValue(child);
+    runSiftWithStatsMock.mockResolvedValue({
+      output: "Reduced answer",
+      stats: {
+        layer: "heuristic",
+        providerCalled: false,
+        totalTokens: null,
+        durationMs: 47,
+        presetName: "typecheck-summary"
+      }
+    });
+
+    const { runExec } = await import("../src/core/exec.js");
+    const pending = runExec(makeRequest({ presetName: "typecheck-summary", quiet: true }));
+
+    child.stdout.emit("data", "raw output");
+    child.emit("close", 0, null);
+
+    await expect(pending).resolves.toBe(0);
+    expect(stderr).not.toContain("[sift:");
+  });
+
+  it("emits a heuristic footer for exec shortcuts on tty stderr", async () => {
+    const child = new FakeChild();
+    const originalStderrIsTTY = process.stderr.isTTY;
+    spawnMock.mockReturnValue(child);
+    Object.defineProperty(process.stderr, "isTTY", {
+      configurable: true,
+      value: true
+    });
+
+    try {
+      const { runExec } = await import("../src/core/exec.js");
+      const pending = runExec(
+        makeRequest({
+          presetName: "typecheck-summary",
+          format: "bullets",
+          command: ["node", "-e", "process.exit(0)"]
+        })
+      );
+
+      child.emit("close", 0, null);
+
+      await expect(pending).resolves.toBe(0);
+      expect(stderr).toContain("[sift: heuristic • LLM skipped • summary ");
+    } finally {
+      Object.defineProperty(process.stderr, "isTTY", {
+        configurable: true,
+        value: originalStderrIsTTY
+      });
+    }
+  });
+
   it("bypasses reduction for interactive prompt-like output", async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);
@@ -497,9 +627,10 @@ describe("runExec unit", () => {
     child.emit("close", 0, null);
 
     await expect(pending).resolves.toBe(0);
-    expect(runSiftMock).not.toHaveBeenCalled();
+    expect(runSiftWithStatsMock).not.toHaveBeenCalled();
     expect(stderr).toContain("Continue? [y/N]");
     expect(stderr).toContain("remaining output");
+    expect(stderr).not.toContain("[sift:");
     expect(fs.existsSync(statePath)).toBe(false);
   });
 
@@ -531,13 +662,14 @@ describe("runExec unit", () => {
   it("preserves child non-zero exits even when fail-on would trigger", async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);
-    runSiftMock.mockResolvedValue(
-      JSON.stringify({
+    runSiftWithStatsMock.mockResolvedValue({
+      output: JSON.stringify({
         verdict: "fail",
         reason: "risky",
         evidence: []
-      })
-    );
+      }),
+      stats: null
+    });
 
     const { runExec } = await import("../src/core/exec.js");
     const pending = runExec(
@@ -557,13 +689,14 @@ describe("runExec unit", () => {
   it("upgrades exit 0 to 1 when fail-on gate trips", async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);
-    runSiftMock.mockResolvedValue(
-      JSON.stringify({
+    runSiftWithStatsMock.mockResolvedValue({
+      output: JSON.stringify({
         status: "ok",
         vulnerabilities: [{ package: "lodash", severity: "critical" }],
         summary: "bad"
-      })
-    );
+      }),
+      stats: null
+    });
 
     const { runExec } = await import("../src/core/exec.js");
     const pending = runExec(
@@ -583,7 +716,7 @@ describe("runExec unit", () => {
   it("skips fail-on when dry-run is enabled", async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);
-    runSiftMock.mockResolvedValue('{"status":"dry-run"}');
+    runSiftWithStatsMock.mockResolvedValue({ output: '{"status":"dry-run"}', stats: null });
 
     const { runExec } = await import("../src/core/exec.js");
     const pending = runExec(

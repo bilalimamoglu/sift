@@ -27,7 +27,8 @@ import {
   assertSupportedFailOnPreset,
   evaluateGate
 } from "./core/gate.js";
-import { runSift } from "./core/run.js";
+import { runSift, runSiftWithStats } from "./core/run.js";
+import { emitStatsFooter } from "./core/stats.js";
 import { readStdin } from "./core/stdin.js";
 import { getPreset } from "./prompts/presets.js";
 import { createPresentation } from "./ui/presentation.js";
@@ -66,6 +67,7 @@ export interface CliDeps {
   readonly evaluateGate: typeof evaluateGate;
   readonly readStdin: typeof readStdin;
   readonly runSift: typeof runSift;
+  readonly runSiftWithStats: typeof runSiftWithStats;
   readonly runWatch: typeof runWatch;
   readonly looksLikeWatchStream: typeof looksLikeWatchStream;
   readonly getPreset: typeof getPreset;
@@ -94,6 +96,7 @@ const defaultCliDeps: CliDeps = {
   evaluateGate,
   readStdin,
   runSift,
+  runSiftWithStats,
   runWatch,
   looksLikeWatchStream,
   getPreset
@@ -279,6 +282,7 @@ function applySharedOptions(command: ReturnType<ReturnType<typeof cac>["command"
       "Fail with exit code 1 when a supported built-in preset produces a blocking result"
     )
     .option("--config <path>", "Path to config file")
+    .option("--quiet", "Suppress the stats footer on stderr")
     .option("--verbose", "Enable verbose stderr logging");
 }
 
@@ -440,9 +444,10 @@ export function createCliApp(args: {
       }
     }
 
-    const output =
-      deps.looksLikeWatchStream(stdin)
-        ? await deps.runWatch({
+    const isWatchStream = deps.looksLikeWatchStream(stdin);
+    const result = isWatchStream
+      ? {
+          output: await deps.runWatch({
             question: input.question,
             format: input.format,
             goal: input.goal,
@@ -456,24 +461,31 @@ export function createCliApp(args: {
             policyName: input.policyName,
             outputContract: input.outputContract,
             fallbackJson: input.fallbackJson
-          })
-        : await deps.runSift({
-            question: input.question,
-            format: input.format,
-            goal: input.goal,
-            stdin,
-            config,
-            dryRun: Boolean(input.options.dryRun),
-            showRaw: Boolean(input.options.showRaw),
-            includeTestIds: Boolean(input.options.includeTestIds),
-            detail: input.detail,
-            presetName: input.presetName,
-            policyName: input.policyName,
-            outputContract: input.outputContract,
-            fallbackJson: input.fallbackJson
-          });
+          }),
+          stats: null
+        }
+      : await deps.runSiftWithStats({
+          question: input.question,
+          format: input.format,
+          goal: input.goal,
+          stdin,
+          config,
+          dryRun: Boolean(input.options.dryRun),
+          showRaw: Boolean(input.options.showRaw),
+          includeTestIds: Boolean(input.options.includeTestIds),
+          detail: input.detail,
+          presetName: input.presetName,
+          policyName: input.policyName,
+          outputContract: input.outputContract,
+          fallbackJson: input.fallbackJson
+        });
 
+    const output = result.output;
     stdout.write(`${output}\n`);
+    emitStatsFooter({
+      stats: result.stats,
+      quiet: Boolean(input.options.quiet)
+    });
 
     if (
       Boolean(input.options.failOn) &&
@@ -522,6 +534,7 @@ export function createCliApp(args: {
       dryRun: Boolean(input.options.dryRun),
       diff: input.diff,
       failOn: Boolean(input.options.failOn),
+      quiet: Boolean(input.options.quiet),
       showRaw: Boolean(input.options.showRaw),
       includeTestIds: Boolean(input.options.includeTestIds),
       watch: Boolean(input.options.watch),
@@ -746,6 +759,7 @@ export function createCliApp(args: {
         outputContract: preset.outputContract,
         fallbackJson: preset.fallbackJson,
         detail: normalizeEscalateDetail(options.detail),
+        quiet: Boolean(options.quiet),
         showRaw: Boolean(options.showRaw),
         verbose: Boolean(options.verbose)
       });

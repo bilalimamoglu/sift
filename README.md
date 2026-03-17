@@ -106,6 +106,44 @@ It also returns a decision signal:
 
 The deepest local coverage today is test debugging, especially `pytest`, with growing support for `vitest` and `jest`.
 
+## Built-in presets
+
+Every preset runs local heuristics first. When the heuristic confidently handles the output, the provider is never called — zero tokens, zero latency, fully deterministic.
+
+| Preset | Heuristic | What it does |
+|--------|-----------|-------------|
+| `test-status` | Deep | Bucket/anchor/decision system for pytest, vitest, jest. 30+ failure patterns, confidence-gated stop/zoom decisions. |
+| `typecheck-summary` | Deterministic | Parses `tsc` output (standard and pretty formats), groups by error code, returns max 5 bullets. |
+| `lint-failures` | Deterministic | Parses ESLint stylish output, groups by rule, distinguishes errors from warnings, detects fixable hints. |
+| `audit-critical` | Deterministic | Extracts high/critical vulnerabilities from `npm audit` or similar. |
+| `infra-risk` | Deterministic | Detects destructive signals in `terraform plan` output. Returns pass/fail verdict. |
+| `build-failure` | Deterministic-first | Extracts the first concrete build error for recognized webpack, esbuild/Vite, Cargo, Go, GCC/Clang, and `tsc --build` output; falls back to the provider for unsupported formats. |
+| `diff-summary` | Provider | Summarizes changes and risks in diff output. |
+| `log-errors` | Provider | Extracts top error signals from log output. |
+
+Presets marked **Deterministic** bypass the provider entirely for recognized output formats. Presets marked **Deterministic-first** try a local heuristic first and fall back to the provider only when the captured output is unsupported or ambiguous. Presets marked **Provider** always call the LLM but benefit from input sanitization and truncation.
+
+```bash
+sift exec --preset typecheck-summary -- npx tsc --noEmit
+sift exec --preset lint-failures -- npx eslint src/
+sift exec --preset build-failure -- npm run build
+sift exec --preset audit-critical -- npm audit
+sift exec --preset infra-risk -- terraform plan
+```
+
+On an interactive terminal, `sift` also shows a small stderr footer so humans can see whether the provider was skipped:
+
+```text
+[sift: heuristic • LLM skipped • summary 47ms]
+[sift: provider • LLM used • 380 tokens • summary 1.2s]
+```
+
+Suppress the footer with `--quiet`:
+
+```bash
+sift exec --preset typecheck-summary --quiet -- npx tsc --noEmit
+```
+
 ## Test debugging workflow
 
 This is where `sift` is strongest today.
@@ -153,10 +191,11 @@ sift agent remove claude
 - shaped by a small number of root causes
 
 Good fits:
-- large `pytest`, `vitest`, or `jest` runs
+- large `pytest`, `vitest`, or `jest` runs (deterministic heuristics)
+- `tsc` type errors and `eslint` lint failures (deterministic heuristics)
+- build failures from webpack, esbuild, cargo, go, gcc
+- `npm audit` and `terraform plan` (deterministic heuristics)
 - repeated CI blockers
-- `npm audit`
-- `terraform plan`
 - noisy diffs and log streams
 
 ## Where it helps less

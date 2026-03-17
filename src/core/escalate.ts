@@ -1,7 +1,8 @@
 import pc from "picocolors";
 import type { Goal, OutputFormat, PromptPolicyName, SiftConfig } from "../types.js";
 import { buildInsufficientSignalOutput, isInsufficientSignalOutput } from "./insufficient.js";
-import { runSift } from "./run.js";
+import { runSiftWithStats } from "./run.js";
+import { emitStatsFooter } from "./stats.js";
 import {
   getNextEscalationDetail,
   readCachedTestStatusRun,
@@ -20,6 +21,7 @@ export interface EscalateRequest {
   dryRun?: boolean;
   includeTestIds?: boolean;
   detail?: "focused" | "verbose";
+  quiet?: boolean;
   showRaw?: boolean;
   verbose?: boolean;
 }
@@ -64,7 +66,7 @@ export async function runEscalate(request: EscalateRequest): Promise<number> {
     }
   }
 
-  let output = await runSift({
+  const result = await runSiftWithStats({
     question: request.question,
     format: request.format,
     goal: request.goal,
@@ -82,6 +84,7 @@ export async function runEscalate(request: EscalateRequest): Promise<number> {
         Boolean(state.pytest?.subsetCapable) && (state.pytest?.failingNodeIds.length ?? 0) > 0
     }
   });
+  let output = result.output;
 
   if (isInsufficientSignalOutput(output)) {
     output = buildInsufficientSignalOutput({
@@ -93,6 +96,10 @@ export async function runEscalate(request: EscalateRequest): Promise<number> {
   }
 
   process.stdout.write(`${output}\n`);
+  emitStatsFooter({
+    stats: result.stats,
+    quiet: Boolean(request.quiet)
+  });
 
   try {
     writeCachedTestStatusRun({

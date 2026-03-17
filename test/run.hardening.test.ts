@@ -432,4 +432,89 @@ describe("runSift hardening", () => {
     expect(output).toContain("formatter output is JSON");
     expect(server.requests).toHaveLength(1);
   });
+
+  it("short-circuits build-failure through the heuristic path and reports it in verbose mode", async () => {
+    const preset = defaultConfig.presets["build-failure"]!;
+    let stderr = "";
+
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [
+          {
+            message: {
+              content:
+                "Build failed: provider fallback should not run. Fix: This should never be returned."
+            }
+          }
+        ]
+      }
+    }));
+
+    const stderrWrite = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation((chunk: string | Uint8Array) => {
+        stderr += chunk.toString();
+        return true;
+      });
+
+    try {
+      await withPatchedStderrTTY(true, async () => {
+        const output = await runSift({
+          question: preset.question,
+          format: "brief",
+          policyName: "build-failure",
+          stdin: [
+            "✘ [ERROR] Could not resolve \"missing-package\"",
+            "",
+            "    src/app.ts:3:21:",
+            "      3 │ import { foo } from \"missing-package\""
+          ].join("\n"),
+          config: {
+            ...makeConfig(server!.baseUrl),
+            runtime: {
+              ...defaultConfig.runtime,
+              verbose: true
+            }
+          }
+        });
+
+        expect(output).toBe(
+          'Build failed: Could not resolve "missing-package" in src/app.ts:3. Fix: Install the missing package or fix the import path.'
+        );
+      });
+    } finally {
+      stderrWrite.mockRestore();
+    }
+
+    expect(stderr).toContain("heuristic=build-failure");
+    expect(server.requests).toHaveLength(0);
+  });
+
+  it("falls back to the provider for unsupported build-failure input", async () => {
+    const preset = defaultConfig.presets["build-failure"]!;
+
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [
+          {
+            message: {
+              content:
+                "Build failed: the wrapper output does not expose a concrete compiler error. Fix: re-run the underlying build tool with raw output."
+            }
+          }
+        ]
+      }
+    }));
+
+    const output = await runSift({
+      question: preset.question,
+      format: "brief",
+      policyName: "build-failure",
+      stdin: "Build failed during packaging. See the CI artifact for the underlying compiler output.\n",
+      config: makeConfig(server.baseUrl)
+    });
+
+    expect(output).toContain("does not expose a concrete compiler error");
+    expect(server.requests).toHaveLength(1);
+  });
 });

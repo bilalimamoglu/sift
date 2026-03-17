@@ -9,7 +9,8 @@ import {
   buildInsufficientSignalOutput,
   isInsufficientSignalOutput
 } from "./insufficient.js";
-import { runSift } from "./run.js";
+import { runSiftWithStats } from "./run.js";
+import { emitStatsFooter, type RunStats } from "./stats.js";
 import { looksLikeWatchStream, runWatch } from "./watch.js";
 import {
   buildTestStatusCommandKey,
@@ -118,6 +119,7 @@ export interface ExecRequest extends Omit<RunRequest, "stdin"> {
   cwd?: string;
   diff?: boolean;
   failOn?: boolean;
+  quiet?: boolean;
   showRaw?: boolean;
   shellCommand?: string;
   skipCacheWrite?: boolean;
@@ -247,6 +249,8 @@ export async function runExec(request: ExecRequest): Promise<number> {
   }
 
   if (!bypassed) {
+    const reductionStartedAt = Date.now();
+
     if (request.showRaw && capturedOutput.length > 0) {
       process.stderr.write(capturedOutput);
       if (!capturedOutput.endsWith("\n")) {
@@ -270,6 +274,16 @@ export async function runExec(request: ExecRequest): Promise<number> {
       }
 
       process.stdout.write(`${execSuccessShortcut}\n`);
+      emitStatsFooter({
+        stats: {
+          layer: "heuristic",
+          providerCalled: false,
+          totalTokens: null,
+          durationMs: Date.now() - reductionStartedAt,
+          presetName: request.presetName
+        } satisfies RunStats,
+        quiet: Boolean(request.quiet)
+      });
       return exitCode;
     }
 
@@ -321,7 +335,7 @@ export async function runExec(request: ExecRequest): Promise<number> {
           })
         : null;
 
-    let output = await runSift({
+    const result = await runSiftWithStats({
       ...request,
       stdin: capturedOutput,
       analysisContext:
@@ -358,6 +372,7 @@ export async function runExec(request: ExecRequest): Promise<number> {
             }
           : request.testStatusContext
     });
+    let output = result.output;
 
     if (shouldCacheTestStatus) {
       if (isInsufficientSignalOutput(output)) {
@@ -415,6 +430,10 @@ export async function runExec(request: ExecRequest): Promise<number> {
     }
 
     process.stdout.write(`${output}\n`);
+    emitStatsFooter({
+      stats: result.stats,
+      quiet: Boolean(request.quiet)
+    });
 
     if (
       request.failOn &&

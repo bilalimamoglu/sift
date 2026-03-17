@@ -113,6 +113,87 @@ describe("runSift unit", () => {
     });
   });
 
+  it("returns null stats for dry-run via runSiftWithStats", async () => {
+    const { runSiftWithStats } = await import("../src/core/run.js");
+
+    const result = await runSiftWithStats(makeRequest({ dryRun: true }));
+
+    expect(JSON.parse(result.output).status).toBe("dry-run");
+    expect(result.stats).toBeNull();
+  });
+
+  it("returns heuristic stats when the heuristic short-circuits", async () => {
+    prepareInputMock.mockReturnValue({
+      raw: "12 passed",
+      sanitized: "12 passed",
+      redacted: "12 passed",
+      truncated: "12 passed",
+      meta: {
+        originalLength: 9,
+        finalLength: 9,
+        redactionApplied: false,
+        truncatedApplied: false
+      }
+    });
+    const { runSiftWithStats } = await import("../src/core/run.js");
+
+    const result = await runSiftWithStats(
+      makeRequest({
+        policyName: "test-status",
+        presetName: "test-status"
+      })
+    );
+
+    expect(result.output).toContain("Tests passed.");
+    expect(result.stats).toMatchObject({
+      layer: "heuristic",
+      providerCalled: false,
+      totalTokens: null,
+      presetName: "test-status"
+    });
+    expect(result.stats?.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("returns provider stats with usage tokens when the provider succeeds", async () => {
+    createProviderMock.mockReturnValue({
+      name: "openai",
+      generate: vi.fn().mockResolvedValue({
+        text: "All clear",
+        usage: {
+          totalTokens: 380
+        }
+      })
+    });
+    const { runSiftWithStats } = await import("../src/core/run.js");
+
+    const result = await runSiftWithStats(makeRequest());
+
+    expect(result.output).toBe("All clear");
+    expect(result.stats).toMatchObject({
+      layer: "provider",
+      providerCalled: true,
+      totalTokens: 380
+    });
+  });
+
+  it("returns fallback stats when the provider fails", async () => {
+    createProviderMock.mockReturnValue({
+      name: "openai",
+      generate: vi.fn().mockRejectedValue(new Error("Provider returned HTTP 429"))
+    });
+    buildFallbackOutputMock.mockReturnValue("fallback");
+    const { runSiftWithStats } = await import("../src/core/run.js");
+
+    const result = await runSiftWithStats(makeRequest());
+
+    expect(result.output).toBe("fallback");
+    expect(result.stats).toMatchObject({
+      layer: "fallback",
+      providerCalled: true,
+      totalTokens: null
+    });
+  });
+
   it("logs heuristic usage in verbose mode", async () => {
     prepareInputMock.mockReturnValue({
       raw: "12 passed",
