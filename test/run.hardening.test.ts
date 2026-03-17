@@ -310,7 +310,7 @@ describe("runSift hardening", () => {
     expect(server.requests).toHaveLength(0);
   });
 
-  it("supports typecheck-summary through the provider path", async () => {
+  it("short-circuits typecheck-summary through the heuristic path", async () => {
     const preset = defaultConfig.presets["typecheck-summary"]!;
 
     server = await createFakeOpenAIServer(() => ({
@@ -337,12 +337,41 @@ describe("runSift hardening", () => {
       config: makeConfig(server.baseUrl)
     });
 
-    expect(output).toContain("Typecheck failed.");
+    expect(output).toContain("- Typecheck failed: 3 errors in 2 files.");
     expect(output).toContain("TS2322");
-    expect(output.split("\n").length).toBeLessThanOrEqual(3);
+    expect(output.split("\n").length).toBeLessThanOrEqual(4);
+    expect(server.requests).toHaveLength(0);
   });
 
-  it("supports lint-failures through the provider path", async () => {
+  it("falls back to the provider for unsupported typecheck-summary input", async () => {
+    const preset = defaultConfig.presets["typecheck-summary"]!;
+
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [
+          {
+            message: {
+              content:
+                "- Typecheck failed.\n- The wrapper output does not expose concrete TypeScript diagnostics.\n- Re-run with raw tsc output."
+            }
+          }
+        ]
+      }
+    }));
+
+    const output = await runSift({
+      question: preset.question,
+      format: "bullets",
+      policyName: "typecheck-summary",
+      stdin: "TypeScript build failed in packages/ui. See the CI artifact for compiler details.\n",
+      config: makeConfig(server.baseUrl)
+    });
+
+    expect(output).toContain("wrapper output does not expose concrete TypeScript diagnostics");
+    expect(server.requests).toHaveLength(1);
+  });
+
+  it("short-circuits lint-failures through the heuristic path", async () => {
     const preset = defaultConfig.presets["lint-failures"]!;
 
     server = await createFakeOpenAIServer(() => ({
@@ -369,8 +398,38 @@ describe("runSift hardening", () => {
       config: makeConfig(server.baseUrl)
     });
 
-    expect(output).toContain("Lint failed.");
+    expect(output).toContain("- Lint failed: 3 problems (2 errors, 1 warning).");
     expect(output).toContain("@typescript-eslint/no-explicit-any");
-    expect(output.split("\n").length).toBeLessThanOrEqual(3);
+    expect(output.split("\n").length).toBeLessThanOrEqual(4);
+    expect(server.requests).toHaveLength(0);
+  });
+
+  it("falls back to the provider for unsupported lint-failures input", async () => {
+    const preset = defaultConfig.presets["lint-failures"]!;
+
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [
+          {
+            message: {
+              content:
+                "- Lint failed.\n- The captured formatter output is JSON, so the heuristic deferred to the provider.\n- Inspect the JSON payload for file-level detail."
+            }
+          }
+        ]
+      }
+    }));
+
+    const output = await runSift({
+      question: preset.question,
+      format: "bullets",
+      policyName: "lint-failures",
+      stdin:
+        '[{"filePath":"src/app.ts","messages":[{"ruleId":"no-console","severity":1,"message":"Unexpected console statement."}]}]',
+      config: makeConfig(server.baseUrl)
+    });
+
+    expect(output).toContain("formatter output is JSON");
+    expect(server.requests).toHaveLength(1);
   });
 });

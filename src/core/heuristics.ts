@@ -7,6 +7,24 @@ const ZERO_DESTRUCTIVE_SUMMARY_PATTERN =
   /\b0\s+to\s+(destroy|delete|drop|recreate|replace|revoke)\b/i;
 const SAFE_LINE_PATTERN =
   /(no changes|up-to-date|up to date|no risky changes|safe to apply)/i;
+const TSC_CODE_LABELS: Record<string, string> = {
+  TS1002: "syntax error",
+  TS1005: "syntax error",
+  TS2304: "cannot find name",
+  TS2307: "cannot find module",
+  TS2322: "type mismatch",
+  TS2339: "missing property on type",
+  TS2345: "argument type mismatch",
+  TS2554: "wrong argument count",
+  TS2741: "missing required property",
+  TS2769: "no matching overload",
+  TS5083: "config file error",
+  TS6133: "declared but unused",
+  TS7006: "implicit any",
+  TS18003: "no inputs were found",
+  TS18046: "unknown type",
+  TS18048: "possibly undefined"
+};
 
 function collectEvidence(input: string, matcher: RegExp, limit = 3): string[] {
   return input
@@ -153,6 +171,57 @@ function collectUniqueMatches(input: string, matcher: RegExp, limit = 6): string
   }
 
   return values;
+}
+
+function compactDisplayFile(file: string): string {
+  const normalized = file.replace(/\\/g, "/").trim();
+  if (!normalized) {
+    return file;
+  }
+
+  const looksAbsolute = normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized);
+  if (!looksAbsolute && normalized.length <= 60) {
+    return normalized;
+  }
+
+  const basename = normalized.split("/").at(-1);
+  return basename && basename.length > 0 ? basename : normalized;
+}
+
+function formatDisplayedFiles(files: Iterable<string>, limit = 3): string[] {
+  return [...new Set([...files].map((file) => file.trim()).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right))
+    .slice(0, limit)
+    .map((file) => compactDisplayFile(file));
+}
+
+interface TscDiagnostic {
+  file: string | null;
+  line: number | null;
+  column: number | null;
+  code: string;
+  message: string;
+}
+
+interface TscSummary {
+  errorCount: number;
+  fileCount: number | null;
+}
+
+interface EslintViolation {
+  file: string;
+  line: number;
+  column: number;
+  severity: "error" | "warning";
+  rule: string;
+  message: string;
+}
+
+interface EslintSummary {
+  problems: number;
+  errors: number;
+  warnings: number;
+  fixableProblems: number | null;
 }
 
 interface FocusedFailureItem {
@@ -566,6 +635,33 @@ function classifyFailureReason(
     };
   }
 
+  const osDiskFullFailure = normalized.match(
+    /(OSError:\s*\[Errno 28\][^$]*|No space left on device)/i
+  );
+  if (osDiskFullFailure) {
+    return {
+      reason: buildClassifiedReason(
+        "configuration",
+        `disk full (${buildExcerptDetail(
+          osDiskFullFailure[1] ?? normalized,
+          "No space left on device"
+        )})`
+      ),
+      group: "test configuration failures"
+    };
+  }
+
+  const osPermissionFailure = normalized.match(/OSError:\s*\[Errno 13\][^$]*/i);
+  if (osPermissionFailure) {
+    return {
+      reason: buildClassifiedReason(
+        "permission",
+        buildExcerptDetail(osPermissionFailure[0] ?? normalized, "permission denied")
+      ),
+      group: "permission or locked resource failures"
+    };
+  }
+
   const xdistWorkerCrash = normalized.match(
     /(worker ['"][^'"]+['"] crashed|node down:\s*[^,;]+|WorkerLost[^,;]*|Worker exited unexpectedly[^,;]*|worker exited unexpectedly[^,;]*)/i
   );
@@ -594,7 +690,7 @@ function classifyFailureReason(
   }
 
   const networkFailure = normalized.match(
-    /(Max retries exceeded[^,;]*|gaierror[^,;]*|SSLCertVerificationError[^,;]*|Network is unreachable)/i
+    /(Max retries exceeded[^,;]*|gaierror[^,;]*|SSLCertVerificationError[^,;]*|Network is unreachable|ConnectionResetError[^,;]*|BrokenPipeError[^,;]*|HTTPError:\s*[45]\d\d[^,;]*)/i
   );
   if (networkFailure) {
     return {
@@ -603,6 +699,16 @@ function classifyFailureReason(
         buildExcerptDetail(networkFailure[1] ?? normalized, "network dependency failure")
       ),
       group: "network dependency failures"
+    };
+  }
+
+  const matcherAssertionFailure = normalized.match(
+    /(expect\(received\)\.(?:toBe|toEqual|toStrictEqual|toMatchObject)\(expected\))/i
+  );
+  if (matcherAssertionFailure) {
+    return {
+      reason: `assertion failed: ${matcherAssertionFailure[1]}`.slice(0, 120),
+      group: "assertion failures"
     };
   }
 
@@ -1559,6 +1665,7 @@ export interface TestStatusAnalysis {
   visibleErrorLabels: string[];
   visibleFailedLabels: string[];
   visibleErrorItems: StatusFailureItem[];
+  visibleFailedItems: StatusFailureItem[];
   buckets: FailureBucket[];
 }
 
@@ -2254,13 +2361,17 @@ export function analyzeTestStatus(input: string): TestStatusAnalysis {
     /\binterrupted\b/i.test(input) || /\bKeyboardInterrupt\b/i.test(input);
   const collectionItems = chooseStrongestFailureItems(collectCollectionFailureItems(input));
   const inlineItems = chooseStrongestFailureItems(collectInlineFailureItems(input));
+  const statusItems = collectInlineFailureItemsWithStatus(input);
   const visibleErrorItems = chooseStrongestStatusFailureItems([
     ...collectionItems.map((item) => ({
       ...item,
       status: "error" as const
     })),
-    ...collectInlineFailureItemsWithStatus(input).filter((item) => item.status === "error")
+    ...statusItems.filter((item) => item.status === "error")
   ]);
+  const visibleFailedItems = chooseStrongestStatusFailureItems(
+    statusItems.filter((item) => item.status === "failed")
+  );
   const labels = collectFailureLabels(input);
   const visibleErrorLabels = labels
     .filter((item) => item.status === "error")
@@ -2329,6 +2440,7 @@ export function analyzeTestStatus(input: string): TestStatusAnalysis {
     visibleErrorLabels,
     visibleFailedLabels,
     visibleErrorItems,
+    visibleFailedItems,
     buckets
   };
 }
@@ -2755,6 +2867,374 @@ function infraRiskHeuristic(input: string): string | null {
   return null;
 }
 
+function parseTscErrors(input: string): TscDiagnostic[] {
+  const diagnostics: TscDiagnostic[] = [];
+
+  for (const rawLine of input.split("\n")) {
+    const line = rawLine.replace(/\u001b\[[0-9;]*m/g, "").trimEnd();
+    if (!line.trim()) {
+      continue;
+    }
+
+    let match = line.match(/^(.+)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.+)$/);
+    if (match) {
+      diagnostics.push({
+        file: match[1]!.replace(/\\/g, "/").trim(),
+        line: Number(match[2]),
+        column: Number(match[3]),
+        code: match[4]!,
+        message: match[5]!.trim()
+      });
+      continue;
+    }
+
+    match = line.match(/^(.+):(\d+):(\d+)\s+-\s+error\s+(TS\d+):\s+(.+)$/);
+    if (match) {
+      diagnostics.push({
+        file: match[1]!.replace(/\\/g, "/").trim(),
+        line: Number(match[2]),
+        column: Number(match[3]),
+        code: match[4]!,
+        message: match[5]!.trim()
+      });
+      continue;
+    }
+
+    match = line.match(/^\s*error\s+(TS\d+):\s+(.+)$/);
+    if (match) {
+      diagnostics.push({
+        file: null,
+        line: null,
+        column: null,
+        code: match[1]!,
+        message: match[2]!.trim()
+      });
+    }
+  }
+
+  return diagnostics;
+}
+
+function extractTscSummary(input: string): TscSummary | null {
+  const matches = [
+    ...input.matchAll(/\bFound\s+(\d+)\s+errors?\b(?:\s+in\s+(\d+)\s+files?)?\.?/gi)
+  ];
+  const summary = matches.at(-1);
+  if (!summary) {
+    return null;
+  }
+
+  return {
+    errorCount: Number(summary[1]),
+    fileCount: summary[2] ? Number(summary[2]) : null
+  };
+}
+
+function formatTscGroup(args: { code: string; count: number; files: Set<string> }): string {
+  const label = TSC_CODE_LABELS[args.code];
+  const displayFiles = formatDisplayedFiles(args.files);
+  let line = `- ${args.code}`;
+  if (label) {
+    line += ` (${label})`;
+  }
+
+  line += `: ${formatCount(args.count, "occurrence")}`;
+  if (displayFiles.length > 0) {
+    line += ` across ${displayFiles.join(", ")}`;
+  }
+
+  return `${line}.`;
+}
+
+function typecheckSummaryHeuristic(input: string): string | null {
+  if (input.trim().length === 0) {
+    return null;
+  }
+
+  const diagnostics = parseTscErrors(input);
+  const summary = extractTscSummary(input);
+  const hasTscSignal = diagnostics.length > 0 || summary !== null || /\berror\s+TS\d+:/m.test(input);
+  if (!hasTscSignal) {
+    return null;
+  }
+
+  if (summary?.errorCount === 0) {
+    return "No type errors.";
+  }
+
+  if (diagnostics.length === 0 && summary === null) {
+    return null;
+  }
+
+  const errorCount = summary?.errorCount ?? diagnostics.length;
+  const allFiles = new Set(
+    diagnostics.map((diagnostic) => diagnostic.file).filter((file): file is string => Boolean(file))
+  );
+  const fileCount = summary?.fileCount ?? (allFiles.size > 0 ? allFiles.size : null);
+  const groups = new Map<string, { count: number; files: Set<string> }>();
+
+  for (const diagnostic of diagnostics) {
+    const group = groups.get(diagnostic.code) ?? {
+      count: 0,
+      files: new Set<string>()
+    };
+    group.count += 1;
+    if (diagnostic.file) {
+      group.files.add(diagnostic.file);
+    }
+    groups.set(diagnostic.code, group);
+  }
+
+  const bullets = [
+    `- Typecheck failed: ${formatCount(errorCount, "error")}${fileCount ? ` in ${formatCount(fileCount, "file")}` : ""}.`
+  ];
+  const sortedGroups = [...groups.entries()]
+    .map(([code, group]) => ({
+      code,
+      count: group.count,
+      files: group.files
+    }))
+    .sort((left, right) => right.count - left.count || left.code.localeCompare(right.code));
+
+  for (const group of sortedGroups.slice(0, 3)) {
+    bullets.push(formatTscGroup(group));
+  }
+
+  if (sortedGroups.length > 3) {
+    const overflowFiles = new Set<string>();
+    for (const group of sortedGroups.slice(3)) {
+      for (const file of group.files) {
+        overflowFiles.add(file);
+      }
+    }
+
+    let overflow = `- ${formatCount(sortedGroups.length - 3, "more error code")}`;
+    if (overflowFiles.size > 0) {
+      overflow += ` across ${formatCount(overflowFiles.size, "file")}`;
+    }
+    bullets.push(`${overflow}.`);
+  }
+
+  return bullets.join("\n");
+}
+
+function looksLikeEslintFileHeader(line: string): boolean {
+  if (line.trim().length === 0 || line.trim() !== line) {
+    return false;
+  }
+
+  if (
+    /^\s*[✖×x]\s+\d+\s+problems?\b/i.test(line) ||
+    /potentially\s+fixable/i.test(line) ||
+    /^\d+\s+problems?\b/i.test(line)
+  ) {
+    return false;
+  }
+
+  const normalized = line.replace(/\\/g, "/");
+  const pathLike =
+    normalized.startsWith("/") ||
+    normalized.startsWith("./") ||
+    normalized.startsWith("../") ||
+    /^[A-Za-z]:\//.test(normalized) ||
+    /^[A-Za-z0-9_.-]+\//.test(normalized);
+
+  return pathLike && /\.[A-Za-z0-9]+$/.test(normalized);
+}
+
+function normalizeEslintRule(rule: string | null, message: string): string {
+  if (rule && rule.trim().length > 0) {
+    return rule.trim();
+  }
+
+  if (/parsing error/i.test(message)) {
+    return "parsing error";
+  }
+
+  if (/fatal/i.test(message)) {
+    return "fatal error";
+  }
+
+  return "unclassified lint error";
+}
+
+function parseEslintStylish(input: string): EslintViolation[] {
+  const violations: EslintViolation[] = [];
+  let currentFile: string | null = null;
+
+  for (const rawLine of input.split("\n")) {
+    const line = rawLine.replace(/\u001b\[[0-9;]*m/g, "").replace(/\r$/, "");
+    if (looksLikeEslintFileHeader(line.trim())) {
+      currentFile = line.trim().replace(/\\/g, "/");
+      continue;
+    }
+
+    let match = line.match(/^\s*(\d+):(\d+)\s+(error|warning)\s+(.+?)\s{2,}(\S+)\s*$/);
+    if (match) {
+      violations.push({
+        file: currentFile ?? "(unknown file)",
+        line: Number(match[1]),
+        column: Number(match[2]),
+        severity: match[3] as "error" | "warning",
+        message: match[4]!.trim(),
+        rule: normalizeEslintRule(match[5]!, match[4]!)
+      });
+      continue;
+    }
+
+    match = line.match(/^\s*(\d+):(\d+)\s+(error|warning)\s+(.+?)\s*$/);
+    if (match) {
+      violations.push({
+        file: currentFile ?? "(unknown file)",
+        line: Number(match[1]),
+        column: Number(match[2]),
+        severity: match[3] as "error" | "warning",
+        message: match[4]!.trim(),
+        rule: normalizeEslintRule(null, match[4]!)
+      });
+    }
+  }
+
+  return violations;
+}
+
+function extractEslintSummary(input: string): EslintSummary | null {
+  const summaryMatches = [
+    ...input.matchAll(
+      /^\s*[✖×x]?\s*(\d+)\s+problems?\s+\((\d+)\s+errors?,\s+(\d+)\s+warnings?\)/gim
+    )
+  ];
+  const summary = summaryMatches.at(-1);
+  if (!summary) {
+    return null;
+  }
+
+  const fixableMatch = input.match(
+    /(\d+)\s+errors?\s+and\s+(\d+)\s+warnings?\s+(?:are|is)\s+potentially\s+fixable/i
+  );
+
+  return {
+    problems: Number(summary[1]),
+    errors: Number(summary[2]),
+    warnings: Number(summary[3]),
+    fixableProblems: fixableMatch ? Number(fixableMatch[1]) + Number(fixableMatch[2]) : null
+  };
+}
+
+function formatLintGroup(args: {
+  rule: string;
+  errors: number;
+  warnings: number;
+  files: Set<string>;
+}): string {
+  const totalErrors = args.errors;
+  const totalWarnings = args.warnings;
+  const displayFiles = formatDisplayedFiles(args.files);
+  let detail = "";
+
+  if (totalErrors > 0 && totalWarnings > 0) {
+    detail = `${formatCount(totalErrors, "error")}, ${formatCount(totalWarnings, "warning")}`;
+  } else if (totalErrors > 0) {
+    detail = formatCount(totalErrors, "error");
+  } else {
+    detail = formatCount(totalWarnings, "warning");
+  }
+
+  let line = `- ${args.rule}: ${detail}`;
+  if (displayFiles.length > 0) {
+    line += ` across ${displayFiles.join(", ")}`;
+  }
+
+  return `${line}.`;
+}
+
+function lintFailuresHeuristic(input: string): string | null {
+  const trimmed = input.trim();
+  if (trimmed.length === 0 || trimmed.startsWith("[") || trimmed.startsWith("{")) {
+    return null;
+  }
+
+  const summary = extractEslintSummary(input);
+  const violations = parseEslintStylish(input);
+  if (summary === null && violations.length === 0) {
+    return null;
+  }
+
+  if (summary?.problems === 0) {
+    return "No lint failures.";
+  }
+
+  const problems = summary?.problems ?? violations.length;
+  const errors = summary?.errors ?? countPattern(input, /^\s*\d+:\d+\s+error\b/gm);
+  const warnings = summary?.warnings ?? countPattern(input, /^\s*\d+:\d+\s+warning\b/gm);
+  const bullets: string[] = [];
+
+  if (errors > 0) {
+    let headline = `- Lint failed: ${formatCount(problems, "problem")} (${formatCount(errors, "error")}, ${formatCount(warnings, "warning")}).`;
+    if ((summary?.fixableProblems ?? 0) > 0) {
+      headline += ` ${formatCount(summary!.fixableProblems!, "problem")} potentially fixable with --fix.`;
+    }
+    bullets.push(headline);
+  } else {
+    bullets.push(`- No lint errors visible: ${formatCount(warnings, "warning")}.`);
+  }
+
+  const groups = new Map<string, { errors: number; warnings: number; files: Set<string> }>();
+  for (const violation of violations) {
+    const group = groups.get(violation.rule) ?? {
+      errors: 0,
+      warnings: 0,
+      files: new Set<string>()
+    };
+    if (violation.severity === "error") {
+      group.errors += 1;
+    } else {
+      group.warnings += 1;
+    }
+    group.files.add(violation.file);
+    groups.set(violation.rule, group);
+  }
+
+  const sortedGroups = [...groups.entries()]
+    .map(([rule, group]) => ({
+      rule,
+      errors: group.errors,
+      warnings: group.warnings,
+      total: group.errors + group.warnings,
+      files: group.files
+    }))
+    .sort((left, right) => {
+      const leftHasErrors = left.errors > 0 ? 1 : 0;
+      const rightHasErrors = right.errors > 0 ? 1 : 0;
+      return (
+        rightHasErrors - leftHasErrors ||
+        right.total - left.total ||
+        left.rule.localeCompare(right.rule)
+      );
+    });
+
+  for (const group of sortedGroups.slice(0, 3)) {
+    bullets.push(formatLintGroup(group));
+  }
+
+  if (sortedGroups.length > 3) {
+    const overflowFiles = new Set<string>();
+    for (const group of sortedGroups.slice(3)) {
+      for (const file of group.files) {
+        overflowFiles.add(file);
+      }
+    }
+
+    let overflow = `- ${formatCount(sortedGroups.length - 3, "more rule")}`;
+    if (overflowFiles.size > 0) {
+      overflow += ` across ${formatCount(overflowFiles.size, "file")}`;
+    }
+    bullets.push(`${overflow}.`);
+  }
+
+  return bullets.join("\n");
+}
+
 export function applyHeuristicPolicy(
   policyName: PromptPolicyName | undefined,
   input: string,
@@ -2774,6 +3254,14 @@ export function applyHeuristicPolicy(
 
   if (policyName === "test-status") {
     return testStatusHeuristic(input, detail);
+  }
+
+  if (policyName === "typecheck-summary") {
+    return typecheckSummaryHeuristic(input);
+  }
+
+  if (policyName === "lint-failures") {
+    return lintFailuresHeuristic(input);
   }
 
   return null;

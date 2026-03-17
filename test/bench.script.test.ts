@@ -143,7 +143,11 @@ describe("benchmark harness", () => {
       "missing-module-collection",
       "vitest-snapshot-mismatch",
       "vitest-mixed-js",
-      "jest-mixed-js"
+      "jest-mixed-js",
+      "pytest-small-runtime-suite",
+      "vitest-expect-assertions",
+      "pytest-network-reset",
+      "pytest-oserror-setup"
     ]);
 
     assertBudgetInvariants(report);
@@ -175,6 +179,10 @@ describe("benchmark harness", () => {
       "vitest-snapshot-mismatch",
       "vitest-mixed-js",
       "jest-mixed-js",
+      "pytest-small-runtime-suite",
+      "vitest-expect-assertions",
+      "pytest-network-reset",
+      "pytest-oserror-setup",
       "single-blocker-short-real",
       "mixed-full-suite-real",
       "snapshot-drift-only-real",

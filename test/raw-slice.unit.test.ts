@@ -45,6 +45,33 @@ function buildObservedAnchorFailureOutput(): string {
   ].join("\n");
 }
 
+function buildGenericRuntimeSwampOutput(): string {
+  return [
+    ...Array.from({ length: 60 }, (_, index) => `E   RuntimeError: generic runtime noise ${index + 1}`),
+    "FAILED tests/unit/test_cache.py::test_cache_payload - RuntimeError: cache payload missing subject",
+    "tests/unit/test_cache.py:41: in test_cache_payload",
+    "    raise RuntimeError(\"cache payload missing subject\")",
+    "E   RuntimeError: cache payload missing subject",
+    ...Array.from({ length: 60 }, (_, index) => `log line ${index + 1}`)
+  ].join("\n");
+}
+
+function buildClusteredFailureHeaderOutput(): string {
+  return [
+    "platform darwin -- Python 3.11.4",
+    ...Array.from({ length: 40 }, (_, index) => `noise block A ${index + 1}`),
+    "FAILED tests/unit/test_alpha.py::test_alpha - RuntimeError: alpha exploded",
+    "E   RuntimeError: alpha exploded",
+    ...Array.from({ length: 80 }, (_, index) => `noise block B ${index + 1}`),
+    "ERROR tests/unit/test_beta.py::test_beta - RuntimeError: beta exploded",
+    "E   RuntimeError: beta exploded",
+    ...Array.from({ length: 80 }, (_, index) => `noise block C ${index + 1}`),
+    "FAILED tests/unit/test_gamma.py::test_gamma - RuntimeError: gamma exploded",
+    "E   RuntimeError: gamma exploded",
+    "============= 2 failed, 1 error in 0.18s ============="
+  ].join("\n");
+}
+
 describe("raw slice helpers", () => {
   it("keeps short inputs untouched", () => {
     const slice = buildGenericRawSlice({
@@ -89,6 +116,39 @@ describe("raw slice helpers", () => {
     expect(slice.text).toContain("FAILED");
   });
 
+  it("prefers high-signal bucket terms over generic runtime noise", () => {
+    const input = buildGenericRuntimeSwampOutput();
+    const contract = {
+      main_buckets: [
+        {
+          bucket_index: 1,
+          label: "runtime failure",
+          count: 1,
+          root_cause: "RuntimeError: cache payload missing subject",
+          evidence: [
+            "tests/unit/test_cache.py::test_cache_payload -> RuntimeError: cache payload missing subject"
+          ]
+        }
+      ],
+      read_targets: []
+    } as unknown as Parameters<typeof buildTestStatusRawSlice>[0]["contract"];
+
+    const slice = buildTestStatusRawSlice({
+      input,
+      config: {
+        ...defaultConfig.input,
+        maxInputChars: 260,
+        headChars: 60,
+        tailChars: 60
+      },
+      contract
+    });
+
+    expect(slice.strategy).toBe("bucket_evidence");
+    expect(slice.text).toContain("cache payload missing subject");
+    expect(slice.text).not.toContain("generic runtime noise 1");
+  });
+
   it("prioritizes observed read-target anchors and narrow traceback windows", () => {
     const input = buildObservedAnchorFailureOutput();
     const analysis = analyzeTestStatus(input);
@@ -113,6 +173,30 @@ describe("raw slice helpers", () => {
     expect(slice.text).toContain("tests/conftest.py:374: in _postgres_schema_isolation");
     expect(slice.text).toContain("PGTEST_POSTGRES_DSN");
     expect(slice.text).not.toContain("noise line 1\nnoise line 2\nnoise line 3");
+  });
+
+  it("keeps evidence from multiple distant failure regions under a tight budget", () => {
+    const input = buildClusteredFailureHeaderOutput();
+    const contract = {
+      main_buckets: [],
+      read_targets: []
+    } as unknown as Parameters<typeof buildTestStatusRawSlice>[0]["contract"];
+
+    const slice = buildTestStatusRawSlice({
+      input,
+      config: {
+        ...defaultConfig.input,
+        maxInputChars: 320,
+        headChars: 60,
+        tailChars: 60
+      },
+      contract
+    });
+
+    expect(slice.strategy).toBe("bucket_evidence");
+    expect(slice.text).toContain("tests/unit/test_alpha.py::test_alpha");
+    expect(slice.text).toContain("tests/unit/test_beta.py::test_beta");
+    expect(slice.text).toContain("tests/unit/test_gamma.py::test_gamma");
   });
 
   it("falls back to traceback windows for generic long output", () => {

@@ -271,6 +271,111 @@ function buildJestMixedJsRaw(): string {
   ].join("\n");
 }
 
+function buildPytestSmallRuntimeSuiteRaw(): string {
+  return [
+    "============================= test session starts ==============================",
+    "platform darwin -- Python 3.11.4, pytest-9.0.2",
+    "collecting ... collected 1 item",
+    "tests/unit/test_payloads.py::test_payload_round_trip FAILED [100%]",
+    "",
+    "=================================== FAILURES ===================================",
+    "___________________________ test_payload_round_trip ____________________________",
+    "tests/unit/test_payloads.py:48: in test_payload_round_trip",
+    "    normalize_payload(payload)",
+    "src/app/payloads.py:19: in normalize_payload",
+    "    raise RuntimeError(\"payload subject missing\")",
+    "E   RuntimeError: payload subject missing",
+    "",
+    "=========================== short test summary info ============================",
+    "FAILED tests/unit/test_payloads.py::test_payload_round_trip - RuntimeError: payload subject missing",
+    "============================== 1 failed in 0.09s =============================="
+  ].join("\n");
+}
+
+function buildVitestExpectAssertionsRaw(): string {
+  return [
+    " RUN  v2.1.0 /repo",
+    "",
+    " ❯ src/auth/refresh.test.ts > refresh token > rotates token FAILED [ 50%]",
+    " ❯ src/routes/landing.test.ts > landing page > renders hero FAILED [100%]",
+    "",
+    "⎯⎯⎯ Failed Tests 2 ⎯⎯⎯",
+    "",
+    " FAIL  src/auth/refresh.test.ts > refresh token > rotates token",
+    "expect(received).toBe(expected)",
+    "Expected: \"next-token\"",
+    "Received: \"same-token\"",
+    "❯ src/auth/refresh.test.ts:27:15",
+    "",
+    " FAIL  src/routes/landing.test.ts > landing page > renders hero",
+    "expect(received).toEqual(expected)",
+    "Expected: {\"cta\":\"Try now\"}",
+    "Received: {\"cta\":\"Learn more\"}",
+    "❯ src/routes/landing.test.ts:14:7",
+    "",
+    " Test Files  2 failed (2)",
+    "      Tests  2 failed | 1 passed (3)"
+  ].join("\n");
+}
+
+function buildPytestNetworkResetRaw(): string {
+  return [
+    "============================= test session starts ==============================",
+    "platform darwin -- Python 3.11.4, pytest-9.0.2",
+    "collecting ... collected 3 items",
+    "tests/integration/test_stream.py::test_socket_flush ERROR [ 33%]",
+    "tests/integration/test_feed.py::test_feed_sync ERROR [ 66%]",
+    "tests/integration/test_api.py::test_remote_fallback ERROR [100%]",
+    "",
+    "==================================== ERRORS ====================================",
+    "__________ ERROR at setup of test_socket_flush __________",
+    "tests/integration/test_stream.py:18: in test_socket_flush",
+    "    client.flush()",
+    "src/app/stream_client.py:44: in flush",
+    "    raise ConnectionResetError(\"peer reset during flush\")",
+    "E   ConnectionResetError: [Errno 54] Connection reset by peer",
+    "__________ ERROR at setup of test_feed_sync __________",
+    "tests/integration/test_feed.py:31: in test_feed_sync",
+    "    writer.write(payload)",
+    "src/app/feed_writer.py:52: in write",
+    "    raise BrokenPipeError(\"feed pipe closed\")",
+    "E   BrokenPipeError: [Errno 32] Broken pipe",
+    "__________ ERROR at setup of test_remote_fallback __________",
+    "tests/integration/test_api.py:29: in test_remote_fallback",
+    "    fetch_remote_feed()",
+    "src/app/remote_feed.py:88: in fetch_remote_feed",
+    "    response.raise_for_status()",
+    "E   HTTPError: 502 Server Error: Bad Gateway for url: https://api.example.com/feed",
+    "",
+    "=========================== short test summary info ============================",
+    "ERROR tests/integration/test_stream.py::test_socket_flush - ConnectionResetError: [Errno 54] Connection reset by peer",
+    "ERROR tests/integration/test_feed.py::test_feed_sync - BrokenPipeError: [Errno 32] Broken pipe",
+    "ERROR tests/integration/test_api.py::test_remote_fallback - HTTPError: 502 Server Error: Bad Gateway for url: https://api.example.com/feed",
+    "============================== 3 errors in 0.14s =============================="
+  ].join("\n");
+}
+
+function buildPytestOSErrorSetupRaw(): string {
+  return [
+    "============================= test session starts ==============================",
+    "platform darwin -- Python 3.11.4, pytest-9.0.2",
+    "collecting ... collected 2 items",
+    "tests/storage/test_tmpdir.py::test_tmpdir_bootstrap ERROR [ 50%]",
+    "tests/storage/test_lockfile.py::test_lockfile_cleanup ERROR [100%]",
+    "",
+    "==================================== ERRORS ====================================",
+    "__________ ERROR at setup of test_tmpdir_bootstrap __________",
+    "E   OSError: [Errno 28] No space left on device: '/tmp/pytest-scratch'",
+    "__________ ERROR at setup of test_lockfile_cleanup __________",
+    "E   OSError: [Errno 13] Permission denied: '/tmp/pytest-lock'",
+    "",
+    "=========================== short test summary info ============================",
+    "ERROR tests/storage/test_tmpdir.py::test_tmpdir_bootstrap - OSError: [Errno 28] No space left on device: '/tmp/pytest-scratch'",
+    "ERROR tests/storage/test_lockfile.py::test_lockfile_cleanup - OSError: [Errno 13] Permission denied: '/tmp/pytest-lock'",
+    "============================== 2 errors in 0.11s =============================="
+  ].join("\n");
+}
+
 export const benchFixtures: BenchFixture[] = [
   {
     name: "single-blocker-short",
@@ -442,6 +547,70 @@ export const benchFixtures: BenchFixture[] = [
     completion: {
       expectedBuckets: ["configuration_error", "snapshot_mismatch"],
       expectedEntitiesAny: ["src/components/card.test.ts"],
+      expectedMaxDetail: "standard"
+    }
+  },
+  {
+    name: "pytest-small-runtime-suite",
+    description: "A single concrete runtime failure should be self-sufficient at standard detail.",
+    rawOutput: buildPytestSmallRuntimeSuiteRaw(),
+    rawRecipe: [
+      {
+        command: "python -m pytest tests/unit/test_payloads.py",
+        output: buildPytestSmallRuntimeSuiteRaw()
+      }
+    ],
+    rawRecipeStopAfter: 1,
+    completion: {
+      expectedBuckets: ["runtime_failure"],
+      expectedMaxDetail: "standard"
+    }
+  },
+  {
+    name: "vitest-expect-assertions",
+    description: "Vitest matcher failures should classify into assertion buckets without raw fallback.",
+    rawOutput: buildVitestExpectAssertionsRaw(),
+    rawRecipe: [
+      {
+        command: "npx vitest run src/auth/refresh.test.ts src/routes/landing.test.ts",
+        output: buildVitestExpectAssertionsRaw()
+      }
+    ],
+    rawRecipeStopAfter: 1,
+    completion: {
+      expectedBuckets: ["assertion_failure"],
+      expectedMaxDetail: "standard"
+    }
+  },
+  {
+    name: "pytest-network-reset",
+    description: "Network reset and gateway timeout errors should collapse into a network bucket.",
+    rawOutput: buildPytestNetworkResetRaw(),
+    rawRecipe: [
+      {
+        command: "python -m pytest tests/integration/test_stream.py tests/integration/test_feed.py tests/integration/test_api.py",
+        output: buildPytestNetworkResetRaw()
+      }
+    ],
+    rawRecipeStopAfter: 1,
+    completion: {
+      expectedBuckets: ["network_failure"],
+      expectedMaxDetail: "standard"
+    }
+  },
+  {
+    name: "pytest-oserror-setup",
+    description: "Setup OSErrors should map to configuration and permission buckets.",
+    rawOutput: buildPytestOSErrorSetupRaw(),
+    rawRecipe: [
+      {
+        command: "python -m pytest tests/storage/test_tmpdir.py tests/storage/test_lockfile.py",
+        output: buildPytestOSErrorSetupRaw()
+      }
+    ],
+    rawRecipeStopAfter: 1,
+    completion: {
+      expectedBuckets: ["configuration_error", "permission_denied_failure"],
       expectedMaxDetail: "standard"
     }
   }

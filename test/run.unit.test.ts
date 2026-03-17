@@ -200,6 +200,44 @@ describe("runSift unit", () => {
     expect(provider.generate).not.toHaveBeenCalled();
   });
 
+  it("stops at standard for a small concrete single-failure suite", async () => {
+    const smallSuiteOutput = [
+      "FAILED tests/unit/test_payloads.py::test_payload_round_trip - RuntimeError: payload subject missing",
+      "============================== 1 failed in 0.10s =============================="
+    ].join("\n");
+
+    prepareInputMock.mockReturnValue({
+      raw: smallSuiteOutput,
+      sanitized: smallSuiteOutput,
+      redacted: smallSuiteOutput,
+      truncated: smallSuiteOutput,
+      meta: {
+        originalLength: smallSuiteOutput.length,
+        finalLength: smallSuiteOutput.length,
+        redactionApplied: false,
+        truncatedApplied: false
+      }
+    });
+
+    const provider = {
+      name: "openai",
+      generate: vi.fn()
+    };
+    createProviderMock.mockReturnValue(provider);
+    const { runSift } = await import("../src/core/run.js");
+
+    const output = await runSift(
+      makeRequest({
+        policyName: "test-status",
+        presetName: "test-status"
+      })
+    );
+
+    expect(output).toContain("Runtime failures: 1 visible failure share RuntimeError: payload subject missing.");
+    expect(output).toContain("Decision: read source next");
+    expect(provider.generate).not.toHaveBeenCalled();
+  });
+
   it("uses full redacted input for tail-only audit-critical heuristic findings", async () => {
     const actualHeuristics = await vi.importActual<typeof import("../src/core/heuristics.js")>(
       "../src/core/heuristics.js"

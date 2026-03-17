@@ -16,6 +16,173 @@ function unique<T>(values: readonly T[]): T[] {
   return [...new Set(values)];
 }
 
+const genericBucketSearchTerms = new Set([
+  "runtimeerror",
+  "typeerror",
+  "error",
+  "exception",
+  "failed",
+  "failure",
+  "visible failure",
+  "failing tests",
+  "setup failures",
+  "runtime failure",
+  "assertion failed",
+  "network",
+  "permission",
+  "configuration"
+]);
+
+function normalizeSearchTerm(value: string): string {
+  return value.replace(/^['"`]+|['"`]+$/g, "").trim();
+}
+
+function isHighSignalSearchTerm(term: string): boolean {
+  const normalized = normalizeSearchTerm(term);
+  if (normalized.length < 4) {
+    return false;
+  }
+
+  const lower = normalized.toLowerCase();
+  if (genericBucketSearchTerms.has(lower)) {
+    return false;
+  }
+
+  if (/^(runtime|type|assertion|network|permission|configuration)\b/i.test(normalized)) {
+    return false;
+  }
+
+  return true;
+}
+
+function scoreSearchTerm(term: string): number {
+  const normalized = normalizeSearchTerm(term);
+  let score = normalized.length;
+
+  if (/^[A-Z][A-Z0-9_]{2,}$/.test(normalized)) {
+    score += 80;
+  }
+  if (/^TS\d+$/.test(normalized)) {
+    score += 70;
+  }
+  if (/^[45]\d\d\b/.test(normalized) || /\bHTTPError:\s*[45]\d\d\b/i.test(normalized)) {
+    score += 60;
+  }
+  if (normalized.includes("/") || normalized.includes("\\")) {
+    score += 50;
+  }
+  if (/\b[A-Za-z0-9_.-]+\.[A-Za-z0-9_.-]+\b/.test(normalized)) {
+    score += 40;
+  }
+  if (/['"`]/.test(term)) {
+    score += 30;
+  }
+  if (normalized.includes("::")) {
+    score += 25;
+  }
+
+  return score;
+}
+
+function collectCandidateSearchTerms(value: string): string[] {
+  const candidates: string[] = [];
+  const normalized = value.trim();
+  if (!normalized) {
+    return candidates;
+  }
+
+  for (const match of normalized.matchAll(/['"`]([^'"`]{4,})['"`]/g)) {
+    candidates.push(match[1]!);
+  }
+
+  for (const match of normalized.matchAll(/\b[A-Z][A-Z0-9_]{2,}\b/g)) {
+    candidates.push(match[0]);
+  }
+
+  for (const match of normalized.matchAll(/\bTS\d+\b/g)) {
+    candidates.push(match[0]);
+  }
+
+  for (const match of normalized.matchAll(/\bHTTPError:\s*[45]\d\d\b/gi)) {
+    candidates.push(match[0]);
+  }
+
+  for (const match of normalized.matchAll(/\/[A-Za-z0-9_./:{}-]{4,}/g)) {
+    candidates.push(match[0]);
+  }
+
+  for (const match of normalized.matchAll(/\b(?:[A-Za-z0-9_.-]+\/)+[A-Za-z0-9_.-]+\b/g)) {
+    candidates.push(match[0]);
+  }
+
+  for (const match of normalized.matchAll(/\b[A-Za-z0-9_.-]+\.[A-Za-z0-9_.-]+\b/g)) {
+    candidates.push(match[0]);
+  }
+
+  const detail = normalized.split(":").slice(1).join(":").trim();
+  if (detail.length >= 8) {
+    candidates.push(detail);
+  }
+
+  return candidates;
+}
+
+function extractBucketSearchTerms(args: {
+  bucket: TestStatusDiagnoseContract["main_buckets"][number];
+  readTargets: TestStatusDiagnoseContract["read_targets"];
+}): string[] {
+  const sources = [
+    args.bucket.root_cause,
+    ...args.bucket.evidence,
+    ...args.readTargets
+      .filter((target) => target.bucket_index === args.bucket.bucket_index)
+      .flatMap((target) => [target.context_hint.search_hint ?? "", target.file])
+  ];
+
+  const prioritized = unique(
+    sources.flatMap((value) => collectCandidateSearchTerms(value)).filter(isHighSignalSearchTerm)
+  ).sort((left, right) => {
+    const delta = scoreSearchTerm(right) - scoreSearchTerm(left);
+    if (delta !== 0) {
+      return delta;
+    }
+    return left.localeCompare(right);
+  });
+
+  if (prioritized.length > 0) {
+    return prioritized.slice(0, 6);
+  }
+
+  const fallbackTerms = unique(
+    [...args.bucket.evidence, args.bucket.root_cause]
+      .flatMap((value) => value.split(/->|:/).map((part) => normalizeSearchTerm(part)))
+      .filter(isHighSignalSearchTerm)
+  );
+  return fallbackTerms.slice(0, 4);
+}
+
+function clusterIndexes(indexes: number[], maxGap = 12): number[][] {
+  if (indexes.length === 0) {
+    return [];
+  }
+
+  const clusters: number[][] = [];
+  let currentCluster = [indexes[0]!];
+
+  for (const index of indexes.slice(1)) {
+    if (index - currentCluster[currentCluster.length - 1]! <= maxGap) {
+      currentCluster.push(index);
+      continue;
+    }
+
+    clusters.push(currentCluster);
+    currentCluster = [index];
+  }
+
+  clusters.push(currentCluster);
+  return clusters;
+}
+
 function buildLineWindows(args: {
   lines: string[];
   indexes: number[];
@@ -37,6 +204,18 @@ function buildLineWindows(args: {
   }
 
   return [...selected].sort((left, right) => left - right).map((index) => args.lines[index]!);
+}
+
+function buildPriorityLineGroup(args: {
+  lines: string[];
+  indexes: number[];
+  radius: number;
+  maxLines: number;
+}): string[] {
+  return unique([
+    ...args.indexes.map((index) => args.lines[index]!).filter(Boolean),
+    ...buildLineWindows(args)
+  ]);
 }
 
 function collapseSelectedLines(args: {
@@ -264,11 +443,10 @@ export function buildTestStatusRawSlice(args: {
     .filter((index) => index >= 0);
 
   const bucketGroups = args.contract.main_buckets.map((bucket) => {
-    const bucketTerms = unique(
-      [bucket.root_cause, ...bucket.evidence]
-        .map((value) => value.split(":").at(-1)?.trim() ?? value.trim())
-        .filter((value) => value.length >= 4)
-    );
+    const bucketTerms = extractBucketSearchTerms({
+      bucket,
+      readTargets: args.contract.read_targets
+    });
     const indexes = lines
       .map((line, index) =>
         bucketTerms.some((term) => new RegExp(escapeRegExp(term), "i").test(line)) ? index : -1
@@ -277,7 +455,7 @@ export function buildTestStatusRawSlice(args: {
 
     return unique([
       ...indexes.map((index) => lines[index]!).filter(Boolean),
-      ...buildLineWindows({
+      ...buildPriorityLineGroup({
         lines,
         indexes,
         radius: 2,
@@ -285,29 +463,70 @@ export function buildTestStatusRawSlice(args: {
       })
     ]);
   });
-  const targetGroups = args.contract.read_targets.map((target) =>
-    buildLineWindows({
+  const targetGroups = args.contract.read_targets.flatMap((target) => {
+    const searchHintIndexes = findSearchHintIndexes({
       lines,
-      indexes: unique([
-        ...findReadTargetIndexes({
-          lines,
-          file: target.file,
-          line: target.line,
-          contextHint: target.context_hint
-        }),
-        ...findSearchHintIndexes({
-          lines,
-          searchHint: target.context_hint.search_hint
-        })
-      ]),
-      radius: target.line === null ? 1 : 2,
-      maxLines: target.line === null ? 6 : 8
-    })
-  );
+      searchHint: target.context_hint.search_hint
+    });
+    const fileIndexes = findReadTargetIndexes({
+      lines,
+      file: target.file,
+      line: target.line,
+      contextHint: target.context_hint
+    });
+    const radius = target.line === null ? 1 : 2;
+    const maxLines = target.line === null ? 6 : 8;
+    const groups = [
+      searchHintIndexes.length > 0
+        ? buildPriorityLineGroup({
+            lines,
+            indexes: searchHintIndexes,
+            radius,
+            maxLines
+          })
+        : null,
+      fileIndexes.length > 0
+        ? buildPriorityLineGroup({
+            lines,
+            indexes: fileIndexes,
+            radius,
+            maxLines
+          })
+        : null
+    ].filter((group): group is string[] => group !== null && group.length > 0);
 
-  const failureIndexes = lines
-    .map((line, index) => (/\b(FAILED|ERROR)\b/.test(line) || /^E\s/.test(line) ? index : -1))
+    if (groups.length > 0) {
+      return groups;
+    }
+
+    return [
+      buildPriorityLineGroup({
+        lines,
+        indexes: unique([...searchHintIndexes, ...fileIndexes]),
+        radius,
+        maxLines
+      })
+    ];
+  });
+
+  const failureHeaderIndexes = lines
+    .map((line, index) => (/\b(FAILED|ERROR)\b/.test(line) ? index : -1))
     .filter((index) => index >= 0);
+  const failureIndexes = (failureHeaderIndexes.length > 0 ? failureHeaderIndexes : lines
+    .map((line, index) => (/^E\s/.test(line) ? index : -1))
+    .filter((index) => index >= 0))
+    .filter((index) => index >= 0);
+  const failureHeaderGroups = clusterIndexes(failureIndexes)
+    .slice(0, 8)
+    .map((cluster) =>
+      buildPriorityLineGroup({
+        lines,
+        indexes: cluster,
+        radius: 1,
+        maxLines: 8
+      })
+    )
+    .filter((group) => group.length > 0);
 
   const selected = collapseSelectedLineGroups({
     groups: [
@@ -322,12 +541,16 @@ export function buildTestStatusRawSlice(args: {
         })
       ]),
       ...bucketGroups,
-      buildLineWindows({
-        lines,
-        indexes: failureIndexes,
-        radius: 1,
-        maxLines: 24
-      })
+      ...(failureHeaderGroups.length > 0
+        ? failureHeaderGroups
+        : [
+            buildLineWindows({
+              lines,
+              indexes: failureIndexes,
+              radius: 1,
+              maxLines: 24
+            })
+          ])
     ],
     maxInputChars: args.config.maxInputChars,
     fallback: () =>

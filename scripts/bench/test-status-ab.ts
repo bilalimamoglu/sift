@@ -5,6 +5,7 @@ import {
   type FailureBucketType,
   type TestStatusAnalysis
 } from "../../src/core/heuristics.js";
+import { buildTestStatusDiagnoseContract } from "../../src/core/testStatusDecision.js";
 import type { DetailLevel } from "../../src/types.js";
 import {
   benchFixtures,
@@ -216,11 +217,62 @@ function collectEntities(analysis: TestStatusAnalysis): string[] {
   return unique(analysis.buckets.flatMap((bucket) => bucket.entities)).filter(Boolean);
 }
 
+function inferBucketTypeFromContractBucket(bucket: {
+  label: string;
+  root_cause: string;
+}): FailureBucketType | null {
+  if (bucket.root_cause.startsWith("missing test env:") || bucket.label === "shared environment blocker") {
+    return "shared_environment_blocker";
+  }
+  if (
+    bucket.root_cause.includes("freeze snapshots are out of sync") ||
+    ["route drift", "schema freeze mismatch", "model catalog drift", "stale snapshot"].includes(bucket.label)
+  ) {
+    return "contract_snapshot_drift";
+  }
+  if (bucket.root_cause.startsWith("snapshot mismatch:") || bucket.label === "snapshot mismatch") {
+    return "snapshot_mismatch";
+  }
+  if (bucket.root_cause.startsWith("missing module:") || bucket.label === "import dependency failure") {
+    return "import_dependency_failure";
+  }
+  if (bucket.root_cause.startsWith("configuration:") || bucket.label === "configuration error") {
+    return "configuration_error";
+  }
+  if (bucket.root_cause.startsWith("timeout:") || bucket.label === "timeout") {
+    return "timeout_failure";
+  }
+  if (bucket.root_cause.startsWith("permission:") || bucket.label === "permission denied") {
+    return "permission_denied_failure";
+  }
+  if (bucket.root_cause.startsWith("network:") || bucket.label === "network failure") {
+    return "network_failure";
+  }
+  if (bucket.root_cause.startsWith("assertion failed:") || bucket.label === "assertion failure") {
+    return "assertion_failure";
+  }
+  if (bucket.label === "runtime failure" || /^[A-Z][A-Za-z]+(?:Error|Exception):/.test(bucket.root_cause)) {
+    return "runtime_failure";
+  }
+  return null;
+}
+
 function buildCompletionReport(
   expectation: BenchCompletionExpectation,
-  analysis: TestStatusAnalysis
+  analysis: TestStatusAnalysis,
+  contract: ReturnType<typeof buildTestStatusDiagnoseContract>["contract"]
 ): CompletionReport {
-  const bucketTypesFound = unique(analysis.buckets.map((bucket) => bucket.type));
+  const bucketTypesFound = unique([
+    ...analysis.buckets.map((bucket) => bucket.type),
+    ...contract.main_buckets
+      .map((bucket) =>
+        inferBucketTypeFromContractBucket({
+          label: bucket.label,
+          root_cause: bucket.root_cause
+        })
+      )
+      .filter((bucketType): bucketType is FailureBucketType => bucketType !== null)
+  ]);
   const missingBuckets = expectation.expectedBuckets.filter(
     (bucketType) => !bucketTypesFound.includes(bucketType)
   );
@@ -286,13 +338,17 @@ function buildFixtureReport(
   encode: (value: string) => number
 ): FixtureReport {
   const analysis = analyzeTestStatus(fixture.rawOutput);
+  const decision = buildTestStatusDiagnoseContract({
+    input: fixture.rawOutput,
+    analysis
+  });
   const outputs: Record<SiftMode, string> = {
     standard: renderSiftOutput(fixture, "standard"),
     focused: renderSiftOutput(fixture, "focused"),
     verbose: renderSiftOutput(fixture, "verbose"),
     verboseShowRaw: renderSiftOutput(fixture, "verboseShowRaw")
   };
-  const completion = buildCompletionReport(fixture.completion, analysis);
+  const completion = buildCompletionReport(fixture.completion, analysis, decision.contract);
   const primary = {
     raw: measureOutput(fixture.rawOutput, encode),
     standard: measureOutput(outputs.standard, encode),

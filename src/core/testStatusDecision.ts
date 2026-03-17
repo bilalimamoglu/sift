@@ -293,6 +293,42 @@ interface ExtendedBucketSpec {
 
 const extendedBucketSpecs: readonly ExtendedBucketSpec[] = [
   {
+    prefix: "service unavailable:",
+    type: "service_unavailable",
+    label: "service unavailable",
+    genericTitle: "Service unavailable failures",
+    defaultCoverage: "error",
+    rootCauseConfidence: 0.9,
+    dominantPriority: 2,
+    dominantBlocker: true,
+    why: "it contains the dependency service or API path that is unavailable in the test environment",
+    fix: "Restore the dependency service or test double before rerunning the full suite."
+  },
+  {
+    prefix: "db refused:",
+    type: "db_connection_failure",
+    label: "database connection",
+    genericTitle: "Database connection failures",
+    defaultCoverage: "error",
+    rootCauseConfidence: 0.9,
+    dominantPriority: 2,
+    dominantBlocker: true,
+    why: "it contains the database host, DSN, or startup path that is refusing connections",
+    fix: "Restore the test database connectivity before rerunning the full suite."
+  },
+  {
+    prefix: "auth bypass absent:",
+    type: "auth_bypass_absent",
+    label: "auth bypass missing",
+    genericTitle: "Auth bypass setup failures",
+    defaultCoverage: "error",
+    rootCauseConfidence: 0.86,
+    dominantPriority: 2,
+    dominantBlocker: true,
+    why: "it contains the auth bypass fixture or setup path that tests expected to be active",
+    fix: "Restore the test auth bypass fixture or mock before rerunning the full suite."
+  },
+  {
     prefix: "snapshot mismatch:",
     type: "snapshot_mismatch",
     label: "snapshot mismatch",
@@ -475,6 +511,16 @@ const extendedBucketSpecs: readonly ExtendedBucketSpec[] = [
     rootCauseConfidence: 0.74,
     why: "it contains the deprecated API or warning filter that is failing the test run",
     fix: "Update the deprecated call site or relax the warning policy only if that is intentional."
+  },
+  {
+    prefix: "assertion failed:",
+    type: "assertion_failure",
+    label: "assertion failure",
+    genericTitle: "Assertion failures",
+    defaultCoverage: "failed",
+    rootCauseConfidence: 0.76,
+    why: "it contains the expected-versus-actual assertion that failed inside the visible test",
+    fix: "Read the assertion diff or expectation and fix the code or expected value before rerunning."
   },
   {
     prefix: "xfail strict:",
@@ -1552,7 +1598,7 @@ function pickUnknownAnchor(args: {
   const fromStatusItems =
     args.kind === "error"
       ? args.analysis.visibleErrorItems[0]
-      : null;
+      : args.analysis.visibleFailedItems[0];
 
   if (fromStatusItems) {
     return {
@@ -2047,13 +2093,34 @@ export function buildTestStatusDiagnoseContract(args: {
     args.analysis.failed === 0 && args.analysis.errors === 0
       ? true
       : residuals.remainingErrors === 0 && residuals.remainingFailed === 0;
+  const dominantBlockerBucketIndex =
+    dominantBucket && isDominantBlockerType(dominantBucket.bucket.type)
+      ? dominantBucket.index + 1
+      : null;
+  const readTargets = buildReadTargets({
+    buckets,
+    dominantBucketIndex: dominantBlockerBucketIndex
+  });
+  const dominantBucketHasConcreteAnchor =
+    dominantBucket !== null &&
+    (readTargets.some((target) => target.bucket_index === dominantBucket.index + 1 && target.file.length > 0) ||
+      dominantBucket.bucket.representativeItems.some((item) => item.anchor_kind !== "none"));
+  const smallConcreteSuite =
+    args.analysis.failed + args.analysis.errors <= 2 &&
+    residuals.remainingErrors === 0 &&
+    residuals.remainingFailed === 0 &&
+    buckets.length === 1 &&
+    !hasUnknownBucket &&
+    dominantBucket !== null &&
+    dominantBucketHasConcreteAnchor;
+  const dominantConfidenceThreshold = smallConcreteSuite ? 0.55 : 0.6;
   const diagnosisComplete =
     (args.analysis.failed === 0 && args.analysis.errors === 0 && args.analysis.passed > 0) ||
     simpleCollectionFailure ||
     (buckets.length > 0 &&
       hasConcreteCoverage &&
       !hasUnknownBucket &&
-      (dominantBucket?.bucket.confidence ?? 0) >= 0.6);
+      (dominantBucket?.bucket.confidence ?? 0) >= dominantConfidenceThreshold);
   const rawNeeded = buckets.length === 0
     ? !(
         (args.analysis.failed === 0 &&
@@ -2064,14 +2131,6 @@ export function buildTestStatusDiagnoseContract(args: {
     : !diagnosisComplete &&
       !hasUnknownBucket &&
       buckets.every((bucket) => bucket.confidence < 0.7);
-  const dominantBlockerBucketIndex =
-    dominantBucket && isDominantBlockerType(dominantBucket.bucket.type)
-      ? dominantBucket.index + 1
-      : null;
-  const readTargets = buildReadTargets({
-    buckets,
-    dominantBucketIndex: dominantBlockerBucketIndex
-  });
   const mainBuckets = buckets.map((bucket, index) => ({
     bucket_index: index + 1,
     label: labelForBucket(bucket),

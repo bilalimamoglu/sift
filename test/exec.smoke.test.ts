@@ -1160,45 +1160,21 @@ describe("exec mode", () => {
   });
 
   it("supports typecheck-summary preset exec flows", async () => {
-    const server = await createFakeOpenAIServer(() => ({
-      body: {
-        choices: [
-          {
-            message: {
-              content:
-                "- Typecheck failed.\n- TS2322 repeats in src/app.ts.\n- Fix src/app.ts before chasing downstream errors."
-            }
-          }
-        ]
-      }
-    }));
+    const script = [
+      "console.error(\"src/app.ts:1:1 - error TS2322: Type 'string' is not assignable to type 'number'.\")",
+      "console.error(\"src/app.ts:2:1 - error TS2304: Cannot find name 'missingValue'.\")",
+      "console.error(\"Found 2 errors in 1 file.\")",
+      "process.exit(1)"
+    ].join(";");
 
-    try {
-      const result = await runCliAsync({
-        args: [
-          "exec",
-          "--preset",
-          "typecheck-summary",
-          "--provider",
-          "openai-compatible",
-          "--base-url",
-          server.baseUrl,
-          "--api-key",
-          "test-key",
-          "--model",
-          "test-model",
-          "--",
-          "node",
-          "-e",
-          "console.error('src/app.ts:1:1 - error TS2322: Type string is not assignable to type number'); process.exit(1)"
-        ]
-      });
+    const result = await runCliAsync({
+      args: ["exec", "--preset", "typecheck-summary", "--", "node", "-e", script]
+    });
 
-      expect(result.status).toBe(1);
-      expect(result.stdout).toContain("Typecheck failed.");
-    } finally {
-      await server.close();
-    }
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("- Typecheck failed: 2 errors in 1 file.");
+    expect(result.stdout).toContain("TS2322 (type mismatch): 1 occurrence");
+    expect(result.stdout).toContain("TS2304 (cannot find name): 1 occurrence");
   });
 
   it("returns a short success answer for silent typecheck success", async () => {
@@ -1220,45 +1196,27 @@ describe("exec mode", () => {
   });
 
   it("supports lint-failures preset exec flows", async () => {
-    const server = await createFakeOpenAIServer(() => ({
-      body: {
-        choices: [
-          {
-            message: {
-              content:
-                "- Lint failed.\n- no-explicit-any is the top repeated rule.\n- Start with src/app.ts."
-            }
-          }
-        ]
-      }
-    }));
+    const script = [
+      "console.error(\"src/app.ts\")",
+      "console.error(\"  1:1  error    Unexpected any              @typescript-eslint/no-explicit-any\")",
+      "console.error(\"  5:1  warning  Unexpected console statement no-console\")",
+      "console.error(\"\")",
+      "console.error(\"src/routes/api.ts\")",
+      "console.error(\"  4:10  error  Unexpected any  @typescript-eslint/no-explicit-any\")",
+      "console.error(\"\")",
+      "console.error(\"✖ 3 problems (2 errors, 1 warning)\")",
+      "console.error(\"  1 error and 1 warning are potentially fixable with the `--fix` option.\")",
+      "process.exit(1)"
+    ].join(";");
 
-    try {
-      const result = await runCliAsync({
-        args: [
-          "exec",
-          "--preset",
-          "lint-failures",
-          "--provider",
-          "openai-compatible",
-          "--base-url",
-          server.baseUrl,
-          "--api-key",
-          "test-key",
-          "--model",
-          "test-model",
-          "--",
-          "node",
-          "-e",
-          "console.error('src/app.ts\\n  1:1  error  Unexpected any  @typescript-eslint/no-explicit-any'); process.exit(1)"
-        ]
-      });
+    const result = await runCliAsync({
+      args: ["exec", "--preset", "lint-failures", "--", "node", "-e", script]
+    });
 
-      expect(result.status).toBe(1);
-      expect(result.stdout).toContain("Lint failed.");
-    } finally {
-      await server.close();
-    }
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("- Lint failed: 3 problems (2 errors, 1 warning).");
+    expect(result.stdout).toContain("@typescript-eslint/no-explicit-any: 2 errors");
+    expect(result.stdout).toContain("2 problems potentially fixable with --fix.");
   });
 
   it("keeps the child exit code when reduction falls back", async () => {

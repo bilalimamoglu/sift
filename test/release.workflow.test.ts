@@ -43,7 +43,7 @@ describe("release workflow", () => {
     expect(vitestConfig).toContain("statements: 80");
     expect(ciWorkflow).toContain("npm run test:coverage");
     expect(ciWorkflow).toContain("matrix:");
-    expect(ciWorkflow).toContain("node-version: [24]");
+    expect(ciWorkflow).toContain("node-version: [20]");
     expect(ciWorkflow).toContain("node-version: ${{ matrix.node-version }}");
   });
 
@@ -68,7 +68,7 @@ describe("release workflow", () => {
     expect(workflow).toContain("version:");
     expect(workflow).toContain("Package version being released");
     expect(workflow).toContain("registry-url: \"https://registry.npmjs.org\"");
-    expect(workflow).toContain("node-version: 24");
+    expect(workflow).toContain("node-version: 20");
     expect(workflow).toContain("environment: release");
     expect(workflow).toContain("Validate requested release version");
     expect(workflow).toContain("workflow_dispatch input version");

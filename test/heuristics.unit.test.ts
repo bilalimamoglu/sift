@@ -120,6 +120,73 @@ function buildVitestImportBlockerOutput(): string {
   ].join("\n");
 }
 
+function buildVitestMatcherAssertionOutput(): string {
+  return [
+    " RUN  v2.1.0 /repo",
+    "",
+    " ❯ src/auth/refresh.test.ts > refresh token > rotates token FAILED [ 50%]",
+    " ❯ src/routes/landing.test.ts > landing page > renders hero FAILED [100%]",
+    "",
+    "⎯⎯⎯ Failed Tests 2 ⎯⎯⎯",
+    "",
+    " FAIL  src/auth/refresh.test.ts > refresh token > rotates token",
+    "expect(received).toBe(expected)",
+    "Expected: \"next-token\"",
+    "Received: \"same-token\"",
+    "❯ src/auth/refresh.test.ts:27:15",
+    "",
+    " FAIL  src/routes/landing.test.ts > landing page > renders hero",
+    "expect(received).toEqual(expected)",
+    "Expected: {\"cta\":\"Try now\"}",
+    "Received: {\"cta\":\"Learn more\"}",
+    "❯ src/routes/landing.test.ts:14:7",
+    "",
+    " Test Files  2 failed (2)",
+    "      Tests  2 failed | 1 passed (3)"
+  ].join("\n");
+}
+
+function buildPytestNetworkResetOutput(): string {
+  return [
+    "============================= test session starts ==============================",
+    "platform darwin -- Python 3.11.4, pytest-9.0.2",
+    "collecting ... collected 3 items",
+    "tests/integration/test_stream.py::test_socket_flush ERROR [ 33%]",
+    "tests/integration/test_feed.py::test_feed_sync ERROR [ 66%]",
+    "tests/integration/test_api.py::test_remote_fallback ERROR [100%]",
+    "",
+    "==================================== ERRORS ====================================",
+    "E   ConnectionResetError: [Errno 54] Connection reset by peer",
+    "E   BrokenPipeError: [Errno 32] Broken pipe",
+    "E   HTTPError: 502 Server Error: Bad Gateway for url: https://api.example.com/feed",
+    "",
+    "=========================== short test summary info ============================",
+    "ERROR tests/integration/test_stream.py::test_socket_flush - ConnectionResetError: [Errno 54] Connection reset by peer",
+    "ERROR tests/integration/test_feed.py::test_feed_sync - BrokenPipeError: [Errno 32] Broken pipe",
+    "ERROR tests/integration/test_api.py::test_remote_fallback - HTTPError: 502 Server Error: Bad Gateway for url: https://api.example.com/feed",
+    "============================== 3 errors in 0.14s =============================="
+  ].join("\n");
+}
+
+function buildPytestOSErrorSetupOutput(): string {
+  return [
+    "============================= test session starts ==============================",
+    "platform darwin -- Python 3.11.4, pytest-9.0.2",
+    "collecting ... collected 2 items",
+    "tests/storage/test_tmpdir.py::test_tmpdir_bootstrap ERROR [ 50%]",
+    "tests/storage/test_lockfile.py::test_lockfile_cleanup ERROR [100%]",
+    "",
+    "==================================== ERRORS ====================================",
+    "E   OSError: [Errno 28] No space left on device: '/tmp/pytest-scratch'",
+    "E   OSError: [Errno 13] Permission denied: '/tmp/pytest-lock'",
+    "",
+    "=========================== short test summary info ============================",
+    "ERROR tests/storage/test_tmpdir.py::test_tmpdir_bootstrap - OSError: [Errno 28] No space left on device: '/tmp/pytest-scratch'",
+    "ERROR tests/storage/test_lockfile.py::test_lockfile_cleanup - OSError: [Errno 13] Permission denied: '/tmp/pytest-lock'",
+    "============================== 2 errors in 0.11s =============================="
+  ].join("\n");
+}
+
 function buildVitestWorkerCrashOutput(): string {
   return [
     " RUN  v2.1.0 /repo",
@@ -207,6 +274,139 @@ function buildContractVsSnapshotOutput(): string {
     "      Tests  2 failed (2)",
     "  Snapshots  1 failed (1)"
   ].join("\n");
+}
+
+function buildTscStandardErrors(): string {
+  return [
+    "src/components/UserCard.tsx(12,3): error TS2322: Type 'string' is not assignable to type 'number'.",
+    "src/components/UserCard.tsx(18,7): error TS2322: Type 'string' is not assignable to type 'number'.",
+    "src/types/user.ts(4,5): error TS2741: Property 'id' is missing in type '{ name: string; }' but required in type 'User'.",
+    "Found 3 errors in 2 files."
+  ].join("\n");
+}
+
+function buildTscPrettyErrors(): string {
+  return [
+    "src/components/UserCard.tsx:12:3 - error TS2322: Type 'string' is not assignable to type 'number'.",
+    "",
+    "12   const age: number = name;",
+    "     ~~~~~~~~~~~~~~~~~~~~~~~~",
+    "",
+    "src/types/user.ts:4:5 - error TS2741: Property 'id' is missing in type '{ name: string; }' but required in type 'User'.",
+    "",
+    "4    id: string;",
+    "     ~~",
+    "",
+    "Found 2 errors in 2 files."
+  ].join("\n");
+}
+
+function buildTscSingleError(): string {
+  return [
+    "src/app.ts(1,1): error TS2304: Cannot find name 'missingValue'.",
+    "Found 1 error."
+  ].join("\n");
+}
+
+function buildTscManyGroupedErrors(): string {
+  return [
+    "src/components/UserCard.tsx(12,3): error TS2322: Type 'string' is not assignable to type 'number'.",
+    "src/components/UserCard.tsx(18,7): error TS2322: Type 'string' is not assignable to type 'number'.",
+    "src/routes/api.ts(2,4): error TS2322: Type 'string' is not assignable to type 'number'.",
+    "src/forms/user.ts(9,1): error TS2741: Property 'id' is missing.",
+    "src/forms/admin.ts(10,1): error TS2741: Property 'role' is missing.",
+    "src/utils/assert.ts(3,9): error TS2304: Cannot find name 'expectType'.",
+    "src/utils/env.ts(6,2): error TS2304: Cannot find name 'processEnv'.",
+    "error TS5083: Cannot read file '/Users/bilalimamoglu/repos/sift/tsconfig.base.json'.",
+    "Found 8 errors in 6 files."
+  ].join("\n");
+}
+
+function buildTscTopLevelConfigError(): string {
+  return [
+    "error TS5083: Cannot read file '/Users/bilalimamoglu/repos/sift/tsconfig.json'.",
+    "Found 1 error."
+  ].join("\n");
+}
+
+function buildTscTruncatedErrors(): string {
+  return [
+    "src/components/UserCard.tsx:12:3 - error TS2322: Type 'string' is not assignable to type 'number'.",
+    "src/components/UserCard.tsx:18:7 - error TS2322: Type 'string' is not assignable to type 'number'."
+  ].join("\n");
+}
+
+function buildTscZeroErrors(): string {
+  return "Found 0 errors.";
+}
+
+function buildEslintStylishErrors(): string {
+  return [
+    "src/app.ts",
+    "  1:12  error    Unexpected any                     @typescript-eslint/no-explicit-any",
+    "  5:1   warning  Unexpected console statement      no-console",
+    "",
+    "src/routes/api.ts",
+    "  4:10  error  Unexpected any  @typescript-eslint/no-explicit-any",
+    "",
+    "\u2716 3 problems (2 errors, 1 warning)",
+    "  1 error and 1 warning are potentially fixable with the `--fix` option."
+  ].join("\n");
+}
+
+function buildEslintErrorsOnly(): string {
+  return [
+    "src/app.ts",
+    "  1:12  error  Unexpected any  @typescript-eslint/no-explicit-any",
+    "",
+    "src/routes/api.ts",
+    "  4:10  error  Unexpected any  @typescript-eslint/no-explicit-any",
+    "",
+    "\u2716 2 problems (2 errors, 0 warnings)"
+  ].join("\n");
+}
+
+function buildEslintWarningsOnly(): string {
+  return [
+    "src/app.ts",
+    "  5:1  warning  Unexpected console statement  no-console",
+    "src/routes/api.ts",
+    "  7:3  warning  Unexpected console statement  no-console",
+    "",
+    "\u2716 2 problems (0 errors, 2 warnings)"
+  ].join("\n");
+}
+
+function buildEslintParsingError(): string {
+  return [
+    "src/app.ts",
+    "  1:1  error  Parsing error: Unexpected token",
+    "",
+    "\u2716 1 problem (1 error, 0 warnings)"
+  ].join("\n");
+}
+
+function buildEslintManyRulesOutput(): string {
+  return [
+    "src/app.ts",
+    "  1:12  error    Unexpected any                     @typescript-eslint/no-explicit-any",
+    "  2:1   error    Missing return type                @typescript-eslint/explicit-function-return-type",
+    "  3:1   warning  Unexpected console statement       no-console",
+    "",
+    "src/routes/api.ts",
+    "  4:10  error  Unexpected any  @typescript-eslint/no-explicit-any",
+    "  6:4   error  Missing return type  @typescript-eslint/explicit-function-return-type",
+    "  8:2   warning  Strings must use singlequote  quotes",
+    "",
+    "src/components/card.tsx",
+    "  3:1  warning  Prop spreading is forbidden  react/jsx-props-no-spreading",
+    "",
+    "\u2716 7 problems (4 errors, 3 warnings)"
+  ].join("\n");
+}
+
+function buildEslintZeroProblems(): string {
+  return "\u2716 0 problems (0 errors, 0 warnings)";
 }
 
 const directClassificationCases = [
@@ -661,11 +861,12 @@ describe("heuristic policies", () => {
 
     expect(decision.contract.main_buckets.map((bucket) => bucket.root_cause)).toEqual(
       expect.arrayContaining([
-        "fixture guard: capsys",
         "auth bypass absent: test auth bypass is missing",
-        "db refused: database connection was refused"
+        "db refused: database connection was refused",
+        "service unavailable: dependency service is unavailable"
       ])
     );
+    expect(analysis.inlineItems.map((item) => item.reason)).toContain("fixture guard: capsys");
 
     const serviceOnlyInput = [
       "ERROR tests/api/test_health.py::test_ready - 503 Service Unavailable",
@@ -907,6 +1108,115 @@ describe("heuristic policies", () => {
     expect(decision.verboseText).toContain(
       "First concrete signal: custom setup override exploded in helper layer"
     );
+  });
+
+  it("surfaces failed-item anchors when unknown failed buckets have a concrete inline reason", () => {
+    const input = [
+      "tests/unit/test_routes.py::test_landing_page FAILED [ 50%]",
+      "tests/unit/test_tasks.py::test_task_payload FAILED [100%]",
+      "FAILED tests/unit/test_routes.py::test_landing_page - custom matcher exploded for hero CTA",
+      "============= 2 failed in 0.10s ============="
+    ].join("\n");
+
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis: analyzeTestStatus(input)
+    });
+
+    expect(decision.standardText).toContain(
+      "First concrete signal: custom matcher exploded for hero CTA"
+    );
+  });
+
+  it("classifies matcher assertions, network resets, and setup oserrors into actionable buckets", () => {
+    expect(
+      classifyFailureReasonForTest("expect(received).toStrictEqual(expected)")
+    ).toMatchObject({
+      reason: "assertion failed: expect(received).toStrictEqual(expected)",
+      group: "assertion failures"
+    });
+
+    expect(
+      classifyFailureReasonForTest("OSError: [Errno 28] No space left on device: '/tmp/pytest-scratch'")
+    ).toMatchObject({
+      reason: expect.stringMatching(/^configuration: disk full \(/),
+      group: "test configuration failures"
+    });
+
+    expect(
+      classifyFailureReasonForTest("OSError: [Errno 13] Permission denied: '/tmp/pytest-lock'")
+    ).toMatchObject({
+      reason: expect.stringMatching(/^permission:/),
+      group: "permission or locked resource failures"
+    });
+
+    expect(
+      classifyFailureReasonForTest(
+        "HTTPError: 502 Server Error: Bad Gateway for url: https://api.example.com/feed"
+      )
+    ).toMatchObject({
+      reason: expect.stringMatching(/^network:/),
+      group: "network dependency failures"
+    });
+  });
+
+  it("groups matcher assertions and network resets into deterministic buckets", () => {
+    const matcherDecision = buildTestStatusDiagnoseContract({
+      input: buildVitestMatcherAssertionOutput(),
+      analysis: analyzeTestStatus(buildVitestMatcherAssertionOutput())
+    });
+    const networkDecision = buildTestStatusDiagnoseContract({
+      input: buildPytestNetworkResetOutput(),
+      analysis: analyzeTestStatus(buildPytestNetworkResetOutput())
+    });
+    const osErrorDecision = buildTestStatusDiagnoseContract({
+      input: buildPytestOSErrorSetupOutput(),
+      analysis: analyzeTestStatus(buildPytestOSErrorSetupOutput())
+    });
+
+    expect(matcherDecision.contract.main_buckets[0]).toMatchObject({
+      label: "assertion failure"
+    });
+    expect(matcherDecision.contract.main_buckets[0]?.root_cause).toMatch(/^assertion failed:/);
+
+    expect(networkDecision.contract.main_buckets[0]).toMatchObject({
+      label: "network failure"
+    });
+    expect(networkDecision.contract.main_buckets[0]?.root_cause).toMatch(/^network:/);
+
+    expect(osErrorDecision.contract.main_buckets.map((bucket) => bucket.label)).toEqual(
+      expect.arrayContaining(["configuration error", "permission denied"])
+    );
+  });
+
+  it("treats small low-confidence concrete suites as complete once the bucket is anchored", () => {
+    const input = [
+      "FAILED tests/unit/test_payloads.py::test_payload_round_trip",
+      "============================== 1 failed in 0.10s =============================="
+    ].join("\n");
+
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis: analyzeTestStatus(input),
+      providerBucketSupplements: [
+        {
+          label: "runtime failure",
+          count: 1,
+          root_cause: "RuntimeError: payload subject missing",
+          anchor: {
+            file: "tests/unit/test_payloads.py",
+            line: 48,
+            search_hint: "payload subject missing"
+          },
+          fix_hint: null,
+          confidence: 0.55
+        }
+      ]
+    });
+
+    expect(decision.contract.diagnosis_complete).toBe(true);
+    expect(decision.contract.decision).toBe("read_source");
+    expect(decision.contract.next_best_action.code).toBe("read_source_for_bucket");
   });
 
   it("detects vitest and jest runners through analyzeTestStatus", () => {
@@ -1152,6 +1462,114 @@ describe("heuristic policies", () => {
     expect(decision.contract.next_best_action.note).toContain(
       "Fix bucket 1 first, then rerun the full suite at standard."
     );
+  });
+
+  it("summarizes standard TypeScript diagnostics deterministically", () => {
+    const output = applyHeuristicPolicy("typecheck-summary", buildTscStandardErrors());
+
+    expect(output).toContain("- Typecheck failed: 3 errors in 2 files.");
+    expect(output).toContain("TS2322 (type mismatch): 2 occurrences");
+    expect(output).toContain("src/components/UserCard.tsx");
+    expect(output).toContain("TS2741 (missing required property): 1 occurrence");
+  });
+
+  it("parses pretty TypeScript diagnostics without echoing context lines", () => {
+    const output = applyHeuristicPolicy("typecheck-summary", buildTscPrettyErrors());
+
+    expect(output).toContain("- Typecheck failed: 2 errors in 2 files.");
+    expect(output).toContain("TS2322 (type mismatch): 1 occurrence");
+    expect(output).toContain("TS2741 (missing required property): 1 occurrence");
+    expect(output).not.toContain("const age: number = name");
+  });
+
+  it("keeps single TypeScript errors short and singular", () => {
+    const output = applyHeuristicPolicy("typecheck-summary", buildTscSingleError());
+
+    expect(output).toContain("- Typecheck failed: 1 error in 1 file.");
+    expect(output).toContain("TS2304 (cannot find name): 1 occurrence");
+  });
+
+  it("groups repeated TypeScript codes and adds an overflow summary", () => {
+    const output = applyHeuristicPolicy("typecheck-summary", buildTscManyGroupedErrors());
+
+    expect(output).toContain("- Typecheck failed: 8 errors in 6 files.");
+    expect(output).toContain("TS2322 (type mismatch): 3 occurrences");
+    expect(output).toContain("TS2741 (missing required property): 2 occurrences");
+    expect(output).toContain("TS2304 (cannot find name): 2 occurrences");
+    expect(output).toContain("- 1 more error code.");
+  });
+
+  it("handles top-level TypeScript compiler errors without inventing files", () => {
+    const output = applyHeuristicPolicy("typecheck-summary", buildTscTopLevelConfigError());
+
+    expect(output).toContain("- Typecheck failed: 1 error.");
+    expect(output).toContain("TS5083 (config file error): 1 occurrence.");
+  });
+
+  it("summarizes truncated TypeScript output from parsed diagnostics", () => {
+    const output = applyHeuristicPolicy("typecheck-summary", buildTscTruncatedErrors());
+
+    expect(output).toContain("- Typecheck failed: 2 errors in 1 file.");
+    expect(output).toContain("TS2322 (type mismatch): 2 occurrences");
+  });
+
+  it("returns explicit zero-error TypeScript success and ignores unrelated text", () => {
+    expect(applyHeuristicPolicy("typecheck-summary", buildTscZeroErrors())).toBe("No type errors.");
+    expect(applyHeuristicPolicy("typecheck-summary", "compiler booted successfully")).toBeNull();
+  });
+
+  it("summarizes stylish ESLint output with fixable hints", () => {
+    const output = applyHeuristicPolicy("lint-failures", buildEslintStylishErrors());
+
+    expect(output).toContain("- Lint failed: 3 problems (2 errors, 1 warning).");
+    expect(output).toContain("2 problems potentially fixable with --fix.");
+    expect(output).toContain("@typescript-eslint/no-explicit-any: 2 errors");
+    expect(output).toContain("no-console: 1 warning");
+  });
+
+  it("summarizes errors-only ESLint output", () => {
+    const output = applyHeuristicPolicy("lint-failures", buildEslintErrorsOnly());
+
+    expect(output).toContain("- Lint failed: 2 problems (2 errors, 0 warnings).");
+    expect(output).toContain("@typescript-eslint/no-explicit-any: 2 errors");
+  });
+
+  it("keeps warnings-only ESLint output non-pass and explicit", () => {
+    const output = applyHeuristicPolicy("lint-failures", buildEslintWarningsOnly());
+
+    expect(output).toContain("- No lint errors visible: 2 warnings.");
+    expect(output).toContain("no-console: 2 warnings");
+    expect(output).not.toContain("passed");
+  });
+
+  it("normalizes rule-less ESLint parsing errors", () => {
+    const output = applyHeuristicPolicy("lint-failures", buildEslintParsingError());
+
+    expect(output).toContain("- Lint failed: 1 problem (1 error, 0 warnings).");
+    expect(output).toContain("parsing error: 1 error");
+  });
+
+  it("groups repeated ESLint rules and adds an overflow summary", () => {
+    const output = applyHeuristicPolicy("lint-failures", buildEslintManyRulesOutput());
+
+    expect(output).toContain("- Lint failed: 7 problems (4 errors, 3 warnings).");
+    expect(output).toContain("@typescript-eslint/no-explicit-any: 2 errors");
+    expect(output).toContain("@typescript-eslint/explicit-function-return-type: 2 errors");
+    expect(output).toContain("no-console: 1 warning");
+    expect(output).toContain("- 2 more rules across 2 files.");
+  });
+
+  it("returns explicit zero-problem ESLint success and null for unsupported inputs", () => {
+    expect(applyHeuristicPolicy("lint-failures", buildEslintZeroProblems())).toBe(
+      "No lint failures."
+    );
+    expect(
+      applyHeuristicPolicy(
+        "lint-failures",
+        '[{"filePath":"src/app.ts","messages":[{"ruleId":"no-console"}]}]'
+      )
+    ).toBeNull();
+    expect(applyHeuristicPolicy("lint-failures", "random shell noise")).toBeNull();
   });
 
   it("keeps audit-critical and infra-risk heuristics intact", () => {
