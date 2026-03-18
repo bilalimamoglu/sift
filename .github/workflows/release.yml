@@ -97,7 +97,7 @@ jobs:
           npx --no-install sift exec "did tests pass?" --dry-run -- node -e "console.log('12 passed')" >/dev/null
 
       - name: Publish to npm
-        run: npm publish --access public
+        run: npm publish --access public --provenance
 
       - name: Create and push git tag
         run: |

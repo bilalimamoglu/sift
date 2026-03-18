@@ -10,6 +10,9 @@ These examples are the long-form companion to [docs/examples](../docs/examples).
 
 - [typecheck-summary/ts-wall-mixed.raw.txt](typecheck-summary/ts-wall-mixed.raw.txt)
 - [lint-failures/eslint-mixed-rules.raw.txt](lint-failures/eslint-mixed-rules.raw.txt)
+- [build-failure/esbuild-missing-module-full.raw.txt](build-failure/esbuild-missing-module-full.raw.txt)
+- [build-failure/webpack-build-failure-full.raw.txt](build-failure/webpack-build-failure-full.raw.txt)
+- [build-failure/vite-import-analysis-full.raw.txt](build-failure/vite-import-analysis-full.raw.txt)
 - [build-failure/vite-build-failure-full.raw.txt](build-failure/vite-build-failure-full.raw.txt)
 - [audit-critical/npm-audit-mixed-severity-full.raw.txt](audit-critical/npm-audit-mixed-severity-full.raw.txt)
 - [infra-risk/terraform-destructive-plan-full.raw.txt](infra-risk/terraform-destructive-plan-full.raw.txt)
@@ -19,3 +22,4 @@ These examples are the long-form companion to [docs/examples](../docs/examples).
 - Source type for all current examples is `synthetic-derived`.
 - The grouped presets intentionally include one noisy wall case each.
 - The reduced outputs were captured from the current heuristics at authoring time.
+- `docs/examples/` pages are benchmark-backed showcase pages; `examples/` keeps the longer companion logs.

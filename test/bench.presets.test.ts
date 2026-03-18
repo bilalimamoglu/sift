@@ -68,6 +68,7 @@ describe("preset reduction benchmark", () => {
       "esbuild-missing-module",
       "webpack-type-error",
       "vite-syntax-error",
+      "vite-import-analysis-missing-import",
       "npm-audit-critical-only",
       "npm-audit-mixed-severity",
       "npm-audit-clean",
@@ -114,14 +115,18 @@ describe("preset reduction benchmark", () => {
 
   it("keeps docs-linked examples attached to the benchmark corpus", () => {
     const report = runPresetBench();
-    const docsCases = report.cases.filter((candidate) => candidate.docsSlug);
+    const docsCases = report.cases
+      .filter((candidate) => candidate.docsSlug)
+      .sort((left, right) => left.docsSlug!.localeCompare(right.docsSlug!));
 
     expect(docsCases.map((candidate) => candidate.docsSlug)).toEqual([
       "01-tsc-type-wall",
       "02-eslint-stylish",
       "03-esbuild-build-failure",
       "04-npm-audit-critical",
-      "05-terraform-destructive"
+      "05-terraform-destructive",
+      "06-webpack-build-failure",
+      "07-vite-import-analysis"
     ]);
 
     for (const candidate of docsCases) {
@@ -130,6 +135,7 @@ describe("preset reduction benchmark", () => {
       const content = fs.readFileSync(docPath, "utf8");
       const catalogCase = benchmarkCases.find((entry) => entry.id === candidate.id);
 
+      expect(content).not.toContain("/Users/");
       expect(content).toContain(`**Preset:** \`${candidate.preset}\``);
       expect(content).toContain(`**Case ID:** \`${candidate.id}\``);
       expect(content).toContain(`## After\n\n\`\`\`text\n${candidate.reducedOutput}\n\`\`\``);
@@ -146,6 +152,13 @@ describe("preset reduction benchmark", () => {
         `- Benchmark raw input: [benchmarks/cases/${catalogCase!.relativeRawPath}]`
       );
     }
+  });
+
+  it("keeps examples markdown free of local absolute paths", () => {
+    const readmePath = path.join(repoRoot(), "examples", "README.md");
+    const content = fs.readFileSync(readmePath, "utf8");
+
+    expect(content).not.toContain("/Users/");
   });
 
   it("uses the o200k_base tokenizer", () => {

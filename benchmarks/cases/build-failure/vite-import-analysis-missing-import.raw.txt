@@ -1,0 +1,8 @@
+vite v5.4.11 building for production...
+transforming (1) src/main.ts
+transforming (2) src/app/AppShell.tsx
+transforming (3) src/routes/root.tsx
+transforming (4) src/routes/dashboard.tsx
+[plugin:vite:import-analysis] Failed to resolve import "@/lib/missing" from "src/routes/dashboard.tsx". Does the file exist?
+transforming (5) src/routes/settings.tsx
+error during build:

@@ -1,0 +1,128 @@
+vite v5.4.11 building for production...
+transforming (1) src/main.tsx
+transforming (2) src/app/AppShell.tsx
+transforming (3) src/app/routes.tsx
+transforming (4) src/app/providers.tsx
+transforming (5) src/features/auth/AuthGate.tsx
+transforming (6) src/features/auth/useSession.ts
+transforming (7) src/features/dashboard/DashboardPage.tsx
+transforming (8) src/features/dashboard/widgets/RevenueCard.tsx
+transforming (9) src/features/dashboard/widgets/TrafficCard.tsx
+transforming (10) src/features/dashboard/widgets/TopPagesCard.tsx
+transforming (11) src/features/users/UserTable.tsx
+transforming (12) src/features/users/UserFilterBar.tsx
+transforming (13) src/features/users/UserDrawer.tsx
+transforming (14) src/features/billing/BillingPage.tsx
+transforming (15) src/features/billing/InvoicesTable.tsx
+transforming (16) src/features/billing/InvoiceFilters.tsx
+transforming (17) src/features/billing/useInvoices.ts
+transforming (18) src/features/settings/SettingsPage.tsx
+transforming (19) src/features/settings/ProfilePanel.tsx
+transforming (20) src/features/settings/SecurityPanel.tsx
+transforming (21) src/features/settings/TeamPanel.tsx
+transforming (22) src/components/layout/AppSidebar.tsx
+transforming (23) src/components/layout/AppHeader.tsx
+transforming (24) src/components/layout/CommandMenu.tsx
+transforming (25) src/components/ui/Button.tsx
+transforming (26) src/components/ui/Card.tsx
+transforming (27) src/components/ui/Drawer.tsx
+transforming (28) src/components/ui/Table.tsx
+transforming (29) src/components/ui/EmptyState.tsx
+transforming (30) src/components/ui/Skeleton.tsx
+transforming (31) src/components/charts/AreaChart.tsx
+transforming (32) src/components/charts/BarChart.tsx
+transforming (33) src/components/charts/Legend.tsx
+transforming (34) src/lib/api/client.ts
+transforming (35) src/lib/api/endpoints.ts
+transforming (36) src/lib/api/queryClient.ts
+transforming (37) src/lib/env.ts
+transforming (38) src/lib/formatters/currency.ts
+transforming (39) src/lib/formatters/date.ts
+transforming (40) src/lib/logger.ts
+transforming (41) src/hooks/useDebouncedValue.ts
+transforming (42) src/hooks/useMediaQuery.ts
+transforming (43) src/hooks/useFeatureFlag.ts
+transforming (44) src/styles/index.css
+transforming (45) src/styles/tokens.css
+transforming (46) src/styles/utilities.css
+transforming (47) src/utils/mappers/account.ts
+transforming (48) src/utils/mappers/invoice.ts
+transforming (49) src/utils/mappers/user.ts
+transforming (50) src/utils/search.ts
+transforming (51) src/utils/validators.ts
+transforming (52) src/routes/root.tsx
+transforming (53) src/routes/dashboard.tsx
+transforming (54) src/routes/users.tsx
+transforming (55) src/routes/billing.tsx
+transforming (56) src/routes/settings.tsx
+transforming (57) node_modules/react/index.js
+transforming (58) node_modules/react-dom/index.js
+transforming (59) node_modules/@tanstack/react-query/build/lib/index.mjs
+transforming (60) node_modules/@radix-ui/react-dialog/dist/index.mjs
+transforming (61) node_modules/@radix-ui/react-dropdown-menu/dist/index.mjs
+transforming (62) node_modules/date-fns/format/index.js
+transforming (63) node_modules/zod/lib/index.mjs
+transforming (64) node_modules/lodash-es/debounce.js
+transforming (65) node_modules/lodash-es/uniqBy.js
+transforming (66) node_modules/recharts/es6/chart/LineChart.js
+transforming (67) node_modules/recharts/es6/chart/BarChart.js
+transforming (68) node_modules/recharts/es6/component/Tooltip.js
+transforming (69) node_modules/recharts/es6/component/ResponsiveContainer.js
+transforming (70) node_modules/d3-scale/src/index.js
+transforming (71) node_modules/d3-shape/src/index.js
+transforming (72) node_modules/d3-array/src/index.js
+transforming (73) node_modules/clsx/dist/clsx.mjs
+transforming (74) node_modules/tailwind-merge/dist/bundle-mjs.mjs
+transforming (75) node_modules/class-variance-authority/dist/index.mjs
+transforming (76) node_modules/lucide-react/dist/esm/lucide-react.js
+transforming (77) node_modules/react-router/dist/development/index.mjs
+transforming (78) node_modules/react-router-dom/dist/development/index.mjs
+transforming (79) node_modules/scheduler/index.js
+transforming (80) node_modules/use-sync-external-store/shim/index.js
+transforming (81) node_modules/tslib/tslib.es6.mjs
+transforming (82) node_modules/@babel/runtime/helpers/esm/objectSpread2.js
+transforming (83) node_modules/@babel/runtime/helpers/esm/toConsumableArray.js
+transforming (84) node_modules/@babel/runtime/helpers/esm/extends.js
+transforming (85) node_modules/postcss/lib/postcss.mjs
+transforming (86) node_modules/autoprefixer/lib/autoprefixer.js
+transforming (87) node_modules/source-map-js/source-map.js
+transforming (88) node_modules/mini-svg-data-uri/index.js
+transforming (89) node_modules/csstype/index.d.ts
+transforming (90) src/hooks/usePosts.ts
+transforming (91) src/features/posts/PostList.tsx
+transforming (92) src/features/posts/PostFilters.tsx
+transforming (93) src/features/posts/PostDrawer.tsx
+transforming (94) src/features/posts/usePostFilters.ts
+transforming (95) src/features/posts/usePostSearch.ts
+transforming (96) src/lib/queryKeys.ts
+transforming (97) src/lib/http.ts
+transforming (98) src/lib/transport.ts
+transforming (99) src/lib/cache.ts
+transforming (100) src/lib/debug.ts
+transforming (101) src/lib/devtools.ts
+transforming (102) src/components/notifications/ToastStack.tsx
+transforming (103) src/components/notifications/ToastViewport.tsx
+transforming (104) src/components/navigation/Breadcrumbs.tsx
+transforming (105) src/components/navigation/SidebarNav.tsx
+transforming (106) src/components/navigation/TopNav.tsx
+transforming (107) src/components/settings/ThemeSwitcher.tsx
+transforming (108) src/components/settings/LocaleSelect.tsx
+transforming (109) src/components/settings/TimezoneSelect.tsx
+[plugin:vite:reporter] generated chunk assets/vendor-react.js (487.12 kB)
+[plugin:vite:reporter] generated chunk assets/vendor-dashboard.js (612.54 kB)
+[plugin:vite:reporter] generated chunk assets/vendor-charts.js (822.17 kB)
+[plugin:vite:reporter] some chunks are larger than 500 kB after minification
+[plugin:vite:reporter] consider code-splitting the dashboard and posts features
+
+✘ [ERROR] Could not resolve "react-query"
+
+    src/hooks/usePosts.ts:3:22:
+      3 │ import { useQuery } from "react-query";
+        ╵                         ~~~~~~~~~~~~
+
+  You can mark the path "react-query" as external to exclude it from the bundle, which will remove
+  this error and leave the unresolved path in the output.
+
+error during build:
+Error: Build failed with 1 error:
+src/hooks/usePosts.ts:3:22: ERROR: Could not resolve "react-query"

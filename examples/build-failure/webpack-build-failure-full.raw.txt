@@ -1,0 +1,111 @@
+<i> [webpack.Progress] 0% 
+<i> [webpack.Progress] 1% setup compilation
+<i> [webpack.Progress] 2% setup compilation
+<i> [webpack.Progress] 4% building 0/1 entries 0/0 dependencies 0/0 modules
+<i> [webpack.Progress] 6% building 1/1 entries 4/6 dependencies 3/6 modules
+<i> [webpack.Progress] 8% building 1/1 entries 12/18 dependencies 9/18 modules
+<i> [webpack.Progress] 10% building 1/1 entries 24/37 dependencies 21/37 modules
+<i> [webpack.Progress] 12% building 1/1 entries 38/64 dependencies 34/64 modules
+<i> [webpack.Progress] 14% building 1/1 entries 51/82 dependencies 47/82 modules
+<i> [webpack.Progress] 16% building 1/1 entries 70/106 dependencies 64/106 modules
+<i> [webpack.Progress] 18% building 1/1 entries 84/129 dependencies 78/129 modules
+<i> [webpack.Progress] 20% building 1/1 entries 101/153 dependencies 95/153 modules
+<i> [webpack.Progress] 22% building 1/1 entries 117/176 dependencies 110/176 modules
+<i> [webpack.Progress] 24% building 1/1 entries 134/201 dependencies 125/201 modules
+<i> [webpack.Progress] 26% building 1/1 entries 151/223 dependencies 143/223 modules
+<i> [webpack.Progress] 28% building 1/1 entries 169/248 dependencies 159/248 modules
+<i> [webpack.Progress] 30% building 1/1 entries 186/271 dependencies 176/271 modules
+<i> [webpack.Progress] 32% building 1/1 entries 204/296 dependencies 192/296 modules
+<i> [webpack.Progress] 34% building 1/1 entries 222/321 dependencies 209/321 modules
+<i> [webpack.Progress] 36% building 1/1 entries 239/344 dependencies 226/344 modules
+<i> [webpack.Progress] 38% building 1/1 entries 256/368 dependencies 242/368 modules
+<i> [webpack.Progress] 40% building 1/1 entries 273/392 dependencies 259/392 modules
+<i> [webpack.Progress] 42% building 1/1 entries 291/417 dependencies 275/417 modules
+<i> [webpack.Progress] 44% building 1/1 entries 308/441 dependencies 292/441 modules
+<i> [webpack.Progress] 46% building 1/1 entries 326/466 dependencies 309/466 modules
+<i> [webpack.Progress] 48% building 1/1 entries 343/489 dependencies 325/489 modules
+<i> [webpack.Progress] 50% building 1/1 entries 361/514 dependencies 342/514 modules
+<i> [webpack.Progress] 52% building 1/1 entries 378/538 dependencies 359/538 modules
+<i> [webpack.Progress] 54% building 1/1 entries 396/563 dependencies 375/563 modules
+<i> [webpack.Progress] 56% building 1/1 entries 413/586 dependencies 392/586 modules
+<i> [webpack.Progress] 58% building 1/1 entries 430/610 dependencies 408/610 modules
+<i> [webpack.Progress] 60% building 1/1 entries 447/634 dependencies 425/634 modules
+<i> [webpack.Progress] 62% building 1/1 entries 465/659 dependencies 441/659 modules
+<i> [webpack.Progress] 64% building 1/1 entries 482/683 dependencies 458/683 modules
+<i> [webpack.Progress] 66% building 1/1 entries 500/708 dependencies 474/708 modules
+<i> [webpack.Progress] 68% building 1/1 entries 517/732 dependencies 491/732 modules
+<i> [webpack.Progress] 70% building 1/1 entries 534/756 dependencies 507/756 modules
+<i> [webpack.Progress] 72% building 1/1 entries 552/781 dependencies 524/781 modules
+<i> [webpack.Progress] 74% building 1/1 entries 569/804 dependencies 541/804 modules
+<i> [webpack.Progress] 76% building 1/1 entries 587/829 dependencies 557/829 modules
+<i> [webpack.Progress] 78% building 1/1 entries 604/853 dependencies 574/853 modules
+<i> [webpack.Progress] 80% building 1/1 entries 621/877 dependencies 590/877 modules
+<i> [webpack.Progress] 82% building 1/1 entries 639/902 dependencies 607/902 modules
+<i> [webpack.Progress] 84% building 1/1 entries 656/926 dependencies 624/926 modules
+<i> [webpack.Progress] 86% building 1/1 entries 674/951 dependencies 640/951 modules
+<i> [webpack.Progress] 88% building 1/1 entries 691/974 dependencies 657/974 modules
+<i> [webpack.Progress] 90% building 1/1 entries 708/998 dependencies 673/998 modules
+<i> [webpack.Progress] 92% sealing asset processing
+<i> [webpack.Progress] 94% sealing after asset optimization
+<i> [webpack.Progress] 96% emitting
+assets by path assets/*.js 1.79 MiB
+  asset assets/runtime.js 8.71 KiB [emitted] [minimized] (name: runtime)
+  asset assets/vendor.js 721 KiB [emitted] [minimized] (name: vendor)
+  asset assets/dashboard.js 512 KiB [emitted] [minimized] (name: dashboard)
+  asset assets/settings.js 419 KiB [emitted] [minimized] (name: settings)
+assets by path assets/*.css 42.9 KiB
+  asset assets/main.css 28.4 KiB [emitted] [minimized]
+  asset assets/vendor.css 14.5 KiB [emitted] [minimized]
+Entrypoint app 1.83 MiB = assets/runtime.js 8.71 KiB assets/vendor.js 721 KiB assets/dashboard.js 512 KiB assets/settings.js 419 KiB assets/main.css 28.4 KiB assets/vendor.css 14.5 KiB
+cached modules 1.17 MiB [cached] 712 modules
+runtime modules 9.12 KiB 11 modules
+orphan modules 47.3 KiB [orphan] 22 modules
+javascript modules 1.83 MiB
+  modules by path ./src/ 812 KiB
+    ./src/main.tsx 2.31 KiB [built] [code generated]
+    ./src/app/AppShell.tsx 8.11 KiB [built] [code generated]
+    ./src/features/auth/AuthGate.tsx 4.91 KiB [built] [code generated]
+    ./src/features/auth/store/userSlice.ts 12.7 KiB [built] [code generated]
+    ./src/features/auth/store/sessionSlice.ts 9.44 KiB [built] [code generated]
+    ./src/features/auth/store/selectors.ts 3.18 KiB [built] [code generated]
+    ./src/features/users/UserTable.tsx 15.1 KiB [built] [code generated]
+    ./src/features/users/UserDrawer.tsx 13.2 KiB [built] [code generated]
+    ./src/features/settings/SettingsPage.tsx 11.4 KiB [built] [code generated]
+    ./src/features/settings/ProfilePanel.tsx 6.72 KiB [built] [code generated]
+    ./src/features/settings/SecurityPanel.tsx 7.05 KiB [built] [code generated]
+    ./src/features/billing/BillingPage.tsx 14.3 KiB [built] [code generated]
+    ./src/lib/http/client.ts 5.44 KiB [built] [code generated]
+    ./src/lib/queryClient.ts 2.11 KiB [built] [code generated]
+    + 57 modules
+  modules by path ./node_modules/ 1.04 MiB
+    ./node_modules/react/index.js 190 bytes [built] [code generated]
+    ./node_modules/react-dom/index.js 1.33 KiB [built] [code generated]
+    ./node_modules/redux/dist/redux.mjs 28.3 KiB [built] [code generated]
+    ./node_modules/@reduxjs/toolkit/dist/redux-toolkit.modern.mjs 92.8 KiB [built] [code generated]
+    + 201 modules
+WARNING in asset size limit: The following asset(s) exceed the recommended size limit (244 KiB).
+Assets:
+  assets/vendor.js (721 KiB)
+  assets/dashboard.js (512 KiB)
+  assets/settings.js (419 KiB)
+
+WARNING in entrypoint size limit: The following entrypoint(s) combined asset size exceeds the recommended limit (244 KiB).
+Entrypoints:
+  app (1.83 MiB)
+      assets/runtime.js
+      assets/vendor.js
+      assets/dashboard.js
+      assets/settings.js
+      assets/main.css
+      assets/vendor.css
+
+WARNING in webpack performance recommendations:
+You can limit the size of your bundles by using import() or require.ensure to lazy load some parts of your application.
+For more info visit https://webpack.js.org/guides/code-splitting/
+
+ERROR in ./src/features/auth/store/userSlice.ts
+Module build failed (from ./node_modules/ts-loader/index.js):
+Error: TypeScript compilation failed
+TS2322: Type 'string' is not assignable to type 'UserStatus'.
+
+webpack 5.88.0 compiled with 1 error and 3 warnings in 4231 ms

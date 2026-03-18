@@ -1,0 +1,1 @@
+Build failed: Could not resolve "react-query" in src/hooks/usePosts.ts:3. Fix: Install the missing package or fix the import path.

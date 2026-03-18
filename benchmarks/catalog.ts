@@ -173,7 +173,8 @@ export const benchmarkCases: BenchmarkCase[] = [
       "Type 'string' is not assignable to type 'UserStatus'",
       "Fix the type error at the indicated location."
     ],
-    expectedHeuristicFires: true
+    expectedHeuristicFires: true,
+    docsSlug: "06-webpack-build-failure"
   },
   {
     id: "vite-syntax-error",
@@ -191,6 +192,23 @@ export const benchmarkCases: BenchmarkCase[] = [
       "Fix the syntax error at the indicated location."
     ],
     expectedHeuristicFires: true
+  },
+  {
+    id: "vite-import-analysis-missing-import",
+    preset: "build-failure",
+    relativeRawPath: "build-failure/vite-import-analysis-missing-import.raw.txt",
+    title: "Vite import-analysis missing import",
+    description: "A Vite build where import-analysis plugin cannot resolve an aliased module path.",
+    sourceType: "synthetic-derived",
+    capturedAt: "2025-01-01",
+    expectedReductionKind: "brief-root-cause",
+    expectedSnippets: [
+      'Failed to resolve import "@/lib/missing"',
+      "src/routes/dashboard.tsx",
+      "Install the missing package or fix the import path."
+    ],
+    expectedHeuristicFires: true,
+    docsSlug: "07-vite-import-analysis"
   },
   {
     id: "npm-audit-critical-only",

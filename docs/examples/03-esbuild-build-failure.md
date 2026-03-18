@@ -32,5 +32,5 @@ Build failed: Could not resolve "react-query" in src/hooks/usePosts.ts:3. Fix: I
 ## Related Files
 
 - Benchmark raw input: [benchmarks/cases/build-failure/esbuild-missing-module.raw.txt](../../benchmarks/cases/build-failure/esbuild-missing-module.raw.txt)
-- Companion raw log: [examples/build-failure/vite-build-failure-full.raw.txt](../../examples/build-failure/vite-build-failure-full.raw.txt)
-- Companion reduced output: [examples/build-failure/vite-build-failure-full.reduced.txt](../../examples/build-failure/vite-build-failure-full.reduced.txt)
+- Companion raw log: [examples/build-failure/esbuild-missing-module-full.raw.txt](../../examples/build-failure/esbuild-missing-module-full.raw.txt)
+- Companion reduced output: [examples/build-failure/esbuild-missing-module-full.reduced.txt](../../examples/build-failure/esbuild-missing-module-full.reduced.txt)

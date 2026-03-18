@@ -1,0 +1,1 @@
+Build failed: TS2322: Type 'string' is not assignable to type 'UserStatus' in src/features/auth/store/userSlice.ts. Fix: Fix the type error at the indicated location.
