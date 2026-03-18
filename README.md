@@ -8,9 +8,15 @@
 
 Your AI agent should not be reading 13,000 lines of test output.
 
-On the largest real fixture in the benchmark:
-**Before:** 128 failures, 198K raw-output tokens, agent reconstructs the failure shape from scratch.
-**After:** 6 lines, 129 `standard` tokens, agent acts on a grouped diagnosis immediately.
+If 125 tests fail for one reason, your agent should pay for that reason once.
+
+`sift` turns noisy command output into a short, structured diagnosis for coding agents.
+
+Instead of feeding an agent thousands of lines of logs, you give it:
+- the root cause
+- where it happens
+- what to fix
+- what to do next
 
 ```bash
 sift exec --preset test-status -- pytest -q
@@ -28,13 +34,14 @@ sift exec --preset test-status -- pytest -q
 - Decision: stop and act.
 ```
 
-If 125 tests fail for one reason, the agent should pay for that reason once.
+On the largest real fixture in the benchmark:
+`198K` raw-output tokens -> `129` `standard` tokens.
+
+Same diagnosis. Far less work.
 
 ## What it is
 
-Developers using coding agents — Claude Code, Codex, Cursor, Windsurf, Copilot, or any LLM-driven workflow that runs shell commands and reads the output.
-
-`sift` sits between the command and the agent. It captures noisy output, groups repeated failures into root-cause buckets, and returns a short diagnosis with an anchor, a likely fix, and a decision signal. The agent gets a map instead of a wall of text.
+`sift` sits between a noisy command and a coding agent. It captures output, groups repeated failures into root-cause buckets, and returns a short diagnosis with an anchor, a likely fix, and a decision signal.
 
 ## Install
 
