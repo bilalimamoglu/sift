@@ -980,7 +980,7 @@ function mergeRepresentativeItems(
     merged.push(item);
   }
 
-  return merged.map((bucket) => specializeBucket(bucket));
+  return merged;
 }
 
 function mergeBucketDetails(existing: GenericBucket, incoming: GenericBucket): GenericBucket {

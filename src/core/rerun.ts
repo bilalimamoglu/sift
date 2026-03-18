@@ -1,4 +1,10 @@
-import type { Goal, OutputFormat, PromptPolicyName, SiftConfig } from "../types.js";
+import type {
+  Goal,
+  OutputFormat,
+  PromptPolicyName,
+  SiftConfig,
+  TestStatusRemainingMode
+} from "../types.js";
 import { runExec } from "./exec.js";
 import {
   getCachedRerunCommand,
@@ -21,6 +27,12 @@ export interface RerunRequest {
   remaining?: boolean;
   detail?: "standard" | "focused" | "verbose";
   showRaw?: boolean;
+  testStatusContext?: {
+    resolvedTests?: string[];
+    remainingTests?: string[];
+    remainingSubsetAvailable?: boolean;
+    remainingMode?: TestStatusRemainingMode;
+  };
 }
 
 export async function runRerun(request: RerunRequest): Promise<number> {

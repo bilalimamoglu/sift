@@ -45,6 +45,7 @@ const failureBucketTypeSchema = z.enum([
   "import_dependency_failure",
   "collection_failure",
   "assertion_failure",
+  "golden_output_drift",
   "runtime_failure",
   "interrupted_run",
   "no_tests_collected",
