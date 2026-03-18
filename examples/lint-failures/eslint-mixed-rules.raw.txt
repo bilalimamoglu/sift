@@ -1,0 +1,110 @@
+src/components/Button.tsx
+
+   4:1   error    'React' must be in scope when using JSX  react/react-in-jsx-scope
+  12:3   warning  Unexpected console statement             no-console
+  27:9   error    'handleClick' is assigned a value but never used  no-unused-vars
+  35:1   warning  Prefer const over let                    prefer-const
+  41:5   error    'React' must be in scope when using JSX  react/react-in-jsx-scope
+  55:13  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  63:7   error    'label' is assigned a value but never used  no-unused-vars
+  71:3   warning  Unexpected console statement             no-console
+  79:9   error    'buttonTheme' is assigned a value but never used  no-unused-vars
+  87:1   warning  Prefer const over let                    prefer-const
+  95:5   error    'React' must be in scope when using JSX  react/react-in-jsx-scope
+ 103:11  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ 111:7   error    'buttonRef' is assigned a value but never used  no-unused-vars
+ 119:1   warning  Unexpected console statement             no-console
+ 127:5   error    'variant' is assigned a value but never used  no-unused-vars
+ 135:9   warning  Prefer const over let                    prefer-const
+ 143:3   error    'React' must be in scope when using JSX  react/react-in-jsx-scope
+ 151:13  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ 159:7   error    'sizeLabel' is assigned a value but never used  no-unused-vars
+ 167:3   warning  Unexpected console statement             no-console
+ 175:5   error    'tone' is assigned a value but never used  no-unused-vars
+ 183:9   warning  Prefer const over let                    prefer-const
+ 191:1   error    'React' must be in scope when using JSX  react/react-in-jsx-scope
+ 199:11  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+src/utils/api.ts
+
+   2:10  error    'axios' is defined but never used          no-unused-vars
+   8:1   warning  Unexpected console statement               no-console
+  14:15  error    'response' is assigned a value but never used  no-unused-vars
+  21:7   warning  Prefer const over let                      prefer-const
+  33:3   error    'React' must be in scope when using JSX    react/react-in-jsx-scope
+  45:9   error    Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+  57:1   warning  Unexpected console statement               no-console
+  69:5   error    'requestOptions' is assigned a value but never used  no-unused-vars
+  81:3   warning  Prefer const over let                      prefer-const
+  93:11  error    'React' must be in scope when using JSX    react/react-in-jsx-scope
+ 105:7   error    Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+ 117:1   warning  Unexpected console statement               no-console
+ 129:5   error    'requestBody' is assigned a value but never used  no-unused-vars
+ 141:3   warning  Prefer const over let                      prefer-const
+ 153:11  error    'React' must be in scope when using JSX    react/react-in-jsx-scope
+ 165:7   error    Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+ 177:1   warning  Unexpected console statement               no-console
+ 189:5   error    'cacheKey' is assigned a value but never used  no-unused-vars
+ 201:3   warning  Prefer const over let                      prefer-const
+ 213:11  error    'payload' is assigned a value but never used  no-unused-vars
+ 225:7   error    'React' must be in scope when using JSX    react/react-in-jsx-scope
+ 237:1   warning  Unexpected console statement               no-console
+ 249:5   error    'responseData' is assigned a value but never used  no-unused-vars
+ 261:3   warning  Prefer const over let                      prefer-const
+
+src/pages/Home.tsx
+
+   5:1   error    'React' must be in scope when using JSX    react/react-in-jsx-scope
+  18:7   error    'useEffect' is defined but never used      no-unused-vars
+  29:3   warning  Unexpected console statement               no-console
+  37:11  error    'loading' is assigned a value but never used  no-unused-vars
+  44:1   warning  Prefer const over let                      prefer-const
+  52:5   error    'React' must be in scope when using JSX    react/react-in-jsx-scope
+  66:9   error    Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+  74:1   warning  Unexpected console statement               no-console
+  82:5   error    'heroTitle' is assigned a value but never used  no-unused-vars
+  90:3   warning  Prefer const over let                      prefer-const
+  98:11  error    'React' must be in scope when using JSX    react/react-in-jsx-scope
+ 106:7   error    Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+ 114:1   warning  Unexpected console statement               no-console
+ 122:9   error    'ctaLabel' is assigned a value but never used  no-unused-vars
+ 130:3   warning  Prefer const over let                      prefer-const
+ 138:11  error    'React' must be in scope when using JSX    react/react-in-jsx-scope
+ 146:7   error    Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+ 154:1   warning  Unexpected console statement               no-console
+ 162:9   error    'sectionTitle' is assigned a value but never used  no-unused-vars
+ 170:3   warning  Prefer const over let                      prefer-const
+ 178:11  error    'React' must be in scope when using JSX    react/react-in-jsx-scope
+ 186:7   error    'subtitle' is assigned a value but never used  no-unused-vars
+ 194:1   warning  Unexpected console statement               no-console
+ 202:3   error    'badgeCopy' is assigned a value but never used  no-unused-vars
+
+src/hooks/useData.ts
+
+   3:8   error    'useState' is defined but never used       no-unused-vars
+  11:1   warning  Unexpected console statement               no-console
+  19:15  error    'error' is assigned a value but never used  no-unused-vars
+  27:7   error    'React' must be in scope when using JSX    react/react-in-jsx-scope
+  35:3   warning  Prefer const over let                      prefer-const
+  43:9   error    'callback' is assigned a value but never used  no-unused-vars
+  51:1   warning  Unexpected console statement               no-console
+  59:5   error    Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+  67:11  warning  Prefer const over let                      prefer-const
+  75:7   error    'queryClient' is assigned a value but never used  no-unused-vars
+  83:1   warning  Unexpected console statement               no-console
+  91:5   error    'React' must be in scope when using JSX    react/react-in-jsx-scope
+  99:9   error    Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+ 107:3   warning  Prefer const over let                      prefer-const
+ 115:7   error    'result' is assigned a value but never used  no-unused-vars
+ 123:1   warning  Unexpected console statement               no-console
+ 131:5   error    'React' must be in scope when using JSX    react/react-in-jsx-scope
+ 139:9   error    Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+ 147:3   warning  Prefer const over let                      prefer-const
+ 155:7   error    'mounted' is assigned a value but never used  no-unused-vars
+ 163:1   warning  Unexpected console statement               no-console
+ 171:5   error    'stateRef' is assigned a value but never used  no-unused-vars
+ 179:3   warning  Prefer const over let                      prefer-const
+ 187:9   error    'React' must be in scope when using JSX    react/react-in-jsx-scope
+
+✖ 96 problems (60 errors, 36 warnings)
+  12 errors and 6 warnings are potentially fixable with the --fix option.

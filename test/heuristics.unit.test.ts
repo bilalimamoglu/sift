@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   analyzeTestStatus,
@@ -1756,6 +1758,17 @@ describe("heuristic policies", () => {
         ["lodash: critical vulnerability", "axios: high severity advisory"].join("\n")
       )
     ).toContain('"status": "ok"');
+    expect(applyHeuristicPolicy("audit-critical", "found 0 vulnerabilities")).toContain(
+      "No high or critical vulnerabilities found in the provided input."
+    );
+    expect(
+      applyHeuristicPolicy(
+        "audit-critical",
+        ["node-fetch: moderate severity advisory", "follow-redirects: low severity advisory"].join(
+          "\n"
+        )
+      )
+    ).toBeNull();
 
     expect(applyHeuristicPolicy("infra-risk", "Plan: 1 to add, 2 to destroy")).toContain(
       '"verdict": "fail"'
@@ -1765,5 +1778,23 @@ describe("heuristic policies", () => {
     );
     expect(applyHeuristicPolicy("infra-risk", "safe to apply")).toContain('"verdict": "pass"');
     expect(applyHeuristicPolicy("infra-risk", "unrelated noise")).toBeNull();
+  });
+
+  it("prefers resource headers and plan summaries for real terraform destroy logs", () => {
+    const raw = readFileSync(
+      join(import.meta.dirname, "..", "examples", "infra-risk", "terraform-destructive-plan-full.raw.txt"),
+      "utf8"
+    );
+    const output = applyHeuristicPolicy("infra-risk", raw);
+
+    expect(output).toContain('"verdict": "fail"');
+    expect(output).toContain("Plan: 0 to add, 0 to change, 8 to destroy.");
+    expect(output).toContain("# aws_cloudfront_distribution.assets[0] will be destroyed");
+    expect(output).toContain("# aws_cognito_user_pool.app will be destroyed");
+    expect(output).toContain("Instance cannot be destroyed");
+    expect(output).toContain('"type": "prevent_destroy"');
+    expect(output).toContain('"target": "aws_cloudfront_distribution.assets[0]"');
+    expect(output).not.toContain("data.aws_iam_policy_document");
+    expect(output).not.toContain("terraform destroy");
   });
 });

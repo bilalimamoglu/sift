@@ -1,0 +1,26 @@
+{
+  "status": "ok",
+  "vulnerabilities": [
+    {
+      "package": "lodash",
+      "severity": "critical",
+      "remediation": "Upgrade lodash to a patched version."
+    },
+    {
+      "package": "@babel/traverse",
+      "severity": "critical",
+      "remediation": "Upgrade @babel/traverse to a patched version."
+    },
+    {
+      "package": "semver",
+      "severity": "high",
+      "remediation": "Upgrade semver to a patched version."
+    },
+    {
+      "package": "tough-cookie",
+      "severity": "high",
+      "remediation": "Upgrade tough-cookie to a patched version."
+    }
+  ],
+  "summary": "4 high or critical vulnerabilities found in the provided input."
+}

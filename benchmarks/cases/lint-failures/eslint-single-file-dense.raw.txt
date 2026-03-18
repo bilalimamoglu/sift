@@ -1,0 +1,26 @@
+src/legacy/DataTable.js
+
+   3:1   error    'moment' is defined but never used            no-unused-vars
+   9:5   warning  Unexpected console statement                  no-console
+  15:9   error    'PropTypes' is defined but never used         no-unused-vars
+  21:3   error    'React' must be in scope when using JSX       react/react-in-jsx-scope
+  27:15  warning  Unexpected console statement                  no-console
+  33:7   error    'sortBy' is assigned a value but never used   no-unused-vars
+  39:1   warning  Prefer const over let                         prefer-const
+  45:11  error    'filterFn' is assigned a value but never used  no-unused-vars
+  51:3   error    'React' must be in scope when using JSX       react/react-in-jsx-scope
+  57:9   warning  Unexpected console statement                  no-console
+  63:5   error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  69:7   error    'React' must be in scope when using JSX       react/react-in-jsx-scope
+  75:13  warning  Prefer const over let                         prefer-const
+  81:1   error    'rowData' is assigned a value but never used  no-unused-vars
+  87:9   error    'React' must be in scope when using JSX       react/react-in-jsx-scope
+  93:3   warning  Unexpected console statement                  no-console
+  99:15  error    'handlers' is assigned a value but never used  no-unused-vars
+ 105:7   warning  Prefer const over let                         prefer-const
+ 111:5   error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+ 117:11  error    'renderer' is assigned a value but never used  no-unused-vars
+ 123:1   error    'React' must be in scope when using JSX       react/react-in-jsx-scope
+ 129:9   error    'config' is assigned a value but never used   no-unused-vars
+
+✖ 22 problems (15 errors, 7 warnings)

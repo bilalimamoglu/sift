@@ -1,0 +1,10 @@
+✘ [ERROR] Could not resolve "react-query"
+
+    src/hooks/usePosts.ts:3:22:
+      3 │ import { useQuery } from "react-query";
+        ╵                         ~~~~~~~~~~~~
+
+  You can mark the path "react-query" as external to exclude it from the bundle, which will remove
+  this error and leave the unresolved path in the output.
+
+1 error

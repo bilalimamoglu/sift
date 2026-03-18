@@ -1,0 +1,9 @@
+src/lib/database.ts(3,22): error TS2307: Cannot find module 'pg-native' or its corresponding type declarations.
+src/lib/cache.ts(1,21): error TS2307: Cannot find module 'ioredis' or its corresponding type declarations.
+src/services/queue.ts(2,22): error TS2307: Cannot find module 'bullmq' or its corresponding type declarations.
+src/services/mailer.ts(1,20): error TS2307: Cannot find module 'nodemailer' or its corresponding type declarations.
+src/services/mailer.ts(5,24): error TS2307: Cannot find module '@sendgrid/mail' or its corresponding type declarations.
+src/workers/processor.ts(3,19): error TS2307: Cannot find module 'pino' or its corresponding type declarations.
+src/workers/processor.ts(7,24): error TS2307: Cannot find module 'pino-pretty' or its corresponding type declarations.
+src/utils/crypto.ts(2,20): error TS2307: Cannot find module 'argon2' or its corresponding type declarations.
+Found 8 errors in 5 files.

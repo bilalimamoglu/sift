@@ -1,0 +1,16 @@
+Terraform will perform the following actions:
+
+  # aws_cloudwatch_log_group.api_logs will be created
+  + resource "aws_cloudwatch_log_group" "api_logs" {
+      + name              = "/aws/lambda/myapp-api"
+      + retention_in_days = 14
+    }
+
+  # aws_ssm_parameter.feature_flag will be created
+  + resource "aws_ssm_parameter" "feature_flag" {
+      + name  = "/myapp/features/new_ui"
+      + type  = "String"
+      + value = "false"
+    }
+
+Plan: 2 to add, 0 to change, 0 to destroy.

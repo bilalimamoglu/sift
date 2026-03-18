@@ -8,7 +8,6 @@ coverage
 !.env.example
 !.env.*.example
 .pytest_cache/
-examples/
 sift.config.yaml
 sift.config.yml
 assets/*

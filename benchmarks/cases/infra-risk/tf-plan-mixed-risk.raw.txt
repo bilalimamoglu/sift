@@ -1,0 +1,18 @@
+Terraform will perform the following actions:
+
+  # aws_iam_role.worker will be updated in-place
+  ~ resource "aws_iam_role" "worker" {
+      ~ assume_role_policy = jsonencode({...})
+    }
+
+  # aws_sqs_queue.dead_letter will be destroyed
+  - resource "aws_sqs_queue" "dead_letter" {
+      - name = "myapp-dlq-prod" -> null
+    }
+
+  # aws_sqs_queue.dead_letter_v2 will be created
+  + resource "aws_sqs_queue" "dead_letter_v2" {
+      + name = "myapp-dlq-prod-v2"
+    }
+
+Plan: 1 to add, 1 to change, 1 to destroy.

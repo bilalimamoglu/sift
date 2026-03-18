@@ -1,0 +1,1 @@
+Build failed: Expected ";" but found "{" in src/utils/parser.ts:18. Fix: Fix the syntax error at the indicated location.

@@ -1,0 +1,28 @@
+{
+  "verdict": "fail",
+  "reason": "Destructive or clearly risky infrastructure change signals are present.",
+  "evidence": [
+    "Plan: 0 to add, 0 to change, 8 to destroy.",
+    "# aws_cloudfront_distribution.assets[0] will be destroyed",
+    "# aws_cognito_user_pool.app will be destroyed",
+    "│ Error: Instance cannot be destroyed"
+  ],
+  "destroy_count": 8,
+  "destroy_targets": [
+    "aws_cloudfront_distribution.assets[0]",
+    "aws_cognito_user_pool.app",
+    "aws_cognito_user_pool.app_test[0]",
+    "aws_cognito_user_pool_client.app_backend",
+    "aws_cognito_user_pool_client.app_backend_test[0]",
+    "aws_s3_bucket_policy.assets[0]",
+    "aws_s3_bucket_public_access_block.assets",
+    "aws_s3_bucket_server_side_encryption_configuration.assets"
+  ],
+  "blockers": [
+    {
+      "type": "prevent_destroy",
+      "target": "aws_cloudfront_distribution.assets[0]",
+      "message": "Instance cannot be destroyed"
+    }
+  ]
+}

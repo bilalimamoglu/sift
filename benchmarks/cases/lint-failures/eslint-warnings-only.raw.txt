@@ -1,0 +1,15 @@
+src/index.ts
+
+   5:1   warning  Unexpected console statement   no-console
+  12:3   warning  Prefer const over let          prefer-const
+  19:7   warning  Unexpected console statement   no-console
+  26:11  warning  Prefer const over let          prefer-const
+
+src/config.ts
+
+   4:1   warning  Unexpected console statement   no-console
+  11:5   warning  Prefer const over let          prefer-const
+  18:9   warning  Unexpected console statement   no-console
+  25:3   warning  Prefer const over let          prefer-const
+
+✖ 8 problems (0 errors, 8 warnings)

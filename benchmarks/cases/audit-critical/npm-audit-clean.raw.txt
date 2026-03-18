@@ -1,0 +1,16 @@
+# npm audit report
+
+Project: worker-runtime
+Workspace: packages/worker
+Node version: 20.12.2
+Package manager: npm 10.8.1
+Dependencies scanned: 918
+Production dependencies scanned: 401
+Registry: https://registry.npmjs.org/
+Audit run id: synthetic-derived-clean
+
+All packages are up to date for the selected lockfile.
+No patched advisories are currently required for production dependencies.
+Re-run npm audit after the next dependency refresh or lockfile update.
+
+found 0 vulnerabilities

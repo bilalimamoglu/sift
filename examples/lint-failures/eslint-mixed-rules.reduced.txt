@@ -1,0 +1,5 @@
+- Lint failed: 96 problems (60 errors, 36 warnings). 18 problems potentially fixable with --fix.
+- no-unused-vars: 28 errors across src/components/Button.tsx, src/hooks/useData.ts, src/pages/Home.tsx.
+- react/react-in-jsx-scope: 18 errors across src/components/Button.tsx, src/hooks/useData.ts, src/pages/Home.tsx.
+- @typescript-eslint/no-explicit-any: 13 errors across src/components/Button.tsx, src/hooks/useData.ts, src/pages/Home.tsx.
+- 2 more rules across 4 files.

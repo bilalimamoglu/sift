@@ -1,0 +1,95 @@
+src/api/client.ts(12,5): error TS2322: Type 'string' is not assignable to type 'number'.
+src/api/client.ts(34,17): error TS2339: Property 'timeout' does not exist on type 'RequestOptions'.
+src/api/client.ts(56,9): error TS2345: Argument of type 'null' is not assignable to parameter of type 'string'.
+src/api/client.ts(78,3): error TS2554: Expected 2 arguments, but got 1.
+src/api/client.ts(84,11): error TS2741: Property 'headers' is missing in type '{}' but required in type 'HttpRequest'.
+src/api/client.ts(92,7): error TS2307: Cannot find module '@/lib/http' or its corresponding type declarations.
+src/api/client.ts(104,19): error TS2322: Type 'number | undefined' is not assignable to type 'number'.
+src/api/client.ts(118,14): error TS2339: Property 'retry' does not exist on type 'RequestOptions'.
+src/api/client.ts(131,8): error TS2345: Argument of type 'Response | null' is not assignable to parameter of type 'Response'.
+src/api/client.ts(146,5): error TS6133: 'unusedClient' is declared but its value is never read.
+src/api/client.ts(159,13): error TS2322: Type 'boolean' is not assignable to type 'string'.
+src/api/client.ts(171,17): error TS2307: Cannot find module '@/lib/retries' or its corresponding type declarations.
+src/components/UserCard.tsx(8,3): error TS2741: Property 'id' is missing in type '{}' but required in type 'User'.
+src/components/UserCard.tsx(22,12): error TS2322: Type 'number | undefined' is not assignable to type 'string'.
+src/components/UserCard.tsx(45,7): error TS2339: Property 'avatar' does not exist on type 'UserProps'.
+src/components/UserCard.tsx(61,18): error TS2345: Argument of type 'null' is not assignable to parameter of type 'User'.
+src/components/UserCard.tsx(74,5): error TS2554: Expected 2 arguments, but got 1.
+src/components/UserCard.tsx(88,9): error TS2741: Property 'name' is missing in type '{}' but required in type 'UserBadge'.
+src/components/UserCard.tsx(102,14): error TS2322: Type 'boolean' is not assignable to type 'string'.
+src/components/UserCard.tsx(117,21): error TS2339: Property 'photoUrl' does not exist on type 'User'.
+src/components/UserCard.tsx(129,8): error TS2345: Argument of type 'MouseEvent | undefined' is not assignable to parameter of type 'MouseEvent'.
+src/components/UserCard.tsx(141,6): error TS6133: 'hovered' is declared but its value is never read.
+src/components/UserCard.tsx(156,12): error TS2322: Type 'null' is not assignable to type 'string'.
+src/components/UserCard.tsx(171,7): error TS2307: Cannot find module '@/lib/avatars' or its corresponding type declarations.
+src/components/Dashboard.tsx(15,7): error TS2339: Property 'data' does not exist on type 'ApiResponse'.
+src/components/Dashboard.tsx(43,19): error TS2345: Argument of type 'Event' is not assignable to parameter of type 'MouseEvent'.
+src/components/Dashboard.tsx(67,11): error TS2322: Type 'boolean' is not assignable to type 'string'.
+src/components/Dashboard.tsx(91,5): error TS2741: Property 'items' is missing in type '{}' but required in type 'DashboardState'.
+src/components/Dashboard.tsx(106,9): error TS2554: Expected 3 arguments, but got 2.
+src/components/Dashboard.tsx(119,13): error TS2339: Property 'widgets' does not exist on type 'DashboardState'.
+src/components/Dashboard.tsx(132,17): error TS2345: Argument of type 'Widget[] | undefined' is not assignable to parameter of type 'Widget[]'.
+src/components/Dashboard.tsx(148,7): error TS2322: Type 'number' is not assignable to type 'string'.
+src/components/Dashboard.tsx(162,21): error TS2307: Cannot find module '@/lib/widgets' or its corresponding type declarations.
+src/components/Dashboard.tsx(174,8): error TS6133: 'draft' is declared but its value is never read.
+src/hooks/useAuth.ts(5,8): error TS2307: Cannot find module '@/lib/auth' or its corresponding type declarations.
+src/hooks/useAuth.ts(18,22): error TS2554: Expected 2 arguments, but got 1.
+src/hooks/useAuth.ts(29,14): error TS2339: Property 'token' does not exist on type 'AuthState'.
+src/hooks/useAuth.ts(44,9): error TS2322: Type 'null' is not assignable to type 'AuthSession'.
+src/hooks/useAuth.ts(58,12): error TS2741: Property 'userId' is missing in type '{}' but required in type 'AuthSession'.
+src/hooks/useAuth.ts(73,6): error TS6133: 'sessionReady' is declared but its value is never read.
+src/hooks/useAuth.ts(88,17): error TS2345: Argument of type 'AuthSession | undefined' is not assignable to parameter of type 'AuthSession'.
+src/hooks/useAuth.ts(99,4): error TS2554: Expected 1 arguments, but got 0.
+src/hooks/useAuth.ts(114,15): error TS2339: Property 'refreshToken' does not exist on type 'AuthState'.
+src/hooks/useAuth.ts(129,9): error TS2322: Type 'boolean' is not assignable to type 'string'.
+src/hooks/useAuth.ts(141,7): error TS2307: Cannot find module '@/lib/session-store' or its corresponding type declarations.
+src/hooks/useAuth.ts(156,13): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/hooks/useData.ts(3,22): error TS2307: Cannot find module '@/lib/api' or its corresponding type declarations.
+src/hooks/useData.ts(17,9): error TS2322: Type 'undefined' is not assignable to type 'DataPayload'.
+src/hooks/useData.ts(31,5): error TS2741: Property 'status' is missing in type 'Partial<DataPayload>' but required in type 'DataPayload'.
+src/hooks/useData.ts(48,17): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'DataPayload'.
+src/hooks/useData.ts(63,8): error TS2554: Expected 2 arguments, but got 1.
+src/hooks/useData.ts(77,4): error TS6133: 'refreshNow' is declared but its value is never read.
+src/hooks/useData.ts(90,14): error TS2339: Property 'meta' does not exist on type 'DataPayload'.
+src/hooks/useData.ts(103,11): error TS2322: Type 'null' is not assignable to type 'DataPayload'.
+src/hooks/useData.ts(117,16): error TS2741: Property 'items' is missing in type '{}' but required in type 'DataPayload'.
+src/hooks/useData.ts(132,9): error TS2307: Cannot find module '@/lib/query-client' or its corresponding type declarations.
+src/hooks/useData.ts(148,13): error TS2345: Argument of type 'DataPayload | undefined' is not assignable to parameter of type 'DataPayload'.
+src/hooks/useData.ts(161,6): error TS2554: Expected 1 arguments, but got 0.
+src/services/authService.ts(11,3): error TS2741: Property 'userId' is missing in type '{}' but required in type 'Session'.
+src/services/authService.ts(25,15): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/services/authService.ts(38,7): error TS2322: Type 'number' is not assignable to type 'string'.
+src/services/authService.ts(52,21): error TS2339: Property 'expiresAt' does not exist on type 'TokenPayload'.
+src/services/authService.ts(66,8): error TS2554: Expected 2 arguments, but got 1.
+src/services/authService.ts(81,12): error TS2741: Property 'issuedAt' is missing in type '{}' but required in type 'TokenPayload'.
+src/services/authService.ts(95,6): error TS6133: 'fallbackToken' is declared but its value is never read.
+src/services/authService.ts(107,15): error TS2345: Argument of type 'Session | undefined' is not assignable to parameter of type 'Session'.
+src/services/authService.ts(121,9): error TS2322: Type 'boolean' is not assignable to type 'string'.
+src/services/authService.ts(136,17): error TS2339: Property 'claims' does not exist on type 'Session'.
+src/services/authService.ts(149,6): error TS2307: Cannot find module '@/lib/jwt' or its corresponding type declarations.
+src/services/authService.ts(163,13): error TS2345: Argument of type 'TokenPayload | null' is not assignable to parameter of type 'TokenPayload'.
+src/utils/transform.ts(7,14): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/utils/transform.ts(19,5): error TS6133: 'result' is declared but its value is never read.
+src/utils/transform.ts(33,9): error TS2322: Type 'unknown' is not assignable to type 'TransformResult'.
+src/utils/transform.ts(61,18): error TS2339: Property 'raw' does not exist on type 'TransformResult'.
+src/utils/transform.ts(76,4): error TS2554: Expected 1 arguments, but got 0.
+src/utils/transform.ts(89,12): error TS2741: Property 'value' is missing in type '{}' but required in type 'TransformResult'.
+src/utils/transform.ts(103,7): error TS2322: Type 'boolean' is not assignable to type 'string'.
+src/utils/transform.ts(116,17): error TS2345: Argument of type 'TransformResult | null' is not assignable to parameter of type 'TransformResult'.
+src/utils/transform.ts(131,8): error TS2307: Cannot find module '@/lib/formatters' or its corresponding type declarations.
+src/utils/transform.ts(144,6): error TS6133: 'debugOutput' is declared but its value is never read.
+src/utils/transform.ts(157,14): error TS2339: Property 'metadata' does not exist on type 'TransformResult'.
+src/utils/transform.ts(171,9): error TS2322: Type 'null' is not assignable to type 'TransformResult'.
+src/pages/Home.tsx(9,3): error TS2741: Property 'title' is missing in type '{}' but required in type 'PageProps'.
+src/pages/Home.tsx(23,7): error TS2339: Property 'user' does not exist on type 'HomeProps'.
+src/pages/Home.tsx(37,14): error TS2322: Type 'null' is not assignable to type 'string'.
+src/pages/Home.tsx(51,9): error TS2345: Argument of type 'Event' is not assignable to parameter of type 'SubmitEvent'.
+src/pages/Home.tsx(66,5): error TS2554: Expected 2 arguments, but got 1.
+src/pages/Home.tsx(79,10): error TS2741: Property 'hero' is missing in type '{}' but required in type 'HomeViewModel'.
+src/pages/Home.tsx(92,17): error TS2339: Property 'cta' does not exist on type 'HomeViewModel'.
+src/pages/Home.tsx(107,8): error TS2322: Type 'boolean' is not assignable to type 'string'.
+src/pages/Home.tsx(121,16): error TS2345: Argument of type 'HomeViewModel | undefined' is not assignable to parameter of type 'HomeViewModel'.
+src/pages/Home.tsx(134,7): error TS2307: Cannot find module '@/lib/home-copy' or its corresponding type declarations.
+src/pages/Home.tsx(147,6): error TS6133: 'featureFlag' is declared but its value is never read.
+src/pages/Home.tsx(161,12): error TS2322: Type 'number' is not assignable to type 'string'.
+Found 96 errors in 8 files.

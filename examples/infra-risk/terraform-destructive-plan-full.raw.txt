@@ -1,0 +1,413 @@
+aws_cloudfront_origin_access_control.assets[0]: Refreshing state... [id=E0000000000000]
+aws_cognito_user_pool.app_test[0]: Refreshing state... [id=eu-central-1_ExampleTest01]
+aws_s3_bucket.assets: Refreshing state... [id=example-prod-assets]
+aws_cognito_user_pool.app: Refreshing state... [id=eu-central-1_ExampleProd01]
+aws_s3_bucket_server_side_encryption_configuration.assets: Refreshing state... [id=example-prod-assets]
+aws_s3_bucket_public_access_block.assets: Refreshing state... [id=example-prod-assets]
+aws_cloudfront_distribution.assets[0]: Refreshing state... [id=E1111111111111]
+aws_cognito_user_pool_client.app_backend_test[0]: Refreshing state... [id=testclient0000000000000001]
+aws_s3_bucket_policy.assets[0]: Refreshing state... [id=example-prod-assets]
+aws_cognito_user_pool_client.app_backend: Refreshing state... [id=prodclient0000000000000001]
+
+Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:
+  - destroy
+
+Terraform planned the following actions, but then encountered a problem:
+
+  # aws_cloudfront_distribution.assets[0] will be destroyed
+  - resource "aws_cloudfront_distribution" "assets" {
+      - aliases                         = [] -> null
+      - arn                             = "arn:aws:cloudfront::123456789012:distribution/E1111111111111" -> null
+      - caller_reference                = "00000000-0000-0000-0000-000000000000" -> null
+      - domain_name                     = "d111111example.cloudfront.net" -> null
+      - enabled                         = true -> null
+      - etag                            = "ETVPDKIKX0DER" -> null
+      - hosted_zone_id                  = "Z2FDTNDATAQYW2" -> null
+      - http_version                    = "http2" -> null
+      - id                              = "E1111111111111" -> null
+      - in_progress_validation_batches  = 0 -> null
+      - is_ipv6_enabled                 = true -> null
+      - last_modified_time              = "2026-02-17 03:03:09.995 +0000 UTC" -> null
+      - price_class                     = "PriceClass_All" -> null
+      - retain_on_delete                = false -> null
+      - staging                         = false -> null
+      - status                          = "Deployed" -> null
+      - tags                            = {
+          - "Name" = "example-assets-prod"
+        } -> null
+      - tags_all                        = {
+          - "Name" = "example-assets-prod"
+        } -> null
+      - trusted_key_groups              = [
+          - {
+              - enabled = false
+              - items   = []
+            },
+        ] -> null
+      - trusted_signers                 = [
+          - {
+              - enabled = false
+              - items   = []
+            },
+        ] -> null
+      - wait_for_deployment             = true -> null
+      - web_acl_id                      = "arn:aws:wafv2:us-east-1:123456789012:global/webacl/CreatedByCloudFront-example/00000000-0000-0000-0000-000000000001" -> null
+        # (2 unchanged attributes hidden)
+
+      - default_cache_behavior {
+          - allowed_methods            = [
+              - "GET",
+              - "HEAD",
+            ] -> null
+          - cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6" -> null
+          - cached_methods             = [
+              - "GET",
+              - "HEAD",
+            ] -> null
+          - compress                   = true -> null
+          - default_ttl                = 0 -> null
+          - max_ttl                    = 0 -> null
+          - min_ttl                    = 0 -> null
+          - smooth_streaming           = false -> null
+          - target_origin_id           = "example-prod-assets.s3.eu-central-1.amazonaws.com-originid" -> null
+          - trusted_key_groups         = [] -> null
+          - trusted_signers            = [] -> null
+          - viewer_protocol_policy     = "redirect-to-https" -> null
+            # (4 unchanged attributes hidden)
+
+          - grpc_config {
+              - enabled = false -> null
+            }
+        }
+
+      - origin {
+          - connection_attempts      = 3 -> null
+          - connection_timeout       = 10 -> null
+          - domain_name              = "example-prod-assets.s3.eu-central-1.amazonaws.com" -> null
+          - origin_access_control_id = "E0000000000000" -> null
+          - origin_id                = "example-prod-assets.s3.eu-central-1.amazonaws.com-originid" -> null
+            # (1 unchanged attribute hidden)
+        }
+
+      - restrictions {
+          - geo_restriction {
+              - locations        = [] -> null
+              - restriction_type = "none" -> null
+            }
+        }
+
+      - viewer_certificate {
+          - cloudfront_default_certificate = true -> null
+          - minimum_protocol_version       = "TLSv1" -> null
+            # (3 unchanged attributes hidden)
+        }
+    }
+
+  # aws_cognito_user_pool.app will be destroyed
+  - resource "aws_cognito_user_pool" "app" {
+      - arn                        = "arn:aws:cognito-idp:eu-central-1:123456789012:userpool/eu-central-1_ExampleProd01" -> null
+      - auto_verified_attributes   = [
+          - "email",
+        ] -> null
+      - creation_date              = "2026-02-18T11:21:38Z" -> null
+      - deletion_protection        = "INACTIVE" -> null
+      - endpoint                   = "cognito-idp.eu-central-1.amazonaws.com/eu-central-1_ExampleProd01" -> null
+      - estimated_number_of_users  = 2 -> null
+      - id                         = "eu-central-1_ExampleProd01" -> null
+      - last_modified_date         = "2026-02-18T11:21:38Z" -> null
+      - mfa_configuration          = "OFF" -> null
+      - name                       = "example-user-pool" -> null
+      - tags                       = {} -> null
+      - tags_all                   = {} -> null
+      - user_pool_tier             = "ESSENTIALS" -> null
+      - username_attributes        = [
+          - "email",
+        ] -> null
+        # (6 unchanged attributes hidden)
+
+      - account_recovery_setting {
+          - recovery_mechanism {
+              - name     = "verified_email" -> null
+              - priority = 1 -> null
+            }
+        }
+
+      - admin_create_user_config {
+          - allow_admin_create_user_only = false -> null
+        }
+
+      - email_configuration {
+          - email_sending_account  = "COGNITO_DEFAULT" -> null
+            # (4 unchanged attributes hidden)
+        }
+
+      - password_policy {
+          - minimum_length                   = 8 -> null
+          - password_history_size            = 0 -> null
+          - require_lowercase                = true -> null
+          - require_numbers                  = true -> null
+          - require_symbols                  = false -> null
+          - require_uppercase                = true -> null
+          - temporary_password_validity_days = 7 -> null
+        }
+
+      - schema {
+          - attribute_data_type      = "String" -> null
+          - developer_only_attribute = false -> null
+          - mutable                  = true -> null
+          - name                     = "role" -> null
+          - required                 = false -> null
+
+          - string_attribute_constraints {
+              - max_length = "20" -> null
+              - min_length = "1" -> null
+            }
+        }
+
+      - sign_in_policy {
+          - allowed_first_auth_factors = [
+              - "PASSWORD",
+            ] -> null
+        }
+
+      - verification_message_template {
+          - default_email_option  = "CONFIRM_WITH_CODE" -> null
+            # (5 unchanged attributes hidden)
+        }
+    }
+
+  # aws_cognito_user_pool.app_test[0] will be destroyed
+  - resource "aws_cognito_user_pool" "app_test" {
+      - arn                        = "arn:aws:cognito-idp:eu-central-1:123456789012:userpool/eu-central-1_ExampleTest01" -> null
+      - auto_verified_attributes   = [
+          - "email",
+        ] -> null
+      - creation_date              = "2026-02-23T18:49:57Z" -> null
+      - deletion_protection        = "INACTIVE" -> null
+      - endpoint                   = "cognito-idp.eu-central-1.amazonaws.com/eu-central-1_ExampleTest01" -> null
+      - estimated_number_of_users  = 1321 -> null
+      - id                         = "eu-central-1_ExampleTest01" -> null
+      - last_modified_date         = "2026-02-23T18:49:57Z" -> null
+      - mfa_configuration          = "OFF" -> null
+      - name                       = "example-test-user-pool" -> null
+      - tags                       = {} -> null
+      - tags_all                   = {} -> null
+      - user_pool_tier             = "ESSENTIALS" -> null
+      - username_attributes        = [
+          - "email",
+        ] -> null
+        # (6 unchanged attributes hidden)
+
+      - account_recovery_setting {
+          - recovery_mechanism {
+              - name     = "verified_email" -> null
+              - priority = 1 -> null
+            }
+        }
+
+      - admin_create_user_config {
+          - allow_admin_create_user_only = false -> null
+        }
+
+      - email_configuration {
+          - email_sending_account  = "COGNITO_DEFAULT" -> null
+            # (4 unchanged attributes hidden)
+        }
+
+      - password_policy {
+          - minimum_length                   = 8 -> null
+          - password_history_size            = 0 -> null
+          - require_lowercase                = true -> null
+          - require_numbers                  = true -> null
+          - require_symbols                  = false -> null
+          - require_uppercase                = true -> null
+          - temporary_password_validity_days = 7 -> null
+        }
+
+      - schema {
+          - attribute_data_type      = "String" -> null
+          - developer_only_attribute = false -> null
+          - mutable                  = true -> null
+          - name                     = "role" -> null
+          - required                 = false -> null
+
+          - string_attribute_constraints {
+              - max_length = "20" -> null
+              - min_length = "1" -> null
+            }
+        }
+
+      - sign_in_policy {
+          - allowed_first_auth_factors = [
+              - "PASSWORD",
+            ] -> null
+        }
+
+      - verification_message_template {
+          - default_email_option  = "CONFIRM_WITH_CODE" -> null
+            # (5 unchanged attributes hidden)
+        }
+    }
+
+  # aws_cognito_user_pool_client.app_backend will be destroyed
+  - resource "aws_cognito_user_pool_client" "app_backend" {
+      - access_token_validity                         = 1 -> null
+      - allowed_oauth_flows                           = [] -> null
+      - allowed_oauth_flows_user_pool_client          = false -> null
+      - allowed_oauth_scopes                          = [] -> null
+      - auth_session_validity                         = 3 -> null
+      - callback_urls                                 = [] -> null
+      - client_secret                                 = (sensitive value) -> null
+      - enable_propagate_additional_user_context_data = false -> null
+      - enable_token_revocation                       = true -> null
+      - explicit_auth_flows                           = [
+          - "ALLOW_ADMIN_USER_PASSWORD_AUTH",
+          - "ALLOW_REFRESH_TOKEN_AUTH",
+          - "ALLOW_USER_PASSWORD_AUTH",
+        ] -> null
+      - generate_secret                               = true -> null
+      - id                                            = "prodclient0000000000000001" -> null
+      - id_token_validity                             = 1 -> null
+      - logout_urls                                   = [] -> null
+      - name                                          = "example-backend-client" -> null
+      - prevent_user_existence_errors                 = "ENABLED" -> null
+      - read_attributes                               = [
+          - "custom:role",
+          - "email",
+        ] -> null
+      - refresh_token_validity                        = 30 -> null
+      - supported_identity_providers                  = [] -> null
+      - user_pool_id                                  = "eu-central-1_ExampleProd01" -> null
+      - write_attributes                              = [
+          - "custom:role",
+          - "email",
+        ] -> null
+        # (1 unchanged attribute hidden)
+
+      - token_validity_units {
+          - access_token  = "hours" -> null
+          - id_token      = "hours" -> null
+          - refresh_token = "days" -> null
+        }
+    }
+
+  # aws_cognito_user_pool_client.app_backend_test[0] will be destroyed
+  - resource "aws_cognito_user_pool_client" "app_backend_test" {
+      - access_token_validity                         = 1 -> null
+      - allowed_oauth_flows                           = [] -> null
+      - allowed_oauth_flows_user_pool_client          = false -> null
+      - allowed_oauth_scopes                          = [] -> null
+      - auth_session_validity                         = 3 -> null
+      - callback_urls                                 = [] -> null
+      - client_secret                                 = (sensitive value) -> null
+      - enable_propagate_additional_user_context_data = false -> null
+      - enable_token_revocation                       = true -> null
+      - explicit_auth_flows                           = [
+          - "ALLOW_ADMIN_USER_PASSWORD_AUTH",
+          - "ALLOW_REFRESH_TOKEN_AUTH",
+          - "ALLOW_USER_PASSWORD_AUTH",
+        ] -> null
+      - generate_secret                               = true -> null
+      - id                                            = "testclient0000000000000001" -> null
+      - id_token_validity                             = 1 -> null
+      - logout_urls                                   = [] -> null
+      - name                                          = "example-backend-test-client" -> null
+      - prevent_user_existence_errors                 = "ENABLED" -> null
+      - read_attributes                               = [
+          - "custom:role",
+          - "email",
+        ] -> null
+      - refresh_token_validity                        = 30 -> null
+      - supported_identity_providers                  = [] -> null
+      - user_pool_id                                  = "eu-central-1_ExampleTest01" -> null
+      - write_attributes                              = [
+          - "custom:role",
+          - "email",
+        ] -> null
+        # (1 unchanged attribute hidden)
+
+      - token_validity_units {
+          - access_token  = "hours" -> null
+          - id_token      = "hours" -> null
+          - refresh_token = "days" -> null
+        }
+    }
+
+  # aws_s3_bucket_policy.assets[0] will be destroyed
+  - resource "aws_s3_bucket_policy" "assets" {
+      - bucket = "example-prod-assets" -> null
+      - id     = "example-prod-assets" -> null
+      - policy = jsonencode(
+            {
+              - Statement = [
+                  - {
+                      - Action    = "s3:GetObject"
+                      - Condition = {
+                          - StringEquals = {
+                              - "AWS:SourceArn" = "arn:aws:cloudfront::123456789012:distribution/E1111111111111"
+                            }
+                        }
+                      - Effect    = "Allow"
+                      - Principal = {
+                          - Service = "cloudfront.amazonaws.com"
+                        }
+                      - Resource  = "arn:aws:s3:::example-prod-assets/*"
+                      - Sid       = "AllowCloudFrontRead"
+                    },
+                ]
+              - Version   = "2012-10-17"
+            }
+        ) -> null
+    }
+
+  # aws_s3_bucket_public_access_block.assets will be destroyed
+  - resource "aws_s3_bucket_public_access_block" "assets" {
+      - block_public_acls       = true -> null
+      - block_public_policy     = true -> null
+      - bucket                  = "example-prod-assets" -> null
+      - id                      = "example-prod-assets" -> null
+      - ignore_public_acls      = true -> null
+      - restrict_public_buckets = true -> null
+    }
+
+  # aws_s3_bucket_server_side_encryption_configuration.assets will be destroyed
+  - resource "aws_s3_bucket_server_side_encryption_configuration" "assets" {
+      - bucket                = "example-prod-assets" -> null
+      - id                    = "example-prod-assets" -> null
+        # (1 unchanged attribute hidden)
+
+      - rule {
+          - bucket_key_enabled = true -> null
+
+          - apply_server_side_encryption_by_default {
+              - sse_algorithm     = "AES256" -> null
+                # (1 unchanged attribute hidden)
+            }
+        }
+    }
+
+Plan: 0 to add, 0 to change, 8 to destroy.
+
+Changes to Outputs:
+  - bucket_arn                  = "arn:aws:s3:::example-prod-assets" -> null
+  - bucket_name                 = "example-prod-assets" -> null
+  - bucket_regional_domain_name = "example-prod-assets.s3.eu-central-1.amazonaws.com" -> null
+  - cloudfront_arn              = "arn:aws:cloudfront::123456789012:distribution/E1111111111111" -> null
+  - cloudfront_domain_name      = "d111111example.cloudfront.net" -> null
+  - cognito_client_id           = "prodclient0000000000000001" -> null
+  - cognito_client_secret       = (sensitive value) -> null
+  - cognito_user_pool_arn       = "arn:aws:cognito-idp:eu-central-1:123456789012:userpool/eu-central-1_ExampleProd01" -> null
+  - cognito_user_pool_id        = "eu-central-1_ExampleProd01" -> null
+  - test_cognito_client_id      = "testclient0000000000000001" -> null
+  - test_cognito_client_secret  = (sensitive value) -> null
+  - test_cognito_user_pool_arn  = "arn:aws:cognito-idp:eu-central-1:123456789012:userpool/eu-central-1_ExampleTest01" -> null
+  - test_cognito_user_pool_id   = "eu-central-1_ExampleTest01" -> null
+╷
+│ Error: Instance cannot be destroyed
+│
+│   on main.tf line 43:
+│   43: resource "aws_cloudfront_distribution" "assets" {
+│
+│ Resource aws_cloudfront_distribution.assets[0] has lifecycle.prevent_destroy set, but the plan calls for this resource to be destroyed. To avoid
+│ this error and continue with the plan, either disable lifecycle.prevent_destroy or reduce the scope of the plan using the -target option.
+╵

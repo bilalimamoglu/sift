@@ -1,0 +1,14 @@
+[vite] Internal server error: Expected ";" but found "{"
+
+  Plugin: vite:esbuild
+  File: /home/runner/work/myapp/src/utils/parser.ts
+
+✘ [ERROR] Expected ";" but found "{"
+
+    src/utils/parser.ts:18:14:
+      18 │   const result { value } = parseToken(input);
+         ╵               ^
+
+error during build:
+Error: Build failed with 1 error:
+src/utils/parser.ts:18:14: ERROR: Expected ";" but found "{"

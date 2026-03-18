@@ -5,8 +5,21 @@ const RISK_LINE_PATTERN =
   /(destroy|delete|drop|recreate|replace|revoke|deny|downtime|data loss|iam|network exposure)/i;
 const ZERO_DESTRUCTIVE_SUMMARY_PATTERN =
   /\b0\s+to\s+(destroy|delete|drop|recreate|replace|revoke)\b/i;
+const NON_ZERO_DESTRUCTIVE_SUMMARY_PATTERN =
+  /\b[1-9]\d*\s+to\s+(destroy|delete|drop|recreate|replace|revoke)\b/i;
 const SAFE_LINE_PATTERN =
   /(no changes|up-to-date|up to date|no risky changes|safe to apply)/i;
+const RESOURCE_DESTROY_HEADER_PATTERN =
+  /^#\s+.+\bwill be (destroyed|deleted|replaced)\b/i;
+const DESTROY_ERROR_PATTERN =
+  /(instance cannot be destroyed|prevent_destroy|downtime|data loss)/i;
+const ACTION_DESTROY_PATTERN = /^-\s+destroy$/i;
+
+interface InfraRiskBlocker {
+  type: "prevent_destroy" | "destroy_blocked";
+  target: string | null;
+  message: string;
+}
 const TSC_CODE_LABELS: Record<string, string> = {
   TS1002: "syntax error",
   TS1005: "syntax error",
@@ -51,6 +64,124 @@ function getCount(input: string, label: string): number {
   const matches = [...input.matchAll(new RegExp(`(\\d+)\\s+${label}`, "gi"))];
   const lastMatch = matches.at(-1);
   return lastMatch ? Number(lastMatch[1]) : 0;
+}
+
+function collectInfraRiskEvidence(input: string): string[] {
+  const lines = input
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  const evidence: string[] = [];
+  const seen = new Set<string>();
+
+  const pushMatches = (
+    matcher: RegExp,
+    options?: { exclude?: RegExp; limit?: number; maxEvidence?: number }
+  ) => {
+    let added = 0;
+    for (const line of lines) {
+      if (!matcher.test(line)) {
+        continue;
+      }
+      if (options?.exclude?.test(line)) {
+        continue;
+      }
+      if (seen.has(line)) {
+        continue;
+      }
+      evidence.push(line);
+      seen.add(line);
+      added += 1;
+      if (options?.limit && added >= options.limit) {
+        return;
+      }
+      if (evidence.length >= (options?.maxEvidence ?? 4)) {
+        return;
+      }
+    }
+  };
+
+  pushMatches(/Plan:/i, {
+    exclude: ZERO_DESTRUCTIVE_SUMMARY_PATTERN,
+    limit: 1
+  });
+  if (evidence.length < 4) {
+    pushMatches(RESOURCE_DESTROY_HEADER_PATTERN, { limit: 2 });
+  }
+  if (evidence.length < 4) {
+    pushMatches(DESTROY_ERROR_PATTERN, { limit: 1 });
+  }
+  if (evidence.length < 4) {
+    pushMatches(ACTION_DESTROY_PATTERN, { limit: 1 });
+  }
+  if (evidence.length < 4) {
+    pushMatches(RISK_LINE_PATTERN, {
+      exclude: /->\s+null$|\b0\s+to\s+(destroy|delete|drop|recreate|replace|revoke)\b/i,
+      maxEvidence: 4
+    });
+  }
+
+  return evidence.slice(0, 4);
+}
+
+function collectInfraDestroyTargets(input: string): string[] {
+  const targets: string[] = [];
+  const seen = new Set<string>();
+
+  for (const line of input.split("\n").map((entry) => entry.trim())) {
+    const match = line.match(/^#\s+(.+?)\s+will be (destroyed|deleted|replaced)\b/i);
+    const target = match?.[1]?.trim();
+    if (!target || seen.has(target)) {
+      continue;
+    }
+    seen.add(target);
+    targets.push(target);
+  }
+
+  return targets;
+}
+
+function inferInfraDestroyCount(input: string, destroyTargets: string[]): number {
+  const matches = [
+    ...input.matchAll(/\b(\d+)\s+to\s+(destroy|delete|drop|recreate|replace|revoke)\b/gi)
+  ];
+  const lastMatch = matches.at(-1);
+  return lastMatch ? Number(lastMatch[1]) : destroyTargets.length;
+}
+
+function collectInfraBlockers(input: string): InfraRiskBlocker[] {
+  const lines = input.split("\n");
+  const blockers: InfraRiskBlocker[] = [];
+  const seen = new Set<string>();
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const trimmed = lines[index]?.trim();
+    const errorMatch = trimmed?.match(/^(?:[│|]\s*)?Error:\s+(.+)$/);
+    if (!errorMatch) {
+      continue;
+    }
+
+    const message = errorMatch[1]!.trim();
+    const nearby = lines.slice(index, index + 8).join("\n");
+    const preventDestroyTarget =
+      nearby.match(/Resource\s+([^\s]+)\s+has lifecycle\.prevent_destroy set/i)?.[1] ?? null;
+    const type = preventDestroyTarget ? "prevent_destroy" : "destroy_blocked";
+    const key = `${type}:${preventDestroyTarget ?? ""}:${message}`;
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    blockers.push({
+      type,
+      target: preventDestroyTarget,
+      message
+    });
+  }
+
+  return blockers;
 }
 
 export type TestRunner = "pytest" | "vitest" | "jest" | "unknown";
@@ -2785,6 +2916,18 @@ function testStatusHeuristic(input: string, detail: DetailLevel = "standard"): s
 
 
 function auditCriticalHeuristic(input: string): string | null {
+  if (/\bfound\s+0\s+vulnerabilities\b/i.test(input) || /\b0\s+vulnerabilities\b/i.test(input)) {
+    return JSON.stringify(
+      {
+        status: "ok",
+        vulnerabilities: [],
+        summary: "No high or critical vulnerabilities found in the provided input."
+      },
+      null,
+      2
+    );
+  }
+
   const vulnerabilities = input
     .split("\n")
     .map((line) => line.trim())
@@ -2828,28 +2971,24 @@ function auditCriticalHeuristic(input: string): string | null {
 }
 
 function infraRiskHeuristic(input: string): string | null {
+  const destroyTargets = collectInfraDestroyTargets(input);
+  const blockers = collectInfraBlockers(input);
   const zeroDestructiveEvidence = input
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line.length > 0 && ZERO_DESTRUCTIVE_SUMMARY_PATTERN.test(line))
     .slice(0, 3);
-  const riskEvidence = input
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(
-      (line) =>
-        line.length > 0 &&
-        RISK_LINE_PATTERN.test(line) &&
-        !ZERO_DESTRUCTIVE_SUMMARY_PATTERN.test(line)
-    )
-    .slice(0, 3);
+  const riskEvidence = collectInfraRiskEvidence(input);
 
   if (riskEvidence.length > 0) {
     return JSON.stringify(
       {
         verdict: "fail",
         reason: "Destructive or clearly risky infrastructure change signals are present.",
-        evidence: riskEvidence
+        evidence: riskEvidence,
+        destroy_count: inferInfraDestroyCount(input, destroyTargets),
+        destroy_targets: destroyTargets,
+        blockers
       },
       null,
       2
@@ -2861,7 +3000,10 @@ function infraRiskHeuristic(input: string): string | null {
       {
         verdict: "pass",
         reason: "The provided input explicitly indicates zero destructive changes.",
-        evidence: zeroDestructiveEvidence
+        evidence: zeroDestructiveEvidence,
+        destroy_count: 0,
+        destroy_targets: [],
+        blockers: []
       },
       null,
       2
@@ -2874,7 +3016,10 @@ function infraRiskHeuristic(input: string): string | null {
       {
         verdict: "pass",
         reason: "The provided input explicitly indicates no risky infrastructure changes.",
-        evidence: safeEvidence
+        evidence: safeEvidence,
+        destroy_count: 0,
+        destroy_targets: [],
+        blockers: []
       },
       null,
       2

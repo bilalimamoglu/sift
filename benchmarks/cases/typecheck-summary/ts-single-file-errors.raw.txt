@@ -1,0 +1,13 @@
+src/utils/transform.ts(7,14): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/utils/transform.ts(15,5): error TS6133: 'result' is declared but its value is never read.
+src/utils/transform.ts(23,9): error TS2322: Type 'unknown' is not assignable to type 'TransformResult'.
+src/utils/transform.ts(31,3): error TS2554: Expected 1 arguments, but got 0.
+src/utils/transform.ts(39,18): error TS2339: Property 'raw' does not exist on type 'TransformResult'.
+src/utils/transform.ts(47,11): error TS2345: Argument of type 'null' is not assignable to parameter of type 'string'.
+src/utils/transform.ts(55,7): error TS2322: Type 'boolean' is not assignable to type 'string'.
+src/utils/transform.ts(63,14): error TS2741: Property 'value' is missing in type '{}' but required in type 'TransformResult'.
+src/utils/transform.ts(71,3): error TS2554: Expected 2 arguments, but got 1.
+src/utils/transform.ts(79,9): error TS6133: 'tmp' is declared but its value is never read.
+src/utils/transform.ts(87,5): error TS2339: Property 'meta' does not exist on type 'TransformResult'.
+src/utils/transform.ts(95,18): error TS2322: Type 'string | null' is not assignable to type 'string'.
+Found 12 errors in 1 file.

@@ -199,7 +199,10 @@ describe("runSift hardening", () => {
     expect(JSON.parse(output)).toEqual({
       verdict: "fail",
       reason: "Destructive or clearly risky infrastructure change signals are present.",
-      evidence: ["Plan: 2 to add, 1 to destroy"]
+      evidence: ["Plan: 2 to add, 1 to destroy"],
+      destroy_count: 1,
+      destroy_targets: [],
+      blockers: []
     });
   });
 
@@ -215,7 +218,10 @@ describe("runSift hardening", () => {
     expect(JSON.parse(output)).toEqual({
       verdict: "pass",
       reason: "The provided input explicitly indicates zero destructive changes.",
-      evidence: ["Plan: 0 to destroy"]
+      evidence: ["Plan: 0 to destroy"],
+      destroy_count: 0,
+      destroy_targets: [],
+      blockers: []
     });
   });
 

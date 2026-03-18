@@ -296,7 +296,10 @@ describe("exec mode", () => {
     expect(JSON.parse(result.stdout)).toEqual({
       verdict: "fail",
       reason: "Destructive or clearly risky infrastructure change signals are present.",
-      evidence: ["Plan: 2 to add, 1 to destroy"]
+      evidence: ["Plan: 2 to add, 1 to destroy"],
+      destroy_count: 1,
+      destroy_targets: [],
+      blockers: []
     });
   });
 

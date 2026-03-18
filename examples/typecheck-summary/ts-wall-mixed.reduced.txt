@@ -1,0 +1,5 @@
+- Typecheck failed: 96 errors in 8 files.
+- TS2322 (type mismatch): 20 occurrences across src/api/client.ts, src/components/Dashboard.tsx, src/components/UserCard.tsx.
+- TS2345 (argument type mismatch): 17 occurrences across src/api/client.ts, src/components/Dashboard.tsx, src/components/UserCard.tsx.
+- TS2339 (missing property on type): 15 occurrences across src/api/client.ts, src/components/Dashboard.tsx, src/components/UserCard.tsx.
+- 4 more error codes across 8 files.
