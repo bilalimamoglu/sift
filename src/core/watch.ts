@@ -4,7 +4,8 @@ import { runSift } from "./run.js";
 import {
   createCachedTestStatusRun,
   diffTestStatusRuns,
-  diffTestStatusTargets
+  diffTestStatusTargets,
+  isRemainingSubsetAvailable
 } from "./testStatusState.js";
 
 const CLEAR_SCREEN_PATTERN = /\u001bc|\u001b\[2J(?:\u001b\[H)?/g;
@@ -185,12 +186,12 @@ async function runTestStatusWatch(request: RunRequest, cycles: string[]): Promis
         resolvedTests: targetDelta?.resolved ?? request.testStatusContext?.resolvedTests,
         remainingTests:
           targetDelta?.remaining ??
-          currentRun.pytest?.failingNodeIds ??
+          currentRun.runner.failingTargets ??
           request.testStatusContext?.remainingTests,
         remainingSubsetAvailable:
           request.testStatusContext?.remainingSubsetAvailable ??
-          (Boolean(currentRun.pytest?.subsetCapable) &&
-            (currentRun.pytest?.failingNodeIds.length ?? 0) > 0)
+          (isRemainingSubsetAvailable(currentRun) && currentRun.runner.failingTargets.length > 0),
+        remainingMode: request.testStatusContext?.remainingMode ?? "none"
       }
     });
 

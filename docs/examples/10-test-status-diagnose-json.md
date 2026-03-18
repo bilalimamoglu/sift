@@ -34,6 +34,7 @@ tests/contracts/test_frontend_catalog_payload.py::test_provider_capabilities_pay
   "additional_source_read_likely_low_value": true,
   "read_raw_only_if": null,
   "decision": "stop",
+  "remaining_mode": "none",
   "primary_suspect_kind": "environment",
   "confidence_reason": "Dominant blocker (missing test env) is anchored and actionable.",
   "dominant_blocker_bucket_index": 1,
@@ -143,7 +144,7 @@ tests/contracts/test_frontend_catalog_payload.py::test_provider_capabilities_pay
 ## Impact
 
 - Raw: `816753` chars / `195406` tokens
-- Reduced: `3525` chars / `937` tokens
+- Reduced: `3553` chars / `945` tokens
 - Reduction: `99.52%`
 
 ## Related Files

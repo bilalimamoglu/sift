@@ -74,6 +74,23 @@ function buildSingleFailureOutput(args: {
   ].join("\n");
 }
 
+function buildGoldenOutputDriftOutput(): string {
+  return buildSingleFailureOutput({
+    status: "FAILED",
+    label: "tests/test_release_workflow.py::test_node_version_matrix_matches_workflow",
+    detail:
+      "AssertionError: expected 'node-version: [20, 24]\\n- Decision: stop and act.' to contain 'node-version: [20]'"
+  });
+}
+
+function buildNonGoldenAssertionOutput(): string {
+  return buildSingleFailureOutput({
+    status: "FAILED",
+    label: "tests/unit/test_auth.py::test_refresh",
+    detail: "AssertionError: expected 200 to be 201"
+  });
+}
+
 function buildVitestAllPassedOutput(): string {
   return [
     " RUN  v2.1.0 /repo",
@@ -1566,6 +1583,74 @@ describe("heuristic policies", () => {
     expect(opaqueDecision.contract.primary_suspect_kind).toBe("unknown");
   });
 
+  it("detects narrow golden output drift buckets for literal expectation changes", () => {
+    const input = buildGoldenOutputDriftOutput();
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis: analyzeTestStatus(input)
+    });
+
+    expect(decision.contract.main_buckets[0]).toMatchObject({
+      label: "golden output drift",
+      root_cause: "golden output drift: expected literal or golden output no longer matches current output",
+      suspect_kind: "test",
+      fix_hint:
+        "Update the expected literal or golden output if the new output is intentional; otherwise fix the generated output and rerun."
+    });
+  });
+
+  it("keeps ordinary matcher assertions out of golden output drift buckets", () => {
+    const input = buildNonGoldenAssertionOutput();
+    const decision = buildTestStatusDiagnoseContract({
+      input,
+      analysis: analyzeTestStatus(input)
+    });
+
+    expect(decision.contract.main_buckets[0]).toMatchObject({
+      label: "assertion failure",
+      suspect_kind: "test"
+    });
+    expect(decision.contract.main_buckets[0]?.root_cause).toMatch(/^assertion failed:/);
+  });
+
+  it("uses config, app, and test precedence when classifying ambiguous assertion buckets", () => {
+    const configInput = buildSingleFailureOutput({
+      status: "FAILED",
+      label: ".github/workflows/release.yml::release-matrix",
+      detail: "AssertionError: expected 'node-version: [20, 24]' to contain 'node-version: [20]'"
+    });
+    const appInput = buildSingleFailureOutput({
+      status: "FAILED",
+      label: "src/cli/render.ts::render_standard_output",
+      detail: "AssertionError: expected true to be false"
+    });
+    const testInput = buildSingleFailureOutput({
+      status: "FAILED",
+      label: "tests/unit/test_rendering.py::test_standard_output",
+      detail: "AssertionError: expected true to be false"
+    });
+
+    const configDecision = buildTestStatusDiagnoseContract({
+      input: configInput,
+      analysis: analyzeTestStatus(configInput)
+    });
+    const appDecision = buildTestStatusDiagnoseContract({
+      input: appInput,
+      analysis: analyzeTestStatus(appInput)
+    });
+    const testDecision = buildTestStatusDiagnoseContract({
+      input: testInput,
+      analysis: analyzeTestStatus(testInput)
+    });
+
+    expect(configDecision.contract.main_buckets[0]?.suspect_kind).toBe("config");
+    expect(configDecision.contract.primary_suspect_kind).toBe("config");
+    expect(appDecision.contract.main_buckets[0]?.suspect_kind).toBe("app_code");
+    expect(appDecision.contract.primary_suspect_kind).toBe("app_code");
+    expect(testDecision.contract.main_buckets[0]?.suspect_kind).toBe("test");
+    expect(testDecision.contract.primary_suspect_kind).toBe("test");
+  });
+
   it("builds a summary-first public diagnose contract and keeps full ids opt-in", () => {
     const input = buildMixedFailureOutput();
     const analysis = analyzeTestStatus(input);
@@ -1593,11 +1678,12 @@ describe("heuristic policies", () => {
       count: 4,
       families: [
         { prefix: "tests/contracts/", count: 2 },
-        { prefix: "other", count: 1 },
-        { prefix: "worker/", count: 1 }
+        { prefix: "opaque-id", count: 1 },
+        { prefix: "worker/test_job.py/", count: 1 }
       ]
     });
     expect(summaryFirst.remaining_subset_available).toBe(true);
+    expect(summaryFirst.remaining_mode).toBe("none");
     expect(summaryFirst).not.toHaveProperty("resolved_tests");
     expect(summaryFirst).not.toHaveProperty("remaining_tests");
     expect(summaryFirst.primary_suspect_kind).toBe("environment");

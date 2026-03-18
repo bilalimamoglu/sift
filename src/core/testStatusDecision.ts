@@ -4,7 +4,14 @@ import type {
   FailureBucketType,
   TestStatusAnalysis
 } from "./heuristics.js";
-import type { RawSliceStrategy } from "../types.js";
+import type { RawSliceStrategy, TestStatusRemainingMode } from "../types.js";
+import {
+  buildTestTargetSummary,
+  describeTargetSummary,
+  formatTargetSummary,
+  type TestStatusFamilySummary,
+  type TestStatusTargetSummary
+} from "./testStatusTargets.js";
 
 export type DiagnoseActionCode =
   | "fix_dominant_blocker"
@@ -19,6 +26,7 @@ export type TestStatusSuspectKind =
   | "environment"
   | "tooling"
   | "unknown";
+export type TestStatusRemainingModeValue = TestStatusRemainingMode;
 
 export interface TestStatusMiniDiff {
   added_paths?: number;
@@ -53,16 +61,6 @@ export interface TestStatusReadTarget {
   };
 }
 
-export interface TestStatusFamilySummary {
-  prefix: string;
-  count: number;
-}
-
-export interface TestStatusTargetSummary {
-  count: number;
-  families: TestStatusFamilySummary[];
-}
-
 export interface TestStatusDiagnoseContract {
   status: "ok" | "insufficient";
   diagnosis_complete: boolean;
@@ -70,6 +68,7 @@ export interface TestStatusDiagnoseContract {
   additional_source_read_likely_low_value: boolean;
   read_raw_only_if: string | null;
   decision: TestStatusDecisionKind;
+  remaining_mode: TestStatusRemainingModeValue;
   primary_suspect_kind: TestStatusSuspectKind;
   confidence_reason: string;
   dominant_blocker_bucket_index: number | null;
@@ -137,6 +136,7 @@ export interface TestStatusContractOverrides {
   additional_source_read_likely_low_value?: boolean;
   read_raw_only_if?: string | null;
   decision?: TestStatusDecisionKind;
+  remaining_mode?: TestStatusRemainingModeValue;
   provider_used?: boolean;
   provider_confidence?: number | null;
   provider_failed?: boolean;
@@ -146,7 +146,7 @@ export interface TestStatusContractOverrides {
 }
 
 export const TEST_STATUS_DIAGNOSE_JSON_CONTRACT =
-  '{"status":"ok|insufficient","diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","primary_suspect_kind":"test|app_code|config|environment|tooling|unknown","confidence_reason":string,"dominant_blocker_bucket_index":number|null,"provider_used":boolean,"provider_confidence":number|null,"provider_failed":boolean,"raw_slice_used":boolean,"raw_slice_strategy":"none|bucket_evidence|traceback_window|head_tail","resolved_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_subset_available":boolean,"main_buckets":[{"bucket_index":number,"label":string,"count":number,"root_cause":string,"suspect_kind":"test|app_code|config|environment|tooling|unknown","fix_hint":string,"evidence":string[],"bucket_confidence":number,"root_cause_confidence":number,"dominant":boolean,"secondary_visible_despite_blocker":boolean,"mini_diff":{"added_paths"?:number,"removed_models"?:number,"changed_task_mappings"?:number}|null}],"read_targets":[{"file":string,"line":number|null,"why":string,"bucket_index":number,"context_hint":{"start_line":number|null,"end_line":number|null,"search_hint":string|null}}],"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string},"resolved_tests"?:string[],"remaining_tests"?:string[]}';
+  '{"status":"ok|insufficient","diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","remaining_mode":"none|subset_rerun|full_rerun_diff","primary_suspect_kind":"test|app_code|config|environment|tooling|unknown","confidence_reason":string,"dominant_blocker_bucket_index":number|null,"provider_used":boolean,"provider_confidence":number|null,"provider_failed":boolean,"raw_slice_used":boolean,"raw_slice_strategy":"none|bucket_evidence|traceback_window|head_tail","resolved_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_subset_available":boolean,"main_buckets":[{"bucket_index":number,"label":string,"count":number,"root_cause":string,"suspect_kind":"test|app_code|config|environment|tooling|unknown","fix_hint":string,"evidence":string[],"bucket_confidence":number,"root_cause_confidence":number,"dominant":boolean,"secondary_visible_despite_blocker":boolean,"mini_diff":{"added_paths"?:number,"removed_models"?:number,"changed_task_mappings"?:number}|null}],"read_targets":[{"file":string,"line":number|null,"why":string,"bucket_index":number,"context_hint":{"start_line":number|null,"end_line":number|null,"search_hint":string|null}}],"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string},"resolved_tests"?:string[],"remaining_tests"?:string[]}';
 export const TEST_STATUS_PROVIDER_SUPPLEMENT_JSON_CONTRACT =
   '{"diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","provider_confidence":number|null,"bucket_supplements":[{"label":string,"count":number,"root_cause":string,"anchor":{"file":string|null,"line":number|null,"search_hint":string|null},"fix_hint":string|null,"confidence":number}],"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string}}';
 
@@ -194,6 +194,7 @@ export const testStatusDiagnoseContractSchema = z.object({
   additional_source_read_likely_low_value: z.boolean(),
   read_raw_only_if: z.string().nullable(),
   decision: z.enum(["stop", "zoom", "read_source", "read_raw"]),
+  remaining_mode: z.enum(["none", "subset_rerun", "full_rerun_diff"]),
   primary_suspect_kind: z.enum([
     "test",
     "app_code",
@@ -584,64 +585,173 @@ function normalizeTestId(value: string): string {
   return value.replace(/\\/g, "/").trim();
 }
 
-function extractTestFamilyPrefix(value: string): string {
-  const normalized = normalizeTestId(value);
-  const testsMatch = normalized.match(/^(tests\/[^/]+\/)/);
-  if (testsMatch) {
-    return testsMatch[1]!;
+function normalizePathCandidate(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
   }
 
-  const filePart = normalized.split("::")[0]?.trim() ?? "";
-  if (!filePart.includes("/")) {
-    return "other";
+  let normalized = value.replace(/\\/g, "/").trim();
+  normalized = normalized.replace(/^[("'`<\[]+/, "").replace(/[>"'`\]),:;]+$/, "");
+  normalized = normalized.replace(/^<repo>\//, "").replace(/^\.\//, "");
+
+  if (normalized.includes("::")) {
+    normalized = normalized.split("::")[0]?.trim() ?? normalized;
   }
 
-  const segments = filePart.replace(/^\/+/, "").split("/").filter(Boolean);
-  if (segments.length === 0) {
-    return "other";
+  if (
+    normalized.startsWith("/") &&
+    !normalized.startsWith("/tmp/") &&
+    !normalized.startsWith("/var/tmp/")
+  ) {
+    return null;
   }
 
-  return `${segments[0]}/`;
+  if (/^\.github\/workflows\/.+\.(?:yml|yaml)$/i.test(normalized)) {
+    return normalized;
+  }
+
+  if (/^(?:src|test|tests)\/.+\.[A-Za-z0-9._-]+$/i.test(normalized)) {
+    return normalized;
+  }
+
+  if (
+    /^(?:package\.json|pytest\.ini|pyproject\.toml|tox\.ini|(?:[A-Za-z0-9._/-]+\/)?conftest\.py)$/i.test(
+      normalized
+    )
+  ) {
+    return normalized;
+  }
+
+  if (/^(?:[A-Za-z0-9._/-]+\/)?(?:vitest|jest)\.config\.[A-Za-z0-9._-]+$/i.test(normalized)) {
+    return normalized;
+  }
+
+  if (/^(?:[A-Za-z0-9._/-]+\/)?tsconfig(?:\.[A-Za-z0-9_-]+)?\.json$/i.test(normalized)) {
+    return normalized;
+  }
+
+  if (/^[A-Za-z0-9._/-]*config[A-Za-z0-9._/-]*\.(?:json|yml|yaml)$/i.test(normalized)) {
+    return normalized;
+  }
+
+  return null;
 }
 
-function buildTestTargetSummary(values: readonly string[]): TestStatusTargetSummary {
-  const counts = new Map<string, number>();
-
-  for (const value of values) {
-    const prefix = extractTestFamilyPrefix(value);
-    counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
+function addPathCandidatesFromText(target: Set<string>, text: string | null | undefined): void {
+  if (!text) {
+    return;
   }
 
-  const families = [...counts.entries()]
-    .map(([prefix, count]) => ({
-      prefix,
-      count
-    }))
-    .sort((left, right) => {
-      if (right.count !== left.count) {
-        return right.count - left.count;
-      }
-      return left.prefix.localeCompare(right.prefix);
-    })
-    .slice(0, 5);
+  const pattern =
+    /(?:^|[\s("'`])((?:\.github\/workflows\/[A-Za-z0-9._/-]+\.(?:yml|yaml)|(?:src|test|tests)\/[A-Za-z0-9._/-]+\.[A-Za-z0-9._-]+|package\.json|pytest\.ini|pyproject\.toml|tox\.ini|(?:[A-Za-z0-9._/-]+\/)?conftest\.py|(?:[A-Za-z0-9._/-]+\/)?(?:vitest|jest)\.config\.[A-Za-z0-9._-]+|(?:[A-Za-z0-9._/-]+\/)?tsconfig(?:\.[A-Za-z0-9_-]+)?\.json|[A-Za-z0-9._/-]*config[A-Za-z0-9._/-]*\.(?:json|yml|yaml)))/g;
+
+  for (const match of text.matchAll(pattern)) {
+    const normalized = normalizePathCandidate(match[1] ?? null);
+    if (normalized) {
+      target.add(normalized);
+    }
+  }
+}
+
+function extractBucketPathCandidates(args: {
+  bucket: GenericBucket;
+  readTarget?: TestStatusReadTarget;
+}): string[] {
+  const candidates = new Set<string>();
+
+  const push = (value: string | null | undefined) => {
+    const normalized = normalizePathCandidate(value);
+    if (normalized) {
+      candidates.add(normalized);
+    }
+  };
+
+  push(args.readTarget?.file);
+
+  for (const item of args.bucket.representativeItems) {
+    push(item.file);
+    addPathCandidatesFromText(candidates, item.label);
+    addPathCandidatesFromText(candidates, item.reason);
+  }
+
+  addPathCandidatesFromText(candidates, args.bucket.reason);
+  addPathCandidatesFromText(candidates, args.bucket.headline);
+  for (const line of args.bucket.summaryLines) {
+    addPathCandidatesFromText(candidates, line);
+  }
+
+  return [...candidates];
+}
+
+function isConfigPathCandidate(path: string): boolean {
+  return (
+    /^\.github\/workflows\/.+\.(?:yml|yaml)$/i.test(path) ||
+    /^(?:package\.json|pytest\.ini|pyproject\.toml|tox\.ini|(?:[A-Za-z0-9._/-]+\/)?conftest\.py)$/i.test(
+      path
+    ) ||
+    /^(?:[A-Za-z0-9._/-]+\/)?(?:vitest|jest)\.config\.[A-Za-z0-9._-]+$/i.test(path) ||
+    /^(?:[A-Za-z0-9._/-]+\/)?tsconfig(?:\.[A-Za-z0-9_-]+)?\.json$/i.test(path) ||
+    /^[A-Za-z0-9._/-]*config[A-Za-z0-9._/-]*\.(?:json|yml|yaml)$/i.test(path)
+  );
+}
+
+function isAppPathCandidate(path: string): boolean {
+  return path.startsWith("src/");
+}
+
+function isTestPathCandidate(path: string): boolean {
+  return path.startsWith("test/") || path.startsWith("tests/");
+}
+
+function looksLikeMatcherLiteralComparison(detail: string): boolean {
+  return /\bexpected\b[\s\S]*\bto (?:be|contain)\b/i.test(detail);
+}
+
+function looksLikeGoldenLiteralDrift(detail: string): boolean {
+  return (
+    /\\n/.test(detail) ||
+    /-\s+(?:Tests|Decision|Likely owner|Next|Stop signal)\b/.test(detail) ||
+    /\b(?:node-version|workflow_dispatch|run-name|matrix|registry-url)\b/i.test(detail)
+  );
+}
+
+function isGoldenOutputDriftBucket(bucket: GenericBucket): boolean {
+  if (bucket.type !== "assertion_failure") {
+    return false;
+  }
+
+  const detail = extractReasonDetail(bucket.reason, "assertion failed:") ?? bucket.reason;
+  if (!looksLikeMatcherLiteralComparison(detail)) {
+    return false;
+  }
+
+  if (bucket.reason.startsWith("snapshot mismatch:")) {
+    return false;
+  }
+
+  if (!looksLikeGoldenLiteralDrift(detail)) {
+    return false;
+  }
+
+  const candidates = extractBucketPathCandidates({
+    bucket
+  });
+  return candidates.some((candidate) => isConfigPathCandidate(candidate) || isTestPathCandidate(candidate));
+}
+
+function specializeBucket(bucket: GenericBucket): GenericBucket {
+  if (!isGoldenOutputDriftBucket(bucket)) {
+    return bucket;
+  }
 
   return {
-    count: values.length,
-    families
+    ...bucket,
+    type: "golden_output_drift",
+    reason: "golden output drift: expected literal or golden output no longer matches current output",
+    labelOverride: "golden output drift",
+    hint:
+      "Update the expected literal or golden output if the new output is intentional; otherwise fix the generated output and rerun."
   };
-}
-
-function formatTargetSummary(summary: TestStatusTargetSummary): string {
-  if (summary.count === 0) {
-    return "count=0";
-  }
-
-  const families =
-    summary.families.length > 0
-      ? summary.families.map((family) => `${family.prefix}${family.count}`).join(", ")
-      : "none";
-
-  return `count=${summary.count}; families=${families}`;
 }
 
 function classifyGenericBucketType(reason: string): FailureBucketType {
@@ -672,6 +782,10 @@ function classifyGenericBucketType(reason: string): FailureBucketType {
 
   if (reason.startsWith("missing module:")) {
     return "import_dependency_failure";
+  }
+
+  if (reason.startsWith("golden output drift:")) {
+    return "golden_output_drift";
   }
 
   if (reason.startsWith("assertion failed:")) {
@@ -866,7 +980,7 @@ function mergeRepresentativeItems(
     merged.push(item);
   }
 
-  return merged;
+  return merged.map((bucket) => specializeBucket(bucket));
 }
 
 function mergeBucketDetails(existing: GenericBucket, incoming: GenericBucket): GenericBucket {
@@ -1135,6 +1249,9 @@ function labelForBucket(bucket: GenericBucket): string {
   if (bucket.type === "import_dependency_failure") {
     return "import dependency failure";
   }
+  if (bucket.type === "golden_output_drift") {
+    return "golden output drift";
+  }
   if (bucket.type === "assertion_failure") {
     return "assertion failure";
   }
@@ -1178,6 +1295,10 @@ function rootCauseConfidenceFor(bucket: GenericBucket): number {
 
   if (bucket.type === "contract_snapshot_drift") {
     return bucket.entities.length > 0 ? 0.92 : 0.76;
+  }
+
+  if (bucket.type === "golden_output_drift") {
+    return 0.78;
   }
 
   if (bucket.source === "provider") {
@@ -1279,6 +1400,10 @@ function buildReadTargetWhy(args: {
 
   if (args.bucket.type === "import_dependency_failure") {
     return "it is the first visible failing module in this missing dependency bucket";
+  }
+
+  if (args.bucket.type === "golden_output_drift") {
+    return "it is the first visible golden or literal drift anchor for this bucket";
   }
 
   if (args.bucket.type === "assertion_failure") {
@@ -1384,6 +1509,14 @@ function buildReadTargetSearchHint(
     return assertionText;
   }
 
+  if (bucket.type === "golden_output_drift") {
+    return (
+      bucket.representativeItems
+        .map((item) => item.reason.match(/^assertion failed:\s+(.+)$/)?.[1] ?? item.reason)
+        .find(Boolean) ?? anchor.label.split("::")[1]?.trim() ?? null
+    );
+  }
+
   if (bucket.reason.startsWith("unknown ")) {
     return anchor.reason;
   }
@@ -1449,6 +1582,7 @@ function buildConcreteNextNote(args: {
   nextBestAction: TestStatusDiagnoseContract["next_best_action"];
   readTargets: TestStatusReadTarget[];
   hasSecondaryVisibleBucket: boolean;
+  remainingMode: TestStatusRemainingModeValue;
 }): string {
   const primaryTarget =
     args.readTargets.find((target) => target.bucket_index === args.nextBestAction.bucket_index) ??
@@ -1466,6 +1600,14 @@ function buildConcreteNextNote(args: {
         : `Read ${formatReadTargetLocation(primaryTarget)} first; ${primaryTarget.why}.`;
 
   if (args.nextBestAction.code === "fix_dominant_blocker") {
+    if (args.remainingMode === "subset_rerun") {
+      return "Fix the remaining bucket first, then refresh the full-suite truth with sift rerun.";
+    }
+
+    if (args.remainingMode === "full_rerun_diff") {
+      return "Fix the remaining bucket first. The cached full-suite baseline is still preserved; use sift rerun when you want to refresh it.";
+    }
+
     if (
       args.nextBestAction.bucket_index === 1 &&
       args.hasSecondaryVisibleBucket
@@ -1477,13 +1619,30 @@ function buildConcreteNextNote(args: {
   }
 
   if (args.nextBestAction.code === "read_source_for_bucket") {
+    if (args.remainingMode === "subset_rerun") {
+      return "Fix the remaining bucket first, then refresh the full-suite truth with sift rerun.";
+    }
+
+    if (args.remainingMode === "full_rerun_diff") {
+      return "Fix the remaining bucket first. The cached full-suite baseline is still preserved; use sift rerun when you want to refresh it.";
+    }
+
     return lead;
   }
 
   if (args.nextBestAction.code === "insufficient_signal") {
-    if (args.nextBestAction.note.startsWith("Provider follow-up failed")) {
+    if (args.nextBestAction.note.startsWith("Provider follow-up")) {
       return args.nextBestAction.note;
     }
+
+    if (args.remainingMode === "subset_rerun") {
+      return "Fix the remaining bucket first, then refresh the full-suite truth with sift rerun.";
+    }
+
+    if (args.remainingMode === "full_rerun_diff") {
+      return "Fix the remaining bucket first. The cached full-suite baseline is still preserved; use sift rerun when you want to refresh it.";
+    }
+
     return `${lead} Then take one deeper sift pass before raw traceback.`;
   }
 
@@ -1822,18 +1981,37 @@ function buildDecisionLine(contract: TestStatusDiagnoseContract): string {
   return "- Decision: raw only if exact traceback is required.";
 }
 
+function buildRemainingPassLine(contract: TestStatusDiagnoseContract): string | null {
+  if (contract.remaining_mode === "subset_rerun") {
+    return "- Remaining pass: showing only what is still failing from the cached baseline.";
+  }
+
+  if (contract.remaining_mode === "full_rerun_diff") {
+    return "- Remaining pass: full rerun analyzed against the cached baseline because narrowed rerun is not available for this runner.";
+  }
+
+  return null;
+}
+
 function buildComparisonLines(contract: TestStatusDiagnoseContract): string[] {
   const lines: string[] = [];
+  const resolvedSummary = buildTestTargetSummary(contract.resolved_tests);
+  const remainingSummary = buildTestTargetSummary(contract.remaining_tests);
 
   if (contract.resolved_tests.length > 0) {
+    const summaryText = describeTargetSummary(resolvedSummary);
     lines.push(
-      `- Resolved in this rerun: ${formatCount(contract.resolved_tests.length, "test")} dropped out of the failing set.`
+      `- Resolved in this rerun: ${formatCount(contract.resolved_tests.length, "test")} dropped out of the failing set${summaryText ? ` ${summaryText}` : ""}.`
     );
   }
 
-  if (contract.resolved_tests.length > 0 && contract.remaining_tests.length > 0) {
+  if (
+    contract.remaining_tests.length > 0 &&
+    (contract.resolved_tests.length > 0 || contract.remaining_mode !== "none")
+  ) {
+    const summaryText = describeTargetSummary(remainingSummary);
     lines.push(
-      `- Remaining failing targets: ${formatCount(contract.remaining_tests.length, "test/module", "tests/modules")}.`
+      `- Remaining failing targets: ${formatCount(contract.remaining_tests.length, "test/module", "tests/modules")}${summaryText ? ` ${summaryText}` : ""}.`
     );
   }
 
@@ -1944,6 +2122,14 @@ function deriveBucketSuspectKind(args: {
   bucket: GenericBucket;
   readTarget?: TestStatusReadTarget;
 }): TestStatusSuspectKind {
+  const pathCandidates = extractBucketPathCandidates({
+    bucket: args.bucket,
+    readTarget: args.readTarget
+  });
+  const hasConfigCandidate = pathCandidates.some((candidate) => isConfigPathCandidate(candidate));
+  const hasAppCandidate = pathCandidates.some((candidate) => isAppPathCandidate(candidate));
+  const hasTestCandidate = pathCandidates.some((candidate) => isTestPathCandidate(candidate));
+
   if (
     args.bucket.type === "shared_environment_blocker" ||
     args.bucket.type === "fixture_guard_failure" ||
@@ -1979,6 +2165,19 @@ function deriveBucketSuspectKind(args: {
     return "test";
   }
 
+  if (args.bucket.type === "golden_output_drift") {
+    if (hasConfigCandidate) {
+      return "config";
+    }
+    if (hasAppCandidate) {
+      return "app_code";
+    }
+    if (hasTestCandidate) {
+      return "test";
+    }
+    return "unknown";
+  }
+
   if (
     args.bucket.type === "xdist_worker_crash" ||
     args.bucket.type === "timeout_failure" ||
@@ -2001,11 +2200,13 @@ function deriveBucketSuspectKind(args: {
     args.bucket.type === "type_error_failure" ||
     args.bucket.type === "serialization_encoding_failure"
   ) {
-    const file = args.readTarget?.file ?? "";
-    if (file.startsWith("src/")) {
+    if (hasConfigCandidate) {
+      return "config";
+    }
+    if (hasAppCandidate) {
       return "app_code";
     }
-    if (file.startsWith("test/") || file.startsWith("tests/")) {
+    if (hasTestCandidate) {
       return "test";
     }
     return "unknown";
@@ -2090,6 +2291,10 @@ function renderStandard(args: {
   buckets: GenericBucket[];
 }): string {
   const lines = [...buildOutcomeLines(args.analysis), ...buildComparisonLines(args.contract)];
+  const remainingPassLine = buildRemainingPassLine(args.contract);
+  if (remainingPassLine) {
+    lines.push(remainingPassLine);
+  }
   if (args.contract.main_buckets.length > 0) {
     for (const bucket of args.contract.main_buckets.slice(0, 3)) {
       const rawBucket = args.buckets[bucket.bucket_index - 1];
@@ -2118,7 +2323,12 @@ function renderStandard(args: {
     }
   }
   lines.push(buildDecisionLine(args.contract));
-  lines.push(`- Likely owner: ${formatSuspectKindLabel(args.contract.primary_suspect_kind)}`);
+  if (
+    args.contract.main_buckets.length > 0 &&
+    args.contract.primary_suspect_kind !== "unknown"
+  ) {
+    lines.push(`- Likely owner: ${formatSuspectKindLabel(args.contract.primary_suspect_kind)}`);
+  }
   lines.push(`- Next: ${args.contract.next_best_action.note}`);
   lines.push(buildStopSignal(args.contract));
 
@@ -2131,6 +2341,10 @@ function renderFocused(args: {
   buckets: GenericBucket[];
 }): string {
   const lines = [...buildOutcomeLines(args.analysis), ...buildComparisonLines(args.contract)];
+  const remainingPassLine = buildRemainingPassLine(args.contract);
+  if (remainingPassLine) {
+    lines.push(remainingPassLine);
+  }
 
   for (const bucket of args.contract.main_buckets) {
     const rawBucket = args.buckets[bucket.bucket_index - 1];
@@ -2159,6 +2373,10 @@ function renderVerbose(args: {
   buckets: GenericBucket[];
 }): string {
   const lines = [...buildOutcomeLines(args.analysis), ...buildComparisonLines(args.contract)];
+  const remainingPassLine = buildRemainingPassLine(args.contract);
+  if (remainingPassLine) {
+    lines.push(remainingPassLine);
+  }
 
   for (const bucket of args.contract.main_buckets) {
     const rawBucket = args.buckets[bucket.bucket_index - 1];
@@ -2189,6 +2407,7 @@ export function buildTestStatusDiagnoseContract(args: {
   analysis: TestStatusAnalysis;
   resolvedTests?: string[];
   remainingTests?: string[];
+  remainingMode?: TestStatusRemainingModeValue;
   providerBucketSupplements?: TestStatusProviderSupplement["bucket_supplements"];
   contractOverrides?: TestStatusContractOverrides;
 }): TestStatusDecision {
@@ -2226,7 +2445,9 @@ export function buildTestStatusDiagnoseContract(args: {
           count: residuals.remainingFailed
         })
       ].filter((bucket): bucket is GenericBucket => Boolean(bucket));
-  const buckets = prioritizeBuckets([...combinedBuckets, ...unknownBuckets]).slice(0, 3);
+  const buckets = prioritizeBuckets(
+    [...combinedBuckets, ...unknownBuckets].map((bucket) => specializeBucket(bucket))
+  ).slice(0, 3);
   const simpleCollectionFailure =
     args.analysis.collectionErrorCount !== undefined &&
     args.analysis.collectionItems.length === 0 &&
@@ -2377,6 +2598,7 @@ export function buildTestStatusDiagnoseContract(args: {
     read_raw_only_if: rawNeeded
       ? "you still need exact traceback lines after focused or verbose detail"
       : null,
+    remaining_mode: args.remainingMode ?? "none",
     dominant_blocker_bucket_index: dominantBlockerBucketIndex,
     primary_suspect_kind: primarySuspectKind,
     confidence_reason: "Unknown or low-confidence buckets remain; one deeper sift pass is justified.",
@@ -2411,7 +2633,8 @@ export function buildTestStatusDiagnoseContract(args: {
         readTargets,
         hasSecondaryVisibleBucket: mainBuckets.some(
           (bucket) => bucket.secondary_visible_despite_blocker
-        )
+        ),
+        remainingMode: args.contractOverrides?.remaining_mode ?? baseContract.remaining_mode
       })
     }
   };
@@ -2497,6 +2720,7 @@ export function buildTestStatusAnalysisContext(args: {
     `- diagnosis_complete=${args.contract.diagnosis_complete}`,
     `- raw_needed=${args.contract.raw_needed}`,
     `- decision=${args.contract.decision}`,
+    `- remaining_mode=${args.contract.remaining_mode}`,
     `- provider_used=${args.contract.provider_used}`,
     `- provider_failed=${args.contract.provider_failed}`,
     `- raw_slice_strategy=${args.contract.raw_slice_strategy}`,

@@ -1,0 +1,313 @@
+
+ RUN  v3.2.4 <repo>
+
+ ❯ test/release.workflow.test.ts (4 tests | 2 failed) 10ms
+   ✓ release workflow > declares GitHub and npm metadata in package.json 1ms
+   × release workflow > enforces measured coverage in vitest and CI 5ms
+     → expected 'name: ci\n\non:\n  push:\n  pull_requ…' to contain 'node-version: [20]'
+   ✓ release workflow > ignores local secrets and machine-local artifacts 0ms
+   × release workflow > defines a manual trusted-publishing release workflow with tag and GitHub release creation 3ms
+     → expected 'name: release\nrun-name: release ${{ …' to contain 'node-version: 20'
+ ❯ test/exec.smoke.test.ts (38 tests | 3 failed) 11473ms
+   ✓ exec mode > runs against the native openai provider  396ms
+   ✓ exec mode > runs a freeform command and reduces its output  310ms
+   ✓ exec mode > accepts provider credentials from environment variables 285ms
+   ✓ exec mode > does not use OPENAI_API_KEY for unknown openai-compatible endpoints 274ms
+   ✓ exec mode > supports dry-run mode without calling the provider 250ms
+   ✓ exec mode > prints captured raw output to stderr when --show-raw is set 300ms
+   ✓ exec mode > shows raw output on stderr and dry-run JSON on stdout 278ms
+   ✓ exec mode > preserves a failing child exit code for preset exec mode 281ms
+   ✓ exec mode > supports shell mode for preset exec flows 213ms
+   × exec mode > uses a local summary for obvious pytest success output 204ms
+     → expected '- Tests passed.\n- 12 tests, 1 skip.\…' to be '- Tests passed.\n- 12 tests, 1 skip.\…' // Object.is equality
+   × exec mode > uses a local summary for pytest collection errors 190ms
+     → expected '- Tests did not complete.\n- 134 erro…' to be '- Tests did not complete.\n- 134 erro…' // Object.is equality
+   × exec mode > groups repeated import-time root causes for collection failures 254ms
+     → expected '- Tests did not complete.\n- 114 erro…' to be '- Tests did not complete.\n- 114 erro…' // Object.is equality
+   ✓ exec mode > supports focused test-status output for visible collection failures 248ms
+   ✓ exec mode > supports verbose test-status output for visible collection failures 243ms
+   ✓ exec mode > reuses the cached test-status run during escalate without rerunning the child command  633ms
+   ✓ exec mode > prepends matching diff output for cached test-status reruns  542ms
+   ✓ exec mode > reruns the remaining pytest subset without replacing the cached full-suite truth  886ms
+   ✓ exec mode > returns summary-first diagnose JSON by default and keeps full pytest ids opt-in  690ms
+   ✓ exec mode > treats standard as the default detail level for test-status 287ms
+   ✓ exec mode > explains insufficient test-status output after a successful command 296ms
+   ✓ exec mode > explains insufficient test-status output after a failing command 282ms
+   ✓ exec mode > returns exit 1 for infra-risk fail verdicts when --fail-on is enabled 216ms
+   ✓ exec mode > returns exit 0 for infra-risk pass verdicts when --fail-on is enabled 211ms
+   ✓ exec mode > returns exit 1 for audit-critical findings when --fail-on is enabled 230ms
+   ✓ exec mode > returns exit 0 for empty audit-critical findings when --fail-on is enabled 298ms
+   ✓ exec mode > skips gate evaluation in dry-run mode 195ms
+   ✓ exec mode > keeps the original failing child exit code when --fail-on is enabled 204ms
+   ✓ exec mode > fails clearly when --fail-on is used with unsupported presets 191ms
+   ✓ exec mode > fails clearly when --detail is used with unsupported presets 202ms
+   ✓ exec mode > fails clearly when --fail-on is used with freeform questions 181ms
+   ✓ exec mode > fails clearly when --detail is used with freeform questions 191ms
+   ✓ exec mode > fails clearly when --fail-on is used with a non-default preset format 190ms
+   ✓ exec mode > supports typecheck-summary preset exec flows 244ms
+   ✓ exec mode > returns a short success answer for silent typecheck success 242ms
+   ✓ exec mode > supports lint-failures preset exec flows 244ms
+   ✓ exec mode > keeps the child exit code when reduction falls back  600ms
+   ✓ exec mode > bypasses reduction for interactive prompt-like output  306ms
+   ✓ exec mode > rejects the old exec preset syntax with a clear error 181ms
+
+ ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/exec.smoke.test.ts > exec mode > uses a local summary for obvious pytest success output
+ AssertionError: expected '- Tests passed.\n- 12 tests, 1 skip.\…' to be '- Tests passed.\n- 12 tests, 1 skip.\…' // Object.is equality
+
+ - Expected
+ + Received
+
+   - Tests passed.
+   - 12 tests, 1 skip.
+   - Decision: stop and act. Do not escalate unless you need exact traceback lines.
+ + - Likely owner: unknown
+   - Next: No failing buckets remain.
+   - Stop signal: diagnosis complete; raw not needed.
+
+ ❯ test/exec.smoke.test.ts:318:34
+     316| 
+     317|     expect(result.status).toBe(0);
+     318|     expect(result.stdout.trim()).toBe(
+        |                                  ^
+     319|       [
+     320|         "- Tests passed.",
+
+ FAIL  test/exec.smoke.test.ts > exec mode > uses a local summary for pytest collection errors
+ AssertionError: expected '- Tests did not complete.\n- 134 erro…' to be '- Tests did not complete.\n- 134 erro…' // Object.is equality
+
+ - Expected
+ + Received
+
+   - Tests did not complete.
+   - 134 errors occurred during collection.
+   - Decision: read source next. Do not escalate unless exact traceback lines are still needed.
+ + - Likely owner: unknown
+   - Next: Inspect the collection traceback or setup code next; the run failed before tests executed.
+   - Stop signal: diagnosis complete; raw not needed.
+
+ ❯ test/exec.smoke.test.ts:342:34
+     340| 
+     341|     expect(result.status).toBe(2);
+     342|     expect(result.stdout.trim()).toBe(
+        |                                  ^
+     343|       [
+     344|         "- Tests did not complete.",
+
+ FAIL  test/exec.smoke.test.ts > exec mode > groups repeated import-time root causes for collection failures
+ AssertionError: expected '- Tests did not complete.\n- 114 erro…' to be '- Tests did not complete.\n- 114 erro…' // Object.is equality
+
+ - Expected
+ + Received
+
+ @@ -2,7 +2,8 @@
+   - 114 errors occurred during collection.
+   - Import/dependency blocker: 114 errors are caused by missing dependencies during test collection.
+   - Anchor: /tmp/tests/unit/test_api.py
+   - Fix: Install the missing dependencies and rerun the affected tests.
+   - Decision: stop and act. Do not escalate unless you need exact traceback lines.
+ + - Likely owner: test or project configuration
+   - Next: Fix bucket 1 first, then rerun the full suite at standard.
+   - Stop signal: diagnosis complete; raw not needed.
+
+ ❯ test/exec.smoke.test.ts:385:34
+     383| 
+     384|     expect(result.status).toBe(2);
+     385|     expect(result.stdout.trim()).toBe(
+        |                                  ^
+     386|       [
+     387|         "- Tests did not complete.",
+
+ FAIL  test/release.workflow.test.ts > release workflow > enforces measured coverage in vitest and CI
+ AssertionError: expected 'name: ci\n\non:\n  push:\n  pull_requ…' to contain 'node-version: [20]'
+
+ - Expected
+ + Received
+
+ - node-version: [20]
+ + name: ci
+ +
+ + on:
+ +   push:
+ +   pull_request:
+ +
+ + jobs:
+ +   test:
+ +     runs-on: ubuntu-latest
+ +     strategy:
+ +       matrix:
+ +         node-version: [20, 24]
+ +
+ +     steps:
+ +       - uses: actions/checkout@v4
+ +
+ +       - uses: actions/setup-node@v4
+ +         with:
+ +           node-version: ${{ matrix.node-version }}
+ +           cache: npm
+ +
+ +       - run: npm ci
+ +       - run: npm run typecheck
+ +       - run: npm run test:coverage
+ +       - run: npm run build
+ +       - run: npm pack
+ +
+ ❯ test/release.workflow.test.ts:46:24
+      44|     expect(ciWorkflow).toContain("npm run test:coverage");
+      45|     expect(ciWorkflow).toContain("matrix:");
+      46|     expect(ciWorkflow).toContain("node-version: [20]");
+        |                        ^
+      47|     expect(ciWorkflow).toContain("node-version: ${{ matrix.node-versio…
+      48|   });
+
+ FAIL  test/release.workflow.test.ts > release workflow > defines a manual trusted-publishing release workflow with tag and GitHub release creation
+ AssertionError: expected 'name: release\nrun-name: release ${{ …' to contain 'node-version: 20'
+
+ - Expected
+ + Received
+
+ - node-version: 20
+ + name: release
+ + run-name: release ${{ inputs.version || github.ref_name }}
+ +
+ + on:
+ +   workflow_dispatch:
+ +     inputs:
+ +       version:
+ +         description: Package version being released, for example 0.3.2
+ +         required: true
+ +         type: string
+ +
+ + jobs:
+ +   publish:
+ +     runs-on: ubuntu-latest
+ +     environment: release
+ +     permissions:
+ +       actions: read
+ +       contents: write
+ +       id-token: write
+ +     steps:
+ +       - uses: actions/checkout@v4
+ +         with:
+ +           fetch-depth: 0
+ +
+ +       - uses: actions/setup-node@v4
+ +         with:
+ +           node-version: 24
+ +           registry-url: "https://registry.npmjs.org"
+ +           cache: npm
+ +
+ +       - name: Read package metadata
+ +         id: pkg
+ +         run: |
+ +           NAME="$(node -e "console.log(require('./package.json').name)")"
+ +           VERSION="$(node -e "console.log(require('./package.json').version)")"
+ +           echo "name=$NAME" >> "$GITHUB_OUTPUT"
+ +           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+ +           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+ +
+ +       - name: Validate requested release version
+ +         run: |
+ +           if [ "${{ inputs.version }}" != "${{ steps.pkg.outputs.version }}" ]; then
+ +             echo "workflow_dispatch input version (${{ inputs.version }}) must match package.json version (${{ steps.pkg.outputs.version }})" >&2
+ +             exit 1
+ +           fi
+ +
+ +       - name: Require successful CI for this commit
+ +         env:
+ +           GITHUB_TOKEN: ${{ github.token }}
+ +         run: |
+ +           CONCLUSION="$(gh api "/repos/${{ github.repository }}/actions/workflows/ci.yml/runs?head_sha=${{ github.sha }}&event=push&status=completed&per_page=1" --jq '.workflow_runs[0].conclusion // ""')"
+ +           if [ "$CONCLUSION" != "success" ]; then
+ +             echo "CI must pass on this exact commit before release. Current conclusion: ${CONCLUSION:-missing}" >&2
+ +             exit 1
+ +           fi
+ +
+ +       - name: Fail if release tag already exists
+ +         run: |
+ +           git fetch --tags --force
+ +           if git rev-parse "${{ steps.pkg.outputs.tag }}" >/dev/null 2>&1; then
+ +             echo "Tag already exists: ${{ steps.pkg.outputs.tag }}" >&2
+ +             exit 1
+ +           fi
+ +
+ +       - name: Fail if npm version already exists
+ +         run: |
+ +           if npm view "${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }}" version >/dev/null 2>&1; then
+ +             echo "npm version already exists: ${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }}" >&2
+ +             exit 1
+ +           fi
+ +
+ +       - name: Install dependencies
+ +         run: npm ci
+ +
+ +       - name: Typecheck
+ +         run: npm run typecheck
+ +
+ +       - name: Test
+ +         run: npm test
+ +
+ +       - name: Build
+ +         run: npm run build
+ +
+ +       - name: Pack
+ +         id: pack
+ +         run: |
+ +           echo "tarball=$(npm pack | tail -n 1)" >> "$GITHUB_OUTPUT"
+ +
+ +       - name: Smoke install tarball
+ +         run: |
+ +           TMP_DIR="$(mktemp -d)"
+ +           cp "${{ steps.pack.outputs.tarball }}" "$TMP_DIR/"
+ +           cd "$TMP_DIR"
+ +           npm init -y >/dev/null 2>&1
+ +           npm install "./${{ steps.pack.outputs.tarball }}" >/dev/null 2>&1
+ +           npx --no-install sift --help >/dev/null
+ +           npx --no-install sift exec "did tests pass?" --dry-run -- node -e "console.log('12 passed')" >/dev/null
+ +
+ +       - name: Publish to npm
+ +         run: npm publish --access public --provenance
+ +
+ +       - name: Create and push git tag
+ +         run: |
+ +           git config user.name "github-actions[bot]"
+ +           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+ +           git tag -a "${{ steps.pkg.outputs.tag }}" -m "sift ${{ steps.pkg.outputs.tag }}"
+ +           git push origin "${{ steps.pkg.outputs.tag }}"
+ +
+ +       - name: Create GitHub release
+ +         env:
+ +           GITHUB_TOKEN: ${{ github.token }}
+ +         run: |
+ +           NOTES_FILE=""
+ +           if [ -f "release-notes/${{ steps.pkg.outputs.tag }}.md" ]; then
+ +             NOTES_FILE="release-notes/${{ steps.pkg.outputs.tag }}.md"
+ +           elif [ -f "release-notes/${{ steps.pkg.outputs.version }}.md" ]; then
+ +             NOTES_FILE="release-notes/${{ steps.pkg.outputs.version }}.md"
+ +           fi
+ +
+ +           if [ -n "$NOTES_FILE" ]; then
+ +             echo "Using release notes from $NOTES_FILE"
+ +             gh release create "${{ steps.pkg.outputs.tag }}" \
+ +               --title "${{ steps.pkg.outputs.tag }}" \
+ +               --notes-file "$NOTES_FILE"
+ +           else
+ +             echo "No versioned release notes file found; falling back to generated notes."
+ +             gh release create "${{ steps.pkg.outputs.tag }}" \
+ +               --title "${{ steps.pkg.outputs.tag }}" \
+ +               --generate-notes
+ +           fi
+ +
+ ❯ test/release.workflow.test.ts:71:22
+      69|     expect(workflow).toContain("Package version being released");
+      70|     expect(workflow).toContain("registry-url: \"https://registry.npmjs…
+      71|     expect(workflow).toContain("node-version: 20");
+        |                      ^
+      72|     expect(workflow).toContain("environment: release");
+      73|     expect(workflow).toContain("Validate requested release version");
+
+ Test Files  2 failed (2)
+      Tests  5 failed | 37 passed (42)
+   Start at  14:12:57
+   Duration  14.43s (transform 71ms, setup 0ms, collect 83ms, tests 11.48s, environment 0ms, prepare 111ms)

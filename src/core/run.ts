@@ -241,10 +241,66 @@ function hasRecognizableTestStatusSignal(input: string): boolean {
   );
 }
 
+function shouldUseCompactTestStatusBypass(args: {
+  request: RunRequest;
+  analysis: ReturnType<typeof analyzeTestStatus>;
+}): boolean {
+  if (args.request.policyName !== "test-status") {
+    return false;
+  }
+
+  if (args.request.detail && args.request.detail !== "standard") {
+    return false;
+  }
+
+  if (args.request.goal === "diagnose" && args.request.format === "json") {
+    return false;
+  }
+
+  if (
+    args.request.testStatusContext?.resolvedTests?.length ||
+    args.request.testStatusContext?.remainingTests?.length ||
+    args.request.testStatusContext?.remainingSubsetAvailable ||
+    (args.request.testStatusContext?.remainingMode &&
+      args.request.testStatusContext.remainingMode !== "none")
+  ) {
+    return false;
+  }
+
+  return (
+    (args.analysis.failed === 0 && args.analysis.errors === 0 && args.analysis.passed > 0) ||
+    (args.analysis.collectionErrorCount !== undefined &&
+      args.analysis.collectionItems.length === 0 &&
+      args.analysis.inlineItems.length === 0 &&
+      args.analysis.buckets.length === 0) ||
+    args.analysis.noTestsCollected ||
+    (args.analysis.interrupted && args.analysis.failed === 0 && args.analysis.errors === 0)
+  );
+}
+
+function sanitizeProviderFailureReason(reason: string): string {
+  const normalized = reason.trim();
+  const httpStatus = normalized.match(/\bHTTP\s+(\d{3})\b/i)?.[1];
+  if (httpStatus) {
+    return `provider follow-up unavailable (HTTP ${httpStatus})`;
+  }
+
+  if (
+    /unterminated string|invalid json|unexpected token|json at position|schema|zod|parse/i.test(
+      normalized
+    )
+  ) {
+    return "provider follow-up returned unusable structured output";
+  }
+
+  return "provider follow-up failed";
+}
+
 function buildTestStatusFallbackContract(args: {
   contract: TestStatusDiagnoseContract;
   reason: string;
 }): string {
+  const sanitizedReason = sanitizeProviderFailureReason(args.reason);
   return JSON.stringify(
     {
       ...args.contract,
@@ -257,7 +313,9 @@ function buildTestStatusFallbackContract(args: {
         code: "read_raw_for_exact_traceback",
         bucket_index:
           args.contract.dominant_blocker_bucket_index ?? args.contract.main_buckets[0]?.bucket_index ?? null,
-        note: `Provider follow-up failed (${args.reason}). Use focused or verbose detail, then raw only if exact traceback lines are still needed.`
+        note: `${sanitizedReason[0]!.toUpperCase()}${sanitizedReason.slice(
+          1
+        )}. Use focused or verbose detail, then raw only if exact traceback lines are still needed.`
       }
     },
     null,
@@ -301,6 +359,7 @@ function buildTestStatusProviderFailureDecision(args: {
   rawSliceUsed: boolean;
   rawSliceStrategy: ReturnType<typeof buildTestStatusRawSlice>["strategy"];
 }): ReturnType<typeof buildTestStatusDiagnoseContract> {
+  const sanitizedReason = sanitizeProviderFailureReason(args.reason);
   const concreteReadTarget = args.baseDecision.contract.read_targets.find((target) =>
     Boolean(target.file)
   );
@@ -313,6 +372,7 @@ function buildTestStatusProviderFailureDecision(args: {
       analysis: args.analysis,
       resolvedTests: args.baseDecision.contract.resolved_tests,
       remainingTests: args.baseDecision.contract.remaining_tests,
+      remainingMode: args.request.testStatusContext?.remainingMode,
       contractOverrides: {
         ...args.baseDecision.contract,
         diagnosis_complete: false,
@@ -330,7 +390,9 @@ function buildTestStatusProviderFailureDecision(args: {
           bucket_index:
             args.baseDecision.contract.dominant_blocker_bucket_index ??
             concreteReadTarget.bucket_index,
-          note: `Provider follow-up failed (${args.reason}). The heuristic anchor is concrete enough to inspect source for the current bucket before reading raw traceback.`
+          note: `${sanitizedReason[0]!.toUpperCase()}${sanitizedReason.slice(
+            1
+          )}. The heuristic anchor is concrete enough to inspect source for the current bucket before reading raw traceback.`
         }
       }
     });
@@ -343,6 +405,7 @@ function buildTestStatusProviderFailureDecision(args: {
     analysis: args.analysis,
     resolvedTests: args.baseDecision.contract.resolved_tests,
     remainingTests: args.baseDecision.contract.remaining_tests,
+    remainingMode: args.request.testStatusContext?.remainingMode,
     contractOverrides: {
       ...args.baseDecision.contract,
       diagnosis_complete: false,
@@ -364,8 +427,12 @@ function buildTestStatusProviderFailureDecision(args: {
           args.baseDecision.contract.main_buckets[0]?.bucket_index ??
           null,
         note: shouldZoomFirst
-          ? `Provider follow-up failed (${args.reason}). Use one deeper sift pass on the same cached output before reading raw traceback lines.`
-          : `Provider follow-up failed (${args.reason}). Read raw traceback only if exact stack lines are still needed.`
+          ? `${sanitizedReason[0]!.toUpperCase()}${sanitizedReason.slice(
+              1
+            )}. Use one deeper sift pass on the same cached output before reading raw traceback lines.`
+          : `${sanitizedReason[0]!.toUpperCase()}${sanitizedReason.slice(
+              1
+            )}. Read raw traceback only if exact stack lines are still needed.`
       }
     }
   });
@@ -388,13 +455,21 @@ async function runSiftCore(request: RunRequest, recorder?: RunStatsRecorder): Pr
   const hasTestStatusSignal =
     request.policyName === "test-status" && hasRecognizableTestStatusSignal(heuristicInput);
   const testStatusAnalysis = hasTestStatusSignal ? analyzeTestStatus(heuristicInput) : null;
-  const testStatusDecision =
+  const useCompactTestStatusOutput =
     hasTestStatusSignal && testStatusAnalysis
+      ? shouldUseCompactTestStatusBypass({
+          request,
+          analysis: testStatusAnalysis
+        })
+      : false;
+  const testStatusDecision =
+    hasTestStatusSignal && testStatusAnalysis && !useCompactTestStatusOutput
       ? buildTestStatusDiagnoseContract({
           input: heuristicInput,
           analysis: testStatusAnalysis,
           resolvedTests: request.testStatusContext?.resolvedTests,
-          remainingTests: request.testStatusContext?.remainingTests
+          remainingTests: request.testStatusContext?.remainingTests,
+          remainingMode: request.testStatusContext?.remainingMode
         })
       : null;
   const testStatusHeuristicOutput = testStatusDecision
@@ -402,7 +477,9 @@ async function runSiftCore(request: RunRequest, recorder?: RunStatsRecorder): Pr
         request,
         decision: testStatusDecision
       })
-    : null;
+    : useCompactTestStatusOutput
+      ? applyHeuristicPolicy("test-status", heuristicInput, "standard")
+      : null;
 
   if (request.config.runtime.verbose) {
     process.stderr.write(
@@ -412,9 +489,11 @@ async function runSiftCore(request: RunRequest, recorder?: RunStatsRecorder): Pr
 
   const heuristicOutput =
     request.policyName === "test-status"
-      ? testStatusDecision?.contract.diagnosis_complete
+      ? useCompactTestStatusOutput
         ? testStatusHeuristicOutput
-        : null
+        : testStatusDecision?.contract.diagnosis_complete
+          ? testStatusHeuristicOutput
+          : null
       : applyHeuristicPolicy(request.policyName, heuristicInput, request.detail);
 
   if (heuristicOutput) {
@@ -557,6 +636,7 @@ async function runSiftCore(request: RunRequest, recorder?: RunStatsRecorder): Pr
         analysis: testStatusAnalysis,
         resolvedTests: request.testStatusContext?.resolvedTests,
         remainingTests: request.testStatusContext?.remainingTests,
+        remainingMode: request.testStatusContext?.remainingMode,
         providerBucketSupplements: supplement.bucket_supplements,
         contractOverrides: {
           diagnosis_complete: supplement.diagnosis_complete,

@@ -1,0 +1,168 @@
+
+ RUN  v3.2.4 <repo>
+
+ ❯ test/heuristics.unit.test.ts (107 tests | 2 failed) 77ms
+   ✓ heuristic policies > returns null when no policy is active 1ms
+   ✓ heuristic policies > keeps simple success and no-test summaries short 3ms
+   ✓ heuristic policies > renders a decision-complete standard summary for mixed blockers and drift 16ms
+   ✓ heuristic policies > keeps focused and verbose output monotonic while adding evidence depth 1ms
+   ✓ heuristic policies > keeps collection-time import blockers grouped and actionable 1ms
+   ✓ heuristic policies > classifies service, db, fixture, and auth setup failures into first-class buckets 1ms
+   ✓ heuristic policies > classifies timeout via direct helper 0ms
+   ✓ heuristic policies > classifies permission denied via direct helper 0ms
+   ✓ heuristic policies > classifies async event loop via direct helper 0ms
+   ✓ heuristic policies > classifies fixture teardown via direct helper 0ms
+   ✓ heuristic policies > classifies db migration via direct helper 0ms
+   ✓ heuristic policies > classifies configuration via direct helper 0ms
+   ✓ heuristic policies > classifies xdist worker crash via direct helper 0ms
+   ✓ heuristic policies > classifies type error via direct helper 0ms
+   ✓ heuristic policies > classifies resource leak via direct helper 0ms
+   ✓ heuristic policies > classifies django db access via direct helper 0ms
+   ✓ heuristic policies > classifies network via direct helper 0ms
+   ✓ heuristic policies > classifies segfault via direct helper 0ms
+   ✓ heuristic policies > classifies flaky via direct helper 0ms
+   ✓ heuristic policies > classifies serialization via direct helper 0ms
+   ✓ heuristic policies > classifies file not found via direct helper 0ms
+   ✓ heuristic policies > classifies memory via direct helper 0ms
+   ✓ heuristic policies > classifies deprecation as error via direct helper 0ms
+   ✓ heuristic policies > classifies strict xfail via direct helper 0ms
+   ✓ heuristic policies > classifies snapshot mismatch via direct helper 0ms
+   ✓ heuristic policies > classifies vitest timeout via direct helper 0ms
+   ✓ heuristic policies > classifies resolve import via direct helper 0ms
+   ✓ heuristic policies > classifies err module not found via direct helper 0ms
+   ✓ heuristic policies > classifies esm commonjs mismatch via direct helper 0ms
+   ✓ heuristic policies > classifies worker exited unexpectedly via direct helper 0ms
+   ✓ heuristic policies > classifies worker memory limit via direct helper 0ms
+   ✓ heuristic policies > classifies vitest unhandled via direct helper 0ms
+   ✓ heuristic policies > classifies localStorage unavailable via direct helper 0ms
+   ✓ heuristic policies > classifies failed to load config via direct helper 0ms
+   ✓ heuristic policies > classifies timeout through the diagnose pipeline 1ms
+   ✓ heuristic policies > classifies permission denied through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies async event loop through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies fixture teardown through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies db migration through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies configuration through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies xdist worker crash through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies type error through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies resource leak through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies django db access through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies network through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies segfault through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies flaky through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies serialization through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies file not found through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies memory through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies deprecation as error through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies strict xfail through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies vitest snapshot mismatch through the diagnose pipeline 4ms
+   ✓ heuristic policies > classifies vitest import blocker through the diagnose pipeline 1ms
+   ✓ heuristic policies > classifies vitest worker crash through the diagnose pipeline 0ms
+   ✓ heuristic policies > classifies jest snapshot mismatch through the diagnose pipeline 0ms
+   ✓ heuristic policies > renders bucket-specific titles for new runtime families in standard output 0ms
+   ✓ heuristic policies > keeps tier 1 bucket ordering from stealing existing env and service buckets 0ms
+   ✓ heuristic policies > keeps tier 2 bucket ordering from stealing import and fixture buckets 0ms
+   ✓ heuristic policies > keeps tier 3 bucket ordering from stealing assertion buckets 0ms
+   ✓ heuristic policies > detects generic env blockers beyond repo-specific literals 0ms
+   ✓ heuristic policies > adds conservative unknown buckets when visible counts are not fully explained 0ms
+   ✓ heuristic policies > maps setup override failures into configuration errors without changing generic type-error behavior 1ms
+   ✓ heuristic policies > classifies property-setter setup failures as configuration errors 0ms
+   ✓ heuristic policies > shows the first concrete signal for unknown buckets in every text detail 1ms
+   ✓ heuristic policies > surfaces failed-item anchors when unknown failed buckets have a concrete inline reason 0ms
+   ✓ heuristic policies > classifies matcher assertions, network resets, and setup oserrors into actionable buckets 0ms
+   ✓ heuristic policies > groups matcher assertions and network resets into deterministic buckets 1ms
+   ✓ heuristic policies > treats small low-confidence concrete suites as complete once the bucket is anchored 0ms
+   ✓ heuristic policies > detects vitest and jest runners through analyzeTestStatus 0ms
+   ✓ heuristic policies > parses vitest and jest summary counts 0ms
+   ✓ heuristic policies > extracts vitest anchors and snapshot mismatch buckets 0ms
+   ✓ heuristic policies > creates a dedicated vitest import blocker bucket 0ms
+   ✓ heuristic policies > parses mixed vitest failures into multiple buckets 0ms
+   ✓ heuristic policies > keeps generic snapshot mismatches out of contract drift buckets 1ms
+   ✓ heuristic policies > parses mixed jest failures into configuration and snapshot buckets 0ms
+   × heuristic policies > builds a structured diagnose contract with dominant blocker and remaining tests 8ms
+     → expected { bucket_index: 1, …(11) } to match object { bucket_index: 1, …(4) }
+ (7 matching properties omitted from actual)
+   ✓ heuristic policies > derives conservative suspect kinds for ambiguous runtime-style buckets 1ms
+   × heuristic policies > builds a summary-first public diagnose contract and keeps full ids opt-in 7ms
+     → expected 'Set PGTEST_POSTGRES_DSN (or pass --pg…' to be 'Set PGTEST_POSTGRES_DSN before rerunn…' // Object.is equality
+   ✓ heuristic policies > prefers observed traceback anchors for read targets without inventing line numbers 0ms
+   ✓ heuristic policies > summarizes standard TypeScript diagnostics deterministically 2ms
+   ✓ heuristic policies > parses pretty TypeScript diagnostics without echoing context lines 1ms
+   ✓ heuristic policies > keeps single TypeScript errors short and singular 0ms
+   ✓ heuristic policies > groups repeated TypeScript codes and adds an overflow summary 0ms
+   ✓ heuristic policies > handles top-level TypeScript compiler errors without inventing files 0ms
+   ✓ heuristic policies > summarizes truncated TypeScript output from parsed diagnostics 0ms
+   ✓ heuristic policies > returns explicit zero-error TypeScript success and ignores unrelated text 0ms
+   ✓ heuristic policies > summarizes stylish ESLint output with fixable hints 2ms
+   ✓ heuristic policies > summarizes errors-only ESLint output 0ms
+   ✓ heuristic policies > keeps warnings-only ESLint output non-pass and explicit 0ms
+   ✓ heuristic policies > normalizes rule-less ESLint parsing errors 0ms
+   ✓ heuristic policies > groups repeated ESLint rules and adds an overflow summary 0ms
+   ✓ heuristic policies > returns explicit zero-problem ESLint success and null for unsupported inputs 0ms
+   ✓ heuristic policies > summarizes webpack module resolution failures as brief prose 1ms
+   ✓ heuristic policies > keeps webpack loader failures brief and actionable 0ms
+   ✓ heuristic policies > summarizes esbuild resolve failures from the first error block 0ms
+   ✓ heuristic policies > handles vite-wrapped esbuild errors without surfacing the wrapper prefix 0ms
+   ✓ heuristic policies > summarizes vite import-analysis failures as module resolution errors 0ms
+   ✓ heuristic policies > summarizes cargo compiler failures with file anchors 0ms
+   ✓ heuristic policies > summarizes go compiler failures 0ms
+   ✓ heuristic policies > summarizes gcc-style compiler failures 0ms
+   ✓ heuristic policies > reuses the tsc parser for build-failure output 0ms
+   ✓ heuristic policies > falls back to wrapper-only guidance when no concrete build tool error is visible 0ms
+   ✓ heuristic policies > returns explicit build success and null for unrelated noise 0ms
+   ✓ heuristic policies > keeps only the first concrete build root cause when multiple errors are visible 0ms
+   ✓ heuristic policies > keeps audit-critical and infra-risk heuristics intact 5ms
+   ✓ heuristic policies > prefers resource headers and plan summaries for real terraform destroy logs 5ms
+ ✓ test/examples.sync.test.ts (2 tests) 145ms
+ ✓ test/test-status.showcase.test.ts (1 test) 1752ms
+   ✓ test-status showcase sync > keeps showcase manifest and docs pages aligned to benchmark output  1751ms
+ ✓ test/bench.script.test.ts (5 tests) 5371ms
+   ✓ benchmark harness > validates the synthetic fixture contract with structured completion  787ms
+   ✓ benchmark harness > validates the real fixture contract with structured completion  1485ms
+   ✓ benchmark harness > supports combined synthetic and real runs  1249ms
+   ✓ benchmark harness > can include rendered outputs and public diagnose metadata  1323ms
+   ✓ benchmark harness > reports live-session scorecards for captured agent transcripts  526ms
+
+ ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/heuristics.unit.test.ts > heuristic policies > builds a structured diagnose contract with dominant blocker and remaining tests
+ AssertionError: expected { bucket_index: 1, …(11) } to match object { bucket_index: 1, …(4) }
+ (7 matching properties omitted from actual)
+
+ - Expected
+ + Received
+
+   {
+     "bucket_index": 1,
+     "dominant": true,
+ -   "fix_hint": "Set PGTEST_POSTGRES_DSN before rerunning the affected tests.",
+ +   "fix_hint": "Set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-isolated tests.",
+     "label": "missing test env",
+     "suspect_kind": "environment",
+   }
+
+ ❯ test/heuristics.unit.test.ts:1500:47
+     1498|     expect(decision.contract.resolved_tests).toHaveLength(1);
+     1499|     expect(decision.contract.remaining_tests).toHaveLength(2);
+     1500|     expect(decision.contract.main_buckets[0]).toMatchObject({
+        |                                               ^
+     1501|       bucket_index: 1,
+     1502|       label: "missing test env",
+
+ FAIL  test/heuristics.unit.test.ts > heuristic policies > builds a summary-first public diagnose contract and keeps full ids opt-in
+ AssertionError: expected 'Set PGTEST_POSTGRES_DSN (or pass --pg…' to be 'Set PGTEST_POSTGRES_DSN before rerunn…' // Object.is equality
+
+ Expected: "Set PGTEST_POSTGRES_DSN before rerunning the affected tests."
+ Received: "Set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-isolated tests."
+
+ ❯ test/heuristics.unit.test.ts:1607:52
+     1605|       "Dominant blocker (missing test env) is anchored and actionable."
+     1606|     );
+     1607|     expect(summaryFirst.main_buckets[0]?.fix_hint).toBe(
+        |                                                    ^
+     1608|       "Set PGTEST_POSTGRES_DSN before rerunning the affected tests."
+     1609|     );
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  2 failed | 113 passed (115)
+   Start at  14:09:12
+   Duration  7.70s (transform 206ms, setup 0ms, collect 425ms, tests 7.35s, environment 0ms, prepare 218ms)

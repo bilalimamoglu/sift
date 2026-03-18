@@ -318,6 +318,7 @@ export function detectTestRunner(input: string): TestRunner {
 
   if (
     /\bpytest\b/i.test(input) ||
+    /^\s*(?:FAILED|ERROR)\s+[A-Za-z0-9_./-]+::[^\n]+$/m.test(input) ||
     /^\s*=+.*\b\d+\s+failed\b.*=+\s*$/m.test(input) ||
     /\bcollected\s+\d+\s+items\b/i.test(input)
   ) {
@@ -1881,6 +1882,7 @@ export type FailureBucketType =
   | "contract_snapshot_drift"
   | "snapshot_mismatch"
   | "import_dependency_failure"
+  | "golden_output_drift"
   | "collection_failure"
   | "assertion_failure"
   | "runtime_failure"
@@ -2088,6 +2090,10 @@ function classifyBucketTypeFromReason(reason: string): FailureBucketType {
 
   if (reason.startsWith("missing module:")) {
     return "import_dependency_failure";
+  }
+
+  if (reason.startsWith("golden output drift:")) {
+    return "golden_output_drift";
   }
 
   if (reason.startsWith("assertion failed:")) {

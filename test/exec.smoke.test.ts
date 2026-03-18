@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { getDefaultTestStatusStatePath } from "../src/constants.js";
 import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
 import { runCliAsync } from "./helpers/cli.js";
 
@@ -316,14 +317,7 @@ describe("exec mode", () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout.trim()).toBe(
-      [
-        "- Tests passed.",
-        "- 12 tests, 1 skip.",
-        "- Decision: stop and act. Do not escalate unless you need exact traceback lines.",
-        "- Likely owner: unknown",
-        "- Next: No failing buckets remain.",
-        "- Stop signal: diagnosis complete; raw not needed."
-      ].join("\n")
+      ["- Tests passed.", "- 12 tests, 1 skip."].join("\n")
     );
     expect(result.stderr).toBe("");
   });
@@ -341,14 +335,7 @@ describe("exec mode", () => {
 
     expect(result.status).toBe(2);
     expect(result.stdout.trim()).toBe(
-      [
-        "- Tests did not complete.",
-        "- 134 errors occurred during collection.",
-        "- Decision: read source next. Do not escalate unless exact traceback lines are still needed.",
-        "- Likely owner: unknown",
-        "- Next: Inspect the collection traceback or setup code next; the run failed before tests executed.",
-        "- Stop signal: diagnosis complete; raw not needed."
-      ].join("\n")
+      ["- Tests did not complete.", "- 134 errors occurred during collection."].join("\n")
     );
     expect(result.stderr).toBe("");
   });
@@ -709,6 +696,185 @@ describe("exec mode", () => {
     ]);
   });
 
+  it("supports vitest remaining reruns by diffing a full rerun against the cached baseline", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-vitest-rerun-home-"));
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-vitest-rerun-cwd-"));
+    const vitestPath = path.join(cwd, "vitest");
+    const outputPath = path.join(cwd, "vitest-output.txt");
+    const argsLogPath = path.join(cwd, "vitest-args.log");
+    const script = [
+      "#!/usr/bin/env node",
+      "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      "const cwd = process.cwd();",
+      "fs.appendFileSync(path.join(cwd, 'vitest-args.log'), JSON.stringify(process.argv.slice(2)) + '\\n');",
+      "const output = fs.readFileSync(path.join(cwd, 'vitest-output.txt'), 'utf8');",
+      "process.stdout.write(output);",
+      "process.exit(/(?:^\\s*FAIL |\\b\\d+\\s+failed\\b)/m.test(output) ? 1 : 0);"
+    ].join("\n");
+
+    await fs.writeFile(vitestPath, script, {
+      encoding: "utf8",
+      mode: 0o755
+    });
+    await fs.writeFile(
+      outputPath,
+      [
+        " FAIL  tests/ui/auth.test.ts > refresh token",
+        "AssertionError: expected token",
+        "",
+        " FAIL  tests/ui/users.test.ts > list users",
+        "AssertionError: expected user",
+        "",
+        " Test Files  2 failed | 0 passed",
+        " Tests  2 failed | 0 passed"
+      ].join("\n"),
+      "utf8"
+    );
+
+    const firstRun = await runCliAsync({
+      args: ["exec", "--preset", "test-status", "--", "./vitest", "run"],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(firstRun.status).toBe(1);
+
+    await fs.writeFile(
+      outputPath,
+      [
+        " FAIL  tests/ui/users.test.ts > list users",
+        "AssertionError: expected user",
+        "",
+        " Test Files  1 failed | 0 passed",
+        " Tests  1 failed | 0 passed"
+      ].join("\n"),
+      "utf8"
+    );
+
+    const remainingRerun = await runCliAsync({
+      args: ["rerun", "--remaining", "--detail", "focused"],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(remainingRerun.status).toBe(1);
+    expect(remainingRerun.stdout).toContain(
+      "Remaining pass: full rerun analyzed against the cached baseline because narrowed rerun is not available for this runner."
+    );
+    expect(remainingRerun.stdout).toContain("tests/ui/users.test.ts > list users");
+    expect(remainingRerun.stdout).not.toContain("tests/ui/auth.test.ts > refresh token");
+
+    const cachedState = JSON.parse(
+      await fs.readFile(getDefaultTestStatusStatePath(home), "utf8")
+    ) as { rawOutput: string };
+    expect(cachedState.rawOutput).toContain("tests/ui/auth.test.ts > refresh token");
+    expect(cachedState.rawOutput).toContain("tests/ui/users.test.ts > list users");
+
+    const argLog = (await fs.readFile(argsLogPath, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as string[]);
+    expect(argLog).toEqual([["run"], ["run"]]);
+  });
+
+  it("returns full-rerun-diff diagnose JSON for jest remaining reruns", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-jest-rerun-home-"));
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-jest-rerun-cwd-"));
+    const jestPath = path.join(cwd, "jest");
+    const outputPath = path.join(cwd, "jest-output.txt");
+    const script = [
+      "#!/usr/bin/env node",
+      "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      "const output = fs.readFileSync(path.join(process.cwd(), 'jest-output.txt'), 'utf8');",
+      "process.stdout.write(output);",
+      "process.exit(/(?:^FAIL |\\bfailed\\b)/m.test(output) ? 1 : 0);"
+    ].join("\n");
+
+    await fs.writeFile(jestPath, script, {
+      encoding: "utf8",
+      mode: 0o755
+    });
+    await fs.writeFile(
+      outputPath,
+      [
+        "FAIL tests/ui/auth.test.ts",
+        "  × refresh token",
+        "    AssertionError: expected token",
+        "",
+        "FAIL tests/ui/users.test.ts",
+        "  × list users",
+        "    AssertionError: expected user",
+        "",
+        "Test Suites: 2 failed, 2 total",
+        "Tests:       2 failed, 2 total",
+        "Snapshots:   0 total",
+        "Time:        1.234 s",
+        "Ran all test suites."
+      ].join("\n"),
+      "utf8"
+    );
+
+    const firstRun = await runCliAsync({
+      args: ["exec", "--preset", "test-status", "--", "./jest"],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(firstRun.status).toBe(1);
+
+    await fs.writeFile(
+      outputPath,
+      [
+        "FAIL tests/ui/users.test.ts",
+        "  × list users",
+        "    AssertionError: expected user",
+        "",
+        "Test Suites: 1 failed, 1 total",
+        "Tests:       1 failed, 1 total",
+        "Snapshots:   0 total",
+        "Time:        0.987 s",
+        "Ran all test suites."
+      ].join("\n"),
+      "utf8"
+    );
+
+    const remainingRerun = await runCliAsync({
+      args: ["rerun", "--remaining", "--goal", "diagnose", "--format", "json"],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(remainingRerun.status).toBe(1);
+    const parsed = JSON.parse(remainingRerun.stdout) as {
+      remaining_mode: string;
+      remaining_subset_available: boolean;
+      remaining_summary: { count: number; families: Array<{ prefix: string; count: number }> };
+    };
+    expect(parsed.remaining_mode).toBe("full_rerun_diff");
+    expect(parsed.remaining_subset_available).toBe(false);
+    expect(parsed.remaining_summary.count).toBe(1);
+    expect(parsed.remaining_summary.families[0]).toEqual({
+      prefix: "tests/ui/",
+      count: 1
+    });
+
+    const cachedState = JSON.parse(
+      await fs.readFile(getDefaultTestStatusStatePath(home), "utf8")
+    ) as { rawOutput: string };
+    expect(cachedState.rawOutput).toContain("FAIL tests/ui/auth.test.ts");
+    expect(cachedState.rawOutput).toContain("FAIL tests/ui/users.test.ts");
+  });
+
   it("returns summary-first diagnose JSON by default and keeps full pytest ids opt-in", async () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-diagnose-json-home-"));
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-diagnose-json-cwd-"));
@@ -742,6 +908,7 @@ describe("exec mode", () => {
       remaining_summary: { count: number; families: Array<{ prefix: string; count: number }> };
       resolved_summary: { count: number };
       remaining_subset_available: boolean;
+      remaining_mode: string;
       read_targets: Array<{
         file: string;
         line: number | null;
@@ -765,6 +932,7 @@ describe("exec mode", () => {
     });
     expect(summaryParsed.resolved_summary.count).toBe(0);
     expect(summaryParsed.remaining_subset_available).toBe(true);
+    expect(summaryParsed.remaining_mode).toBe("none");
     expect(summaryParsed.read_targets.map((target) => target.file)).toEqual(
       expect.arrayContaining([
         "tests/contracts/test_openapi_contract_freeze.py",

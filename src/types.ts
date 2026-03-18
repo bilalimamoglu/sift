@@ -13,6 +13,7 @@ export type OutputFormat = "brief" | "bullets" | "json" | "verdict";
 export type DetailLevel = "standard" | "focused" | "verbose";
 export type Goal = "summarize" | "diagnose";
 export type RawSliceStrategy = "none" | "bucket_evidence" | "traceback_window" | "head_tail";
+export type TestStatusRemainingMode = "none" | "subset_rerun" | "full_rerun_diff";
 
 export type ResponseMode = "text" | "json";
 export type JsonResponseFormatMode = "auto" | "on" | "off";
@@ -117,6 +118,7 @@ export interface RunRequest {
     resolvedTests?: string[];
     remainingTests?: string[];
     remainingSubsetAvailable?: boolean;
+    remainingMode?: TestStatusRemainingMode;
   };
   fallbackJson?: unknown;
 }

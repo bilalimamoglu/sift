@@ -30,7 +30,9 @@ describe("agent installer smoke", () => {
     expect(rawCodex.status).toBe(0);
     expect(rawCodex.stdout).toContain("<!-- sift:begin codex -->");
     expect(rawCodex.stdout).toContain("refresh the truth with `sift rerun`");
-    expect(rawCodex.stdout).toContain("`sift rerun --remaining` currently supports only argv-mode `pytest ...` or `python -m pytest ...` runs;");
+    expect(rawCodex.stdout).toContain(
+      "`sift rerun --remaining` narrows automatically for `pytest` and reruns the full original command for `vitest` and `jest` while keeping the diagnosis focused on what still fails."
+    );
     expect(rawCodex.stdout).toContain("--include-test-ids");
     expect(rawCodex.stdout).toContain("read_targets.context_hint.start_line/end_line");
     expect(rawCodex.stdout).toContain("read_targets.context_hint.search_hint");

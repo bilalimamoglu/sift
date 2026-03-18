@@ -8,8 +8,9 @@
 
 Your AI agent should not be reading 13,000 lines of test output.
 
-**Before:** 128 failures, 198K tokens, 16 tool calls, agent reconstructs the failure shape from scratch.
-**After:** 6 lines, 129 tokens, 4 tool calls, agent acts on a grouped diagnosis immediately.
+On the largest real fixture in the benchmark:
+**Before:** 128 failures, 198K raw-output tokens, agent reconstructs the failure shape from scratch.
+**After:** 6 lines, 129 `standard` tokens, agent acts on a grouped diagnosis immediately.
 
 ```bash
 sift exec --preset test-status -- pytest -q
@@ -29,7 +30,7 @@ sift exec --preset test-status -- pytest -q
 
 If 125 tests fail for one reason, the agent should pay for that reason once.
 
-## Who is this for
+## What it is
 
 Developers using coding agents — Claude Code, Codex, Cursor, Windsurf, Copilot, or any LLM-driven workflow that runs shell commands and reads the output.
 
@@ -43,9 +44,24 @@ npm install -g @bilalimamoglu/sift
 
 Requires Node.js 20+.
 
-## Quick start
+## Try it in 60 seconds
 
-Guided setup writes a machine-wide config and verifies the provider:
+If you already have an API key, you can try `sift` without any setup wizard:
+
+```bash
+export OPENAI_API_KEY=your_openai_api_key
+sift exec --preset test-status -- pytest -q
+```
+
+You can also use a freeform prompt for non-test output:
+
+```bash
+sift exec "what changed?" -- git diff
+```
+
+## Set it up for daily use
+
+Guided setup writes a machine-wide config, verifies the provider, and makes the CLI easier to use day to day:
 
 ```bash
 sift config setup
@@ -53,6 +69,13 @@ sift doctor
 ```
 
 Config lives at `~/.config/sift/config.yaml`. A repo-local `sift.config.yaml` can override it later.
+
+If you want your coding agent to use `sift` automatically, install the managed instruction block too:
+
+```bash
+sift agent install codex
+sift agent install claude
+```
 
 Then run noisy commands through `sift`:
 
@@ -87,6 +110,19 @@ export SIFT_BASE_URL=https://your-endpoint/v1
 export SIFT_PROVIDER_API_KEY=your_api_key
 ```
 
+## Why it helps
+
+The core abstraction is a **bucket**: one distinct root cause, no matter how many tests it affects.
+
+Instead of making an agent reason over 125 repeated tracebacks, `sift` compresses them into one actionable bucket with:
+- a label
+- an affected count
+- an anchor
+- a likely fix
+- a decision signal
+
+That changes the agent's job from "figure out what happened" to "act on the diagnosis."
+
 ## How it works
 
 `sift` follows a cheapest-first pipeline:
@@ -97,18 +133,18 @@ export SIFT_PROVIDER_API_KEY=your_api_key
 4. Escalate to a cheaper provider only if needed.
 5. Return a short diagnosis to the main agent.
 
-The core abstraction is a **bucket** — one distinct root cause, no matter how many tests it affects. Instead of making an agent reason over 125 repeated tracebacks, `sift` compresses them into one actionable bucket with a label, an affected count, an anchor, and a likely fix.
-
 It also returns a decision signal:
 - `stop and act` when the diagnosis is already actionable
 - `zoom` when one deeper pass is justified
 - raw logs only as a last resort
 
-The deepest local coverage today is test debugging, especially `pytest`, with growing support for `vitest` and `jest`.
+For recognized formats, local heuristics can fully handle the output and skip the provider entirely.
+
+The deepest local coverage today is test debugging, especially `pytest`, with growing support for `vitest` and `jest`. Other presets cover typecheck walls, lint failures, build errors, audit output, and Terraform risk detection.
 
 ## Built-in presets
 
-Every preset runs local heuristics first. When the heuristic confidently handles the output, the provider is never called — zero tokens, zero latency, fully deterministic.
+Every preset runs local heuristics first. When the heuristic confidently handles the output, the provider is never called.
 
 | Preset | Heuristic | What it does |
 |--------|-----------|-------------|
@@ -144,6 +180,22 @@ Suppress the footer with `--quiet`:
 sift exec --preset typecheck-summary --quiet -- npx tsc --noEmit
 ```
 
+## Strongest today
+
+`sift` is strongest when output is:
+- long
+- repetitive
+- triage-heavy
+- shaped by a small number of shared root causes
+
+Best fits today:
+- large `pytest`, `vitest`, or `jest` runs
+- `tsc` type errors and `eslint` lint failures
+- build failures from webpack, esbuild/Vite, Cargo, Go, GCC/Clang
+- `npm audit` and `terraform plan`
+- repeated CI blockers
+- noisy diffs and log streams
+
 ## Test debugging workflow
 
 This is where `sift` is strongest today.
@@ -163,40 +215,17 @@ sift rerun --remaining --detail focused
 
 If `standard` already gives you the root cause, anchor, and fix, stop there and act.
 
-`sift rerun --remaining` currently supports only cached `pytest` or `python -m pytest` runs. For other runners, rerun a narrowed command manually with `sift exec --preset test-status -- <narrowed command>`.
+`sift rerun --remaining` narrows automatically for cached `pytest` runs.
 
-## Agent setup
+For cached `vitest` and `jest` runs, it reruns the original full command and keeps the diagnosis focused on what still fails relative to the cached baseline.
 
-`sift` can install a managed instruction block so coding agents use it by default for long command output:
-
-```bash
-sift agent install claude
-sift agent install codex
-```
-
-This writes a tuned set of rules into your agent's config (CLAUDE.md, AGENTS.md, etc.) so the agent routes noisy commands through `sift` automatically — no manual prompting needed.
+For other runners, rerun a narrowed command manually with `sift exec --preset test-status -- <narrowed command>`.
 
 ```bash
 sift agent status
 sift agent show claude
 sift agent remove claude
 ```
-
-## Where `sift` helps most
-
-`sift` is strongest when output is:
-- long
-- repetitive
-- triage-heavy
-- shaped by a small number of root causes
-
-Good fits:
-- large `pytest`, `vitest`, or `jest` runs (deterministic heuristics)
-- `tsc` type errors and `eslint` lint failures (deterministic heuristics)
-- build failures from webpack, esbuild, cargo, go, gcc
-- `npm audit` and `terraform plan` (deterministic heuristics)
-- repeated CI blockers
-- noisy diffs and log streams
 
 ## Where it helps less
 
@@ -218,7 +247,14 @@ On a real 640-test Python backend (125 repeated setup errors, 3 contract failure
 | Tool calls | 16 | 7 | 56% |
 | Diagnosis | Same | Same | — |
 
-The headline numbers (62% token reduction, 71% fewer tool calls, 65% faster) come from the end-to-end wall-clock comparison. The table above shows the token-level reduction on the largest real fixture.
+The table above is the single-fixture reduction story: the largest real test log in the benchmark shrank from `198026` raw tokens to `129` `standard` tokens.
+
+The end-to-end workflow benchmark is a different metric:
+- `62%` fewer total debugging tokens
+- `71%` fewer tool calls
+- `65%` faster wall-clock time
+
+Both matter. The table shows how aggressively `sift` can compress one large noisy run. The workflow numbers show how that compounds across a full debug loop.
 
 Methodology and caveats live in [BENCHMARK_NOTES.md](BENCHMARK_NOTES.md).
 
@@ -261,7 +297,9 @@ runtime:
 ## Docs
 
 - CLI reference: [docs/cli-reference.md](docs/cli-reference.md)
+- Worked examples: [docs/examples](docs/examples)
 - Benchmark methodology: [BENCHMARK_NOTES.md](BENCHMARK_NOTES.md)
+- Release notes: [release-notes](release-notes)
 
 ## License
 

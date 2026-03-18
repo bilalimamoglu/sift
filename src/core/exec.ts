@@ -17,6 +17,7 @@ import {
   createCachedTestStatusRun,
   diffTestStatusRuns,
   diffTestStatusTargets,
+  isRemainingSubsetAvailable,
   tryReadCachedTestStatusRun,
   writeCachedTestStatusRun
 } from "./testStatusState.js";
@@ -123,6 +124,8 @@ export interface ExecRequest extends Omit<RunRequest, "stdin"> {
   showRaw?: boolean;
   shellCommand?: string;
   skipCacheWrite?: boolean;
+  readCachedBaseline?: boolean;
+  writeCachedBaseline?: boolean;
   watch?: boolean;
 }
 
@@ -161,9 +164,12 @@ export async function runExec(request: ExecRequest): Promise<number> {
   const shellPath = process.env.SHELL || "/bin/bash";
   const commandPreview = buildCommandPreview(request);
   const commandCwd = request.cwd ?? process.cwd();
-  const shouldCacheTestStatusBase =
-    request.presetName === "test-status" && !request.skipCacheWrite;
-  const previousCachedRun = shouldCacheTestStatusBase ? tryReadCachedTestStatusRun() : null;
+  const isTestStatusPreset = request.presetName === "test-status";
+  const readCachedBaseline = isTestStatusPreset && (request.readCachedBaseline ?? true);
+  const writeCachedBaselineRequested =
+    isTestStatusPreset &&
+    (request.writeCachedBaseline ?? (request.skipCacheWrite ? false : true));
+  const previousCachedRun = readCachedBaseline ? tryReadCachedTestStatusRun() : null;
   if (request.config.runtime.verbose) {
     process.stderr.write(
       `${pc.dim("sift")} exec mode=${hasShellCommand ? "shell" : "argv"} command=${commandPreview}\n`
@@ -236,7 +242,8 @@ export async function runExec(request: ExecRequest): Promise<number> {
   const capturedOutput = capture.render();
   const autoWatchDetected = !request.watch && looksLikeWatchStream(capturedOutput);
   const useWatchFlow = Boolean(request.watch) || autoWatchDetected;
-  const shouldCacheTestStatus = shouldCacheTestStatusBase && !useWatchFlow;
+  const shouldBuildTestStatusState = isTestStatusPreset && !useWatchFlow;
+  const shouldWriteCachedBaseline = writeCachedBaselineRequested && !useWatchFlow;
 
   if (request.config.runtime.verbose) {
     process.stderr.write(
@@ -307,12 +314,26 @@ export async function runExec(request: ExecRequest): Promise<number> {
       return exitCode;
     }
 
-    const analysis = shouldCacheTestStatus ? analyzeTestStatus(capturedOutput) : null;
+    const analysis = shouldBuildTestStatusState ? analyzeTestStatus(capturedOutput) : null;
     let currentCachedRun =
-      shouldCacheTestStatus && analysis
+      shouldBuildTestStatusState && analysis
         ? createCachedTestStatusRun({
             cwd: commandCwd,
             commandKey: buildTestStatusCommandKey({
+              cwd: commandCwd,
+              runner: analysis.runner,
+              command:
+                Array.isArray(request.command) && request.command.length > 0
+                  ? {
+                      mode: "argv",
+                      argv: [...request.command]
+                    }
+                  : request.shellCommand
+                    ? {
+                        mode: "shell",
+                        shellCommand: request.shellCommand
+                      }
+                    : undefined,
               commandPreview,
               shellCommand: request.shellCommand
             }),
@@ -328,7 +349,10 @@ export async function runExec(request: ExecRequest): Promise<number> {
           })
         : null;
     const targetDelta =
-      request.diff && !request.dryRun && previousCachedRun && currentCachedRun
+      (request.diff || request.testStatusContext?.remainingMode === "subset_rerun" || request.testStatusContext?.remainingMode === "full_rerun_diff") &&
+      !request.dryRun &&
+      previousCachedRun &&
+      currentCachedRun
         ? diffTestStatusTargets({
             previous: previousCachedRun,
             current: currentCachedRun
@@ -339,7 +363,9 @@ export async function runExec(request: ExecRequest): Promise<number> {
       ...request,
       stdin: capturedOutput,
       analysisContext:
-        request.skipCacheWrite && request.presetName === "test-status"
+        request.testStatusContext?.remainingMode &&
+        request.testStatusContext.remainingMode !== "none" &&
+        request.presetName === "test-status"
           ? [
               request.analysisContext,
               "Zoom context:",
@@ -351,30 +377,32 @@ export async function runExec(request: ExecRequest): Promise<number> {
               .join("\n")
           : request.analysisContext,
       testStatusContext:
-        shouldCacheTestStatus && analysis
+        shouldBuildTestStatusState && analysis
           ? {
               ...request.testStatusContext,
               resolvedTests: targetDelta?.resolved ?? request.testStatusContext?.resolvedTests,
               remainingTests:
                 targetDelta?.remaining ??
-                currentCachedRun?.pytest?.failingNodeIds ??
+                currentCachedRun?.runner.failingTargets ??
                 request.testStatusContext?.remainingTests,
               remainingSubsetAvailable:
                 request.testStatusContext?.remainingSubsetAvailable ??
                 Boolean(
-                  currentCachedRun?.pytest?.subsetCapable &&
+                  currentCachedRun &&
+                    isRemainingSubsetAvailable(currentCachedRun) &&
                     (
                       targetDelta?.remaining ??
-                      currentCachedRun?.pytest?.failingNodeIds ??
+                      currentCachedRun?.runner.failingTargets ??
                       []
                     ).length > 0
-                )
+                ),
+              remainingMode: request.testStatusContext?.remainingMode ?? "none"
             }
           : request.testStatusContext
     });
     let output = result.output;
 
-    if (shouldCacheTestStatus) {
+    if (shouldBuildTestStatusState) {
       if (isInsufficientSignalOutput(output)) {
         output = buildInsufficientSignalOutput({
           presetName: request.presetName,
@@ -390,26 +418,12 @@ export async function runExec(request: ExecRequest): Promise<number> {
           previous: previousCachedRun,
           current: currentCachedRun
         });
-        currentCachedRun = createCachedTestStatusRun({
-          cwd: commandCwd,
-          commandKey: currentCachedRun.commandKey,
-          commandPreview,
-          command: request.command,
-          shellCommand: request.shellCommand,
-          detail: request.detail ?? "standard",
-          exitCode,
-          rawOutput: capturedOutput,
-          originalChars: capture.getTotalChars(),
-          truncatedApplied: capture.wasTruncated(),
-          analysis: analysis!,
-          remainingNodeIds: delta.remainingNodeIds
-        });
         if (delta.lines.length > 0) {
           output = `${delta.lines.join("\n")}\n${output}`;
         }
       }
 
-      if (currentCachedRun) {
+      if (currentCachedRun && shouldWriteCachedBaseline) {
         try {
           writeCachedTestStatusRun(currentCachedRun);
         } catch (error) {

@@ -20,7 +20,8 @@ When debugging test failures, default to `sift` first and treat `standard` as th
 - After making or planning a fix, refresh the truth with `sift rerun` so the same full suite runs again at `standard` and shows what is resolved or still remaining.
 - The normal stop budget is `standard` first, then at most one zoom step before raw.
 - Only if more detail is still needed after `sift rerun`, use `sift rerun --remaining --detail focused`, then `sift rerun --remaining --detail verbose`, then `sift rerun --remaining --detail verbose --show-raw`.
-- `sift rerun --remaining` currently supports only argv-mode `pytest ...` or `python -m pytest ...` runs; otherwise rerun a narrowed command manually with `sift exec --preset test-status -- <narrowed pytest command>`.
+- `sift rerun --remaining` narrows automatically for `pytest` and reruns the full original command for `vitest` and `jest` while keeping the diagnosis focused on what still fails.
+- For other runners, rerun a narrowed command manually with `sift exec --preset test-status -- <narrowed test command>` if you need a smaller surface.
 - Start with `standard` text. Use diagnose JSON only when automation or machine branching truly needs it.
 - If `standard` already shows bucket-level root cause, anchor, and fix lines, trust it and report from it directly.
 - In that case, do not re-verify the same bucket with raw pytest; at most do one targeted source read before you edit.

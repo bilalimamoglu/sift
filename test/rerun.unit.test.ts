@@ -24,7 +24,6 @@ function writeState(args: {
   command?: string[];
   shellCommand?: string;
   rawOutput: string;
-  remainingNodeIds?: string[];
 }) {
   writeCachedTestStatusRun(
     createCachedTestStatusRun({
@@ -38,8 +37,7 @@ function writeState(args: {
       rawOutput: args.rawOutput,
       originalChars: args.rawOutput.length,
       truncatedApplied: false,
-      analysis: analyzeTestStatus(args.rawOutput),
-      remainingNodeIds: args.remainingNodeIds
+      analysis: analyzeTestStatus(args.rawOutput)
     }),
     getDefaultTestStatusStatePath(args.homeDir)
   );
@@ -98,8 +96,7 @@ describe("runRerun", () => {
         "FAILED tests/unit/test_auth.py::test_refresh - AssertionError: expected token",
         "FAILED tests/unit/test_users.py::test_list - AssertionError: expected user",
         "2 failed in 0.12s"
-      ].join("\n"),
-      remainingNodeIds: ["tests/unit/test_users.py::test_list"]
+      ].join("\n")
     });
     runExecMock.mockResolvedValue(1);
 
@@ -117,13 +114,25 @@ describe("runRerun", () => {
 
     expect(runExecMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        command: ["python", "-m", "pytest", "-q", "tests/unit/test_users.py::test_list"],
+        command: [
+          "python",
+          "-m",
+          "pytest",
+          "-q",
+          "tests/unit/test_auth.py::test_refresh",
+          "tests/unit/test_users.py::test_list"
+        ],
         cwd: "/tmp/repo",
         detail: "focused",
         diff: false,
         presetName: "test-status",
         showRaw: true,
-        skipCacheWrite: true
+        readCachedBaseline: true,
+        writeCachedBaseline: false,
+        testStatusContext: expect.objectContaining({
+          remainingSubsetAvailable: true,
+          remainingMode: "subset_rerun"
+        })
       })
     );
   });
@@ -166,8 +175,7 @@ describe("runRerun", () => {
     writeState({
       homeDir,
       command: ["pytest", "-q"],
-      rawOutput: "12 passed in 0.12s",
-      remainingNodeIds: []
+      rawOutput: "12 passed in 0.12s"
     });
     const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
@@ -185,15 +193,18 @@ describe("runRerun", () => {
     expect(stdoutSpy).toHaveBeenCalledWith("No remaining failing pytest targets.\n");
   });
 
-  it("fails clearly when the cached command is not subset-capable pytest", async () => {
+  it("reruns the cached full vitest command in remaining diff mode without overwriting baseline", async () => {
     writeState({
       homeDir,
       command: ["vitest", "run"],
       rawOutput: [
-        "FAILED tests/unit/test_auth.py::test_refresh - AssertionError: expected token",
-        "1 failed in 0.12s"
+        " FAIL  tests/unit/auth.test.ts > refresh token",
+        "AssertionError: expected token",
+        "",
+        "Tests  1 failed"
       ].join("\n")
     });
+    runExecMock.mockResolvedValue(1);
 
     const { runRerun } = await import("../src/core/rerun.js");
     await expect(
@@ -203,6 +214,95 @@ describe("runRerun", () => {
         config: defaultConfig,
         remaining: true
       })
-    ).rejects.toThrow("Automatic remaining-subset reruns currently support only argv-mode `pytest ...` or `python -m pytest ...` commands.");
+    ).resolves.toBe(1);
+
+    expect(runExecMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: ["vitest", "run"],
+        cwd: "/tmp/repo",
+        diff: false,
+        presetName: "test-status",
+        readCachedBaseline: true,
+        writeCachedBaseline: false,
+        testStatusContext: expect.objectContaining({
+          remainingSubsetAvailable: false,
+          remainingMode: "full_rerun_diff"
+        })
+      })
+    );
+  });
+
+  it("fails clearly when a migrated cache lacks a trustworthy full-command baseline", async () => {
+    const legacyStatePath = getDefaultTestStatusStatePath(homeDir);
+    fs.mkdirSync(path.dirname(legacyStatePath), {
+      recursive: true
+    });
+    fs.writeFileSync(
+      legacyStatePath,
+      `${JSON.stringify(
+        {
+          version: 1,
+          timestamp: "2026-03-18T10:00:00.000Z",
+          presetName: "test-status",
+          cwd: "/tmp/repo",
+          commandKey: "argv:vitest run",
+          commandPreview: "vitest run",
+          detail: "standard",
+          exitCode: 1,
+          rawOutput: [
+            " FAIL  tests/unit/auth.test.ts > refresh token",
+            "AssertionError: expected token",
+            "",
+            "Test Files  1 failed | 0 passed",
+            "Tests  1 failed | 0 passed"
+          ].join("\n"),
+          capture: {
+            originalChars: 72,
+            truncatedApplied: false
+          },
+          analysis: createCachedTestStatusRun({
+            cwd: "/tmp/repo",
+            command: ["vitest", "run"],
+            detail: "standard",
+            exitCode: 1,
+            rawOutput: [
+              " FAIL  tests/unit/auth.test.ts > refresh token",
+              "AssertionError: expected token",
+              "",
+              "Test Files  1 failed | 0 passed",
+              "Tests  1 failed | 0 passed"
+            ].join("\n"),
+            originalChars: 108,
+            truncatedApplied: false,
+            analysis: analyzeTestStatus([
+              " FAIL  tests/unit/auth.test.ts > refresh token",
+              "AssertionError: expected token",
+              "",
+              "Test Files  1 failed | 0 passed",
+              "Tests  1 failed | 0 passed"
+            ].join("\n"))
+          }).analysis,
+          pytest: {
+            subsetCapable: false,
+            failingNodeIds: ["tests/unit/auth.test.ts > refresh token"]
+          }
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+
+    const { runRerun } = await import("../src/core/rerun.js");
+    await expect(
+      runRerun({
+        question: "Did the tests pass?",
+        format: "bullets",
+        config: defaultConfig,
+        remaining: true
+      })
+    ).rejects.toThrow(
+      "Cached test-status run cannot use `sift rerun --remaining` yet because the original full command is unavailable from cache."
+    );
   });
 });

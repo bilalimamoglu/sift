@@ -1,0 +1,7 @@
+✓ test/release.workflow.test.ts (4 tests) 7ms
+✓ test/exec.smoke.test.ts (38 tests) 10216ms
+
+Test Files  2 passed (2)
+     Tests  42 passed (42)
+  Start at  15:27:33
+  Duration  13.57s (transform 62ms, setup 0ms, collect 71ms, tests 10.22s, environment 0ms, prepare 145ms)

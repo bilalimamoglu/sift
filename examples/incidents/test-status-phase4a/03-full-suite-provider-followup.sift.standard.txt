@@ -1,0 +1,13 @@
+- Tests did not pass.
+- 5 tests failed. 114 errors occurred.
+- Runtime failures: 1 visible failure share missing test env: CONCLUSION.
+- Anchor: test/release.workflow.test.ts lines 66-76
+- Fix: Set CONCLUSION before rerunning the affected tests.
+- unknown setup blocker: 114 visible failures share a repeated but unclassified pattern.
+- Fix: Take one deeper sift pass or inspect the first anchored setup failure.
+- Assertion failures: 1 visible failure share assertion failed: expected '- Tests did not complete.\n- 114 erro…' to be '- Tests did not complete.\n- 114 erro…' // Ob.
+- Anchor: test/exec.smoke.test.ts lines 380-390
+- Fix: Inspect the failing assertion and rerun the full suite at standard.
+- Decision: zoom. One deeper sift pass is justified before raw.
+- Next: Provider follow-up failed (Unterminated string in JSON at position 138 (line 1 column 139)). Use one deeper sift pass on the same cached output before reading raw traceback lines.
+- Stop signal: diagnosis incomplete; raw only if the provider follow-up failed and one deeper sift pass still is not enough.

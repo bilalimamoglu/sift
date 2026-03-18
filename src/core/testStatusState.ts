@@ -2,8 +2,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { getDefaultTestStatusStatePath } from "../constants.js";
-import type { FailureBucketType, TestStatusAnalysis } from "./heuristics.js";
+import {
+  detectTestRunner,
+  type FailureBucketType,
+  type TestRunner,
+  type TestStatusAnalysis
+} from "./heuristics.js";
 import type { DetailLevel } from "../types.js";
+import {
+  buildTestTargetSummary,
+  describeTargetSummary,
+  normalizeFailingTarget
+} from "./testStatusTargets.js";
 
 const detailSchema = z.enum(["standard", "focused", "verbose"]);
 const failureBucketTypeSchema = z.enum([
@@ -85,7 +95,22 @@ const cachedPytestStateSchema = z
   })
   .optional();
 
-const cachedRunSchema = z.object({
+const testRunnerSchema = z.enum(["pytest", "vitest", "jest", "unknown"]) satisfies z.ZodType<TestRunner>;
+
+const cachedRunnerSubsetSchema = z.object({
+  available: z.boolean(),
+  strategy: z.enum(["pytest-node-ids", "none"]),
+  baseArgv: z.array(z.string()).min(1).optional()
+});
+
+const cachedRunnerStateSchema = z.object({
+  name: testRunnerSchema,
+  failingTargets: z.array(z.string()),
+  baselineCommand: cachedCommandSchema,
+  subset: cachedRunnerSubsetSchema
+});
+
+const cachedRunV1Schema = z.object({
   version: z.literal(1),
   timestamp: z.string(),
   presetName: z.literal("test-status"),
@@ -104,11 +129,37 @@ const cachedRunSchema = z.object({
   pytest: cachedPytestStateSchema
 });
 
+const cachedRunV2Schema = z.object({
+  version: z.literal(2),
+  timestamp: z.string(),
+  presetName: z.literal("test-status"),
+  cwd: z.string(),
+  commandKey: z.string(),
+  commandPreview: z.string(),
+  command: cachedCommandSchema,
+  detail: detailSchema,
+  exitCode: z.number().int(),
+  rawOutput: z.string(),
+  capture: z.object({
+    originalChars: countSchema,
+    truncatedApplied: z.boolean()
+  }),
+  analysis: cachedAnalysisSchema,
+  runner: cachedRunnerStateSchema
+});
+
+const cachedRunSchema = z.discriminatedUnion("version", [cachedRunV1Schema, cachedRunV2Schema]);
+
 export type CachedTestStatusBucket = z.infer<typeof cachedBucketSchema>;
 export type CachedTestStatusAnalysis = z.infer<typeof cachedAnalysisSchema>;
 export type CachedTestStatusCommand = NonNullable<z.infer<typeof cachedCommandSchema>>;
 export type CachedPytestState = NonNullable<z.infer<typeof cachedPytestStateSchema>>;
-export type CachedTestStatusRun = z.infer<typeof cachedRunSchema>;
+export type CachedRunnerState = z.infer<typeof cachedRunnerStateSchema>;
+type CachedTestStatusRunV1 = z.infer<typeof cachedRunV1Schema>;
+type CachedTestStatusRunV2 = z.infer<typeof cachedRunV2Schema>;
+export type CachedTestStatusRun = CachedTestStatusRunV2 & {
+  runnerMigrationFallbackUsed?: boolean;
+};
 
 export class MissingCachedTestStatusRunError extends Error {
   constructor() {
@@ -167,6 +218,41 @@ function isPytestExecutable(value: string): boolean {
 
 function isPythonExecutable(value: string): boolean {
   return basenameMatches(value, /^python(?:\d+(?:\.\d+)*)?(?:\.exe)?$/i);
+}
+
+function detectRunnerFromCommand(command?: CachedTestStatusCommand): TestRunner {
+  if (!command) {
+    return "unknown";
+  }
+
+  if (command.mode === "argv") {
+    const [first, second, third] = command.argv;
+    if (first && isPytestExecutable(first)) {
+      return "pytest";
+    }
+    if (first && isPythonExecutable(first) && second === "-m" && third === "pytest") {
+      return "pytest";
+    }
+    if (first && basenameMatches(first, /^vitest(?:\.exe)?$/i)) {
+      return "vitest";
+    }
+    if (first && basenameMatches(first, /^jest(?:\.exe)?$/i)) {
+      return "jest";
+    }
+    return "unknown";
+  }
+
+  if (/\bpython(?:\d+(?:\.\d+)*)?\s+-m\s+pytest\b|\bpytest\b/i.test(command.shellCommand)) {
+    return "pytest";
+  }
+  if (/\bvitest\b/i.test(command.shellCommand)) {
+    return "vitest";
+  }
+  if (/\bjest\b/i.test(command.shellCommand)) {
+    return "jest";
+  }
+
+  return "unknown";
 }
 
 const shortPytestOptionsWithValue = new Set([
@@ -287,40 +373,85 @@ function buildCachedCommand(args: {
   return undefined;
 }
 
-function buildFailingNodeIds(analysis: TestStatusAnalysis): string[] {
+function buildFailingTargets(analysis: TestStatusAnalysis): string[] {
+  const runner = analysis.runner;
   const values: string[] = [];
 
   for (const value of [...analysis.visibleErrorLabels, ...analysis.visibleFailedLabels]) {
-    if (value.length > 0 && !values.includes(value)) {
-      values.push(value);
+    const normalized = normalizeFailingTarget(value, runner);
+    if (normalized.length > 0 && !values.includes(normalized)) {
+      values.push(normalized);
     }
   }
 
   return values;
 }
 
-function buildCachedPytestState(args: {
+function buildCachedRunnerState(args: {
   command?: CachedTestStatusCommand;
   analysis: TestStatusAnalysis;
-  remainingNodeIds?: string[];
-}): CachedPytestState {
+}): CachedRunnerState {
   const baseArgv = args.command?.mode === "argv" && isSubsetCapablePytestArgv(args.command.argv)
     ? [...args.command.argv]
     : undefined;
+  const runnerName =
+    args.analysis.runner !== "unknown" ? args.analysis.runner : detectRunnerFromCommand(args.command);
 
   return {
-    subsetCapable: Boolean(baseArgv),
-    baseArgv,
-    failingNodeIds: buildFailingNodeIds(args.analysis),
-    remainingNodeIds: args.remainingNodeIds
+    name: runnerName,
+    failingTargets: buildFailingTargets(args.analysis),
+    baselineCommand: args.command,
+    subset: {
+      available: runnerName === "pytest" && Boolean(baseArgv),
+      strategy: runnerName === "pytest" && baseArgv ? "pytest-node-ids" : "none",
+      ...(runnerName === "pytest" && baseArgv ? { baseArgv } : {})
+    }
   };
 }
 
+function normalizeCwd(value: string): string {
+  return path.resolve(value).replace(/\\/g, "/");
+}
+
+export function buildTestStatusBaselineIdentity(args: {
+  cwd: string;
+  runner: TestRunner;
+  command?: CachedTestStatusCommand;
+  commandPreview?: string;
+  shellCommand?: string;
+}): string {
+  const cwd = normalizeCwd(args.cwd);
+  const command =
+    args.command ??
+    buildCachedCommand({
+      shellCommand: args.shellCommand,
+      command: args.shellCommand ? undefined : args.commandPreview?.split(" ")
+    });
+  const mode = command?.mode ?? (args.shellCommand ? "shell" : "argv");
+  const normalizedCommand =
+    command?.mode === "argv"
+      ? command.argv.join("\u001f")
+      : command?.mode === "shell"
+        ? command.shellCommand.trim().replace(/\s+/g, " ")
+        : (args.commandPreview ?? "").trim().replace(/\s+/g, " ");
+
+  return [cwd, args.runner, mode, normalizedCommand].join("\u001e");
+}
+
 export function buildTestStatusCommandKey(args: {
+  cwd?: string;
+  runner?: TestRunner;
+  command?: CachedTestStatusCommand;
   commandPreview: string;
   shellCommand?: string;
 }): string {
-  return `${args.shellCommand ? "shell" : "argv"}:${args.commandPreview}`;
+  return buildTestStatusBaselineIdentity({
+    cwd: args.cwd ?? process.cwd(),
+    runner: args.runner ?? "unknown",
+    command: args.command,
+    commandPreview: args.commandPreview,
+    shellCommand: args.shellCommand
+  });
 }
 
 export function snapshotTestStatusAnalysis(
@@ -348,8 +479,8 @@ export function snapshotTestStatusAnalysis(
 export function createCachedTestStatusRun(args: {
   timestamp?: string;
   cwd: string;
-  commandKey: string;
-  commandPreview: string;
+  commandKey?: string;
+  commandPreview?: string;
   command?: string[];
   shellCommand?: string;
   detail: DetailLevel;
@@ -358,20 +489,32 @@ export function createCachedTestStatusRun(args: {
   originalChars: number;
   truncatedApplied: boolean;
   analysis: TestStatusAnalysis;
-  remainingNodeIds?: string[];
 }): CachedTestStatusRun {
   const command = buildCachedCommand({
     command: args.command,
     shellCommand: args.shellCommand
   });
+  const runnerName =
+    args.analysis.runner !== "unknown" ? args.analysis.runner : detectRunnerFromCommand(command);
+  const commandPreview =
+    args.commandPreview ?? args.shellCommand ?? (args.command ?? []).join(" ");
+  const commandKey =
+    args.commandKey ??
+    buildTestStatusBaselineIdentity({
+      cwd: args.cwd,
+      runner: runnerName,
+      command,
+      commandPreview,
+      shellCommand: args.shellCommand
+    });
 
   return {
-    version: 1,
+    version: 2,
     timestamp: args.timestamp ?? new Date().toISOString(),
     presetName: "test-status",
     cwd: args.cwd,
-    commandKey: args.commandKey,
-    commandPreview: args.commandPreview,
+    commandKey,
+    commandPreview,
     command,
     detail: args.detail,
     exitCode: args.exitCode,
@@ -381,11 +524,75 @@ export function createCachedTestStatusRun(args: {
       truncatedApplied: args.truncatedApplied
     },
     analysis: snapshotTestStatusAnalysis(args.analysis),
-    pytest: buildCachedPytestState({
+    runner: buildCachedRunnerState({
       command,
-      analysis: args.analysis,
-      remainingNodeIds: args.remainingNodeIds
+      analysis: args.analysis
     })
+  };
+}
+
+function migrateCachedTestStatusRun(
+  state: CachedTestStatusRunV1 | CachedTestStatusRunV2
+): CachedTestStatusRun {
+  if (state.version === 2) {
+    return state;
+  }
+
+  const runnerFromOutput = detectTestRunner(state.rawOutput);
+  const runner = runnerFromOutput !== "unknown" ? runnerFromOutput : detectRunnerFromCommand(state.command);
+  const storedCommand = state.command;
+  const fallbackBaseArgv = !storedCommand && state.pytest?.baseArgv
+    ? {
+        mode: "argv" as const,
+        argv: [...state.pytest.baseArgv]
+      }
+    : undefined;
+  const baselineCommand = storedCommand ?? fallbackBaseArgv;
+  const commandPreview =
+    state.commandPreview ??
+    (baselineCommand?.mode === "argv"
+      ? baselineCommand.argv.join(" ")
+      : baselineCommand?.mode === "shell"
+        ? baselineCommand.shellCommand
+        : "");
+  const commandKey = buildTestStatusBaselineIdentity({
+    cwd: state.cwd,
+    runner,
+    command: baselineCommand,
+    commandPreview
+  });
+
+  return {
+    version: 2,
+    timestamp: state.timestamp,
+    presetName: state.presetName,
+    cwd: state.cwd,
+    commandKey,
+    commandPreview,
+    command: state.command,
+    detail: state.detail,
+    exitCode: state.exitCode,
+    rawOutput: state.rawOutput,
+    capture: state.capture,
+    analysis: state.analysis,
+    runner: {
+      name: runner,
+      failingTargets: [...new Set((state.pytest?.failingNodeIds ?? []).map((target) =>
+        normalizeFailingTarget(target, runner)
+      ))],
+      baselineCommand,
+      subset: {
+        available: runner === "pytest" && Boolean(state.pytest?.baseArgv),
+        strategy:
+          runner === "pytest" && state.pytest?.baseArgv ? "pytest-node-ids" : "none",
+        ...(runner === "pytest" && state.pytest?.baseArgv
+          ? {
+              baseArgv: [...state.pytest.baseArgv]
+            }
+          : {})
+      }
+    },
+    ...(fallbackBaseArgv ? { runnerMigrationFallbackUsed: true } : {})
   };
 }
 
@@ -405,7 +612,7 @@ export function readCachedTestStatusRun(
   }
 
   try {
-    return cachedRunSchema.parse(JSON.parse(raw));
+    return migrateCachedTestStatusRun(cachedRunSchema.parse(JSON.parse(raw)));
   } catch {
     throw new InvalidCachedTestStatusRunError();
   }
@@ -456,7 +663,9 @@ function buildTargetDelta(args: {
     args.previous.presetName !== "test-status" ||
     args.current.presetName !== "test-status" ||
     args.previous.cwd !== args.current.cwd ||
-    args.previous.commandKey !== args.current.commandKey
+    args.previous.commandKey !== args.current.commandKey ||
+    args.previous.runner.name !== args.current.runner.name ||
+    args.previous.runner.name === "unknown"
   ) {
     return {
       comparable: false,
@@ -466,17 +675,8 @@ function buildTargetDelta(args: {
     };
   }
 
-  if (!args.previous.pytest || !args.current.pytest) {
-    return {
-      comparable: false,
-      resolved: [],
-      remaining: [],
-      introduced: []
-    };
-  }
-
-  const previousTargets = args.previous.pytest.failingNodeIds;
-  const currentTargets = args.current.pytest.failingNodeIds;
+  const previousTargets = args.previous.runner.failingTargets;
+  const currentTargets = args.current.runner.failingTargets;
   const currentTargetSet = new Set(currentTargets);
   const previousTargetSet = new Set(previousTargets);
 
@@ -500,13 +700,16 @@ export function diffTestStatusTargets(args: {
   return buildTargetDelta(args);
 }
 
+export function isRemainingSubsetAvailable(state: CachedTestStatusRun): boolean {
+  return state.runner.name === "pytest" && state.runner.subset.available;
+}
+
 export function getRemainingPytestNodeIds(state: CachedTestStatusRun): string[] {
-  return state.pytest?.remainingNodeIds ?? state.pytest?.failingNodeIds ?? [];
+  return state.runner.name === "pytest" ? state.runner.failingTargets : [];
 }
 
 export interface CachedTestStatusDelta {
   lines: string[];
-  remainingNodeIds?: string[];
 }
 
 export function diffTestStatusRuns(args: {
@@ -521,24 +724,55 @@ export function diffTestStatusRuns(args: {
     args.current.analysis.buckets.map((bucket) => [buildBucketSignature(bucket), bucket] as const)
   );
   const lines: string[] = [];
+  const resolvedSummary = buildTestTargetSummary(targetDelta.resolved);
+  const remainingSummary = buildTestTargetSummary(targetDelta.remaining);
+  const introducedSummary = buildTestTargetSummary(targetDelta.introduced);
 
-  if (targetDelta.resolved.length > 0) {
-    lines.push(
-      `- Resolved: ${formatCount(targetDelta.resolved.length, "failing test/module", "failing tests/modules")} no longer appear${appendPreview(targetDelta.resolved)}.`
-    );
-  }
+  const pushTargetLine = (args: {
+    kind: "Resolved" | "Remaining" | "New";
+    summary: ReturnType<typeof buildTestTargetSummary>;
+    countLabel: string;
+    fallbackValues: string[];
+    verb: string;
+  }) => {
+    if (args.summary.count === 0) {
+      return;
+    }
 
-  if (targetDelta.remaining.length > 0) {
-    lines.push(
-      `- Remaining: ${formatCount(targetDelta.remaining.length, "failing test/module", "failing tests/modules")} still appear${appendPreview(targetDelta.remaining)}.`
-    );
-  }
+    const summaryText = describeTargetSummary(args.summary);
+    if (summaryText) {
+      lines.push(
+        `- ${args.kind}: ${formatCount(args.summary.count, args.countLabel, `${args.countLabel}s`)} ${args.verb} ${summaryText}.`
+      );
+      return;
+    }
 
-  if (targetDelta.introduced.length > 0) {
     lines.push(
-      `- New: ${formatCount(targetDelta.introduced.length, "failing test/module", "failing tests/modules")} appeared${appendPreview(targetDelta.introduced)}.`
+      `- ${args.kind}: ${formatCount(args.summary.count, args.countLabel, `${args.countLabel}s`)} ${args.verb}${appendPreview(args.fallbackValues)}.`
     );
-  }
+  };
+
+  pushTargetLine({
+    kind: "Resolved",
+    summary: resolvedSummary,
+    countLabel: "failing target",
+    fallbackValues: targetDelta.resolved,
+    verb: "no longer appear"
+  });
+  pushTargetLine({
+    kind: "Remaining",
+    summary: remainingSummary,
+    countLabel: "failing target",
+    fallbackValues: targetDelta.remaining,
+    verb: "still appear"
+  });
+  pushTargetLine({
+    kind: "New",
+    summary: introducedSummary,
+    countLabel: "failing target",
+    fallbackValues: targetDelta.introduced,
+    verb: "appeared"
+  });
 
   for (const bucket of args.current.analysis.buckets) {
     const signature = buildBucketSignature(bucket);
@@ -571,8 +805,7 @@ export function diffTestStatusRuns(args: {
   }
 
   return {
-    lines: lines.slice(0, 4),
-    remainingNodeIds: targetDelta.comparable ? targetDelta.remaining : undefined
+    lines: lines.slice(0, 4)
   };
 }
 
@@ -586,15 +819,17 @@ export function renderTestStatusDelta(args: {
 export function getCachedRerunCommand(state: CachedTestStatusRun):
   | { command: string[]; shellCommand?: never }
   | { command?: never; shellCommand: string } {
-  if (state.command?.mode === "argv") {
+  const baselineCommand = state.runner.baselineCommand ?? state.command;
+
+  if (baselineCommand?.mode === "argv") {
     return {
-      command: [...state.command.argv]
+      command: [...baselineCommand.argv]
     };
   }
 
-  if (state.command?.mode === "shell") {
+  if (baselineCommand?.mode === "shell") {
     return {
-      shellCommand: state.command.shellCommand
+      shellCommand: baselineCommand.shellCommand
     };
   }
 
@@ -604,12 +839,12 @@ export function getCachedRerunCommand(state: CachedTestStatusRun):
 }
 
 export function getRemainingPytestRerunCommand(state: CachedTestStatusRun): string[] {
-  if (!state.pytest?.subsetCapable || !state.pytest.baseArgv) {
+  if (!isRemainingSubsetAvailable(state) || !state.runner.subset.baseArgv) {
     throw new Error(
       "Cached test-status run cannot use `sift rerun --remaining`. Automatic remaining-subset reruns currently support only argv-mode `pytest ...` or `python -m pytest ...` commands. Run a narrowed command manually with `sift exec --preset test-status -- <narrowed pytest command>`."
     );
   }
 
   const remainingNodeIds = getRemainingPytestNodeIds(state);
-  return [...state.pytest.baseArgv, ...remainingNodeIds];
+  return [...state.runner.subset.baseArgv, ...remainingNodeIds];
 }

@@ -1,0 +1,70 @@
+FAIL  test/release.workflow.test.ts > release workflow > enforces measured coverage in vitest and CI
+AssertionError: expected 'name: ci\n\non:\n  push:\n  pull_requ…' to contain 'node-version: [20]'
+
+- Expected
++ Received
+
+- node-version: [20]
++ name: ci
++
++ on:
++   push:
++   pull_request:
++
++ jobs:
++   test:
++     runs-on: ubuntu-latest
++     strategy:
++       matrix:
++         node-version: [20, 24]
++
++     steps:
++       - uses: actions/checkout@v4
++
++       - uses: actions/setup-node@v4
++         with:
++           node-version: ${{ matrix.node-version }}
++           cache: npm
++
++       - run: npm ci
++       - run: npm run typecheck
++       - run: npm run test:coverage
++       - run: npm run build
++       - run: npm pack
++
+FAIL  test/release.workflow.test.ts > release workflow > defines a manual trusted-publishing release workflow with tag and GitHub release creation
+AssertionError: expected 'name: release\nrun-name: release ${{ …' to contain 'node-version: 20'
+
+- Expected
++ Received
+
+- node-version: 20
++ name: release
++ run-name: release ${{ inputs.version || github.ref_name }}
++
++ on:
++   workflow_dispatch:
++     inputs:
++       version:
++         description: Package version being released, for example 0.3.2
++         required: true
++         type: string
++
++ jobs:
++   publish:
++     runs-on: ubuntu-latest
++     environment: release
++     permissions:
++       actions: read
++       contents: write
++       id-token: write
++     steps:
++       - uses: actions/checkout@v4
++         with:
++           fetch-depth: 0
++
++       - uses: actions/setup-node@v4
++         with:
++           node-version: 24
++           registry-url: "https://registry.npmjs.org"
++           cache: npm

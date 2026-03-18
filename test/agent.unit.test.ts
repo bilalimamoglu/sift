@@ -122,7 +122,9 @@ describe("agent command helpers", () => {
     expect(block).toContain("`sift escalate` and `sift rerun` require a cached `sift exec --preset test-status -- <test command>` run first.");
     expect(block).toContain("refresh the truth with `sift rerun`");
     expect(block).toContain("sift rerun --remaining --detail focused");
-    expect(block).toContain("`sift rerun --remaining` currently supports only argv-mode `pytest ...` or `python -m pytest ...` runs;");
+    expect(block).toContain(
+      "`sift rerun --remaining` narrows automatically for `pytest` and reruns the full original command for `vitest` and `jest` while keeping the diagnosis focused on what still fails."
+    );
     expect(block).toContain("Use diagnose JSON only when automation or machine branching truly needs it.");
     expect(block).toContain(
       "If `standard` already shows bucket-level root cause, anchor, and fix lines, trust it and report from it directly."

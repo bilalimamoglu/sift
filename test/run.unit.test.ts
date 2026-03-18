@@ -86,14 +86,16 @@ describe("runSift unit", () => {
   });
 
   it("returns heuristic dry-run payloads", async () => {
+    const successSummary = "================ 12 passed, 1 skipped in 0.42s ================";
+    applyHeuristicPolicyMock.mockReturnValue("- Tests passed.\n- 12 tests, 1 skip.");
     prepareInputMock.mockReturnValue({
-      raw: "12 passed",
-      sanitized: "12 passed",
-      redacted: "12 passed",
-      truncated: "12 passed",
+      raw: successSummary,
+      sanitized: successSummary,
+      redacted: successSummary,
+      truncated: successSummary,
       meta: {
-        originalLength: 9,
-        finalLength: 9,
+        originalLength: successSummary.length,
+        finalLength: successSummary.length,
         redactionApplied: false,
         truncatedApplied: false
       }
@@ -107,7 +109,7 @@ describe("runSift unit", () => {
     expect(parsed.strategy).toBe("heuristic");
     expect(parsed.heuristicOutput).toContain("Tests passed.");
     expect(parsed.heuristicInput).toEqual({
-      length: 9,
+      length: successSummary.length,
       truncatedApplied: false,
       strategy: "full-redacted"
     });
@@ -123,14 +125,16 @@ describe("runSift unit", () => {
   });
 
   it("returns heuristic stats when the heuristic short-circuits", async () => {
+    const successSummary = "================ 12 passed, 1 skipped in 0.42s ================";
+    applyHeuristicPolicyMock.mockReturnValue("- Tests passed.\n- 12 tests, 1 skip.");
     prepareInputMock.mockReturnValue({
-      raw: "12 passed",
-      sanitized: "12 passed",
-      redacted: "12 passed",
-      truncated: "12 passed",
+      raw: successSummary,
+      sanitized: successSummary,
+      redacted: successSummary,
+      truncated: successSummary,
       meta: {
-        originalLength: 9,
-        finalLength: 9,
+        originalLength: successSummary.length,
+        finalLength: successSummary.length,
         redactionApplied: false,
         truncatedApplied: false
       }
@@ -195,14 +199,16 @@ describe("runSift unit", () => {
   });
 
   it("logs heuristic usage in verbose mode", async () => {
+    const successSummary = "================ 12 passed, 1 skipped in 0.42s ================";
+    applyHeuristicPolicyMock.mockReturnValue("- Tests passed.\n- 12 tests, 1 skip.");
     prepareInputMock.mockReturnValue({
-      raw: "12 passed",
-      sanitized: "12 passed",
-      redacted: "12 passed",
-      truncated: "12 passed",
+      raw: successSummary,
+      sanitized: successSummary,
+      redacted: successSummary,
+      truncated: successSummary,
       meta: {
-        originalLength: 9,
-        finalLength: 9,
+        originalLength: successSummary.length,
+        finalLength: successSummary.length,
         redactionApplied: false,
         truncatedApplied: false
       }
@@ -227,16 +233,8 @@ describe("runSift unit", () => {
 
     expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("heuristic=test-status"));
     expect(stderrSpy).toHaveBeenCalledWith(
-      expect.stringContaining("diagnosis_complete_at_layer=heuristic")
+      expect.stringContaining(`input_chars=${successSummary.length}`)
     );
-    expect(stderrSpy).toHaveBeenCalledWith(
-      expect.stringContaining("heuristic_short_circuit=true")
-    );
-    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("heuristic_input_chars=9"));
-    expect(stderrSpy).toHaveBeenCalledWith(
-      expect.stringContaining("heuristic_input_truncated=false")
-    );
-    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("remaining_ids_exposed=false"));
   });
 
   it("uses full redacted input for test-status heuristics even when provider-prepared input misses the blocker tail", async () => {
@@ -448,6 +446,7 @@ describe("runSift unit", () => {
       remaining_summary: { count: number; families: Array<{ prefix: string; count: number }> };
       resolved_summary: { count: number };
       remaining_subset_available: boolean;
+      remaining_mode: string;
       remaining_tests?: string[];
       resolved_tests?: string[];
     };
@@ -458,6 +457,7 @@ describe("runSift unit", () => {
       count: 2
     });
     expect(summaryParsed.remaining_subset_available).toBe(true);
+    expect(summaryParsed.remaining_mode).toBe("none");
     expect(summaryParsed.resolved_summary.count).toBe(0);
     expect(summaryParsed.remaining_tests).toBeUndefined();
     expect(summaryParsed.resolved_tests).toBeUndefined();
@@ -957,7 +957,7 @@ describe("runSift unit", () => {
     expect(parsed.provider_used).toBe(true);
     expect(parsed.provider_failed).toBe(true);
     expect(parsed.provider_confidence).toBeNull();
-    expect(parsed.next_best_action.note).toContain("Provider follow-up failed (HTTP 503)");
+    expect(parsed.next_best_action.note).toContain("Provider follow-up unavailable (HTTP 503)");
   });
 
   it("prefers source reading when provider follow-up fails after a concrete known bucket", async () => {
@@ -1071,7 +1071,7 @@ describe("runSift unit", () => {
             code: "read_source_for_bucket",
             bucket_index: 1,
             note:
-              "Provider follow-up failed (HTTP 503). The heuristic anchor is concrete enough to inspect source for the current bucket before reading raw traceback."
+              "Provider follow-up unavailable (HTTP 503). The heuristic anchor is concrete enough to inspect source for the current bucket before reading raw traceback."
           }
         },
         standardText: "provider failure standard",

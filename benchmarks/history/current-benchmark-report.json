@@ -1,0 +1,1884 @@
+{
+  "version": "0.4.0",
+  "generatedAt": "2026-03-18T18:15:54.670Z",
+  "presetBenchmarks": {
+    "tokenizer": "o200k_base",
+    "cases": [
+      {
+        "id": "ts-wall-mixed",
+        "preset": "typecheck-summary",
+        "title": "TypeScript error wall with stable top code groups",
+        "docsSlug": "01-tsc-type-wall",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "grouped-errors",
+        "rawChars": 10233,
+        "rawTokens": 2803,
+        "reducedOutput": "- Typecheck failed: 96 errors in 8 files.\n- TS2322 (type mismatch): 20 occurrences across src/api/client.ts, src/components/Dashboard.tsx, src/components/UserCard.tsx.\n- TS2345 (argument type mismatch): 17 occurrences across src/api/client.ts, src/components/Dashboard.tsx, src/components/UserCard.tsx.\n- TS2339 (missing property on type): 15 occurrences across src/api/client.ts, src/components/Dashboard.tsx, src/components/UserCard.tsx.\n- 4 more error codes across 8 files.",
+        "reducedChars": 476,
+        "reducedTokens": 120,
+        "charsSaved": 9757,
+        "tokensSaved": 2683,
+        "reductionPct": 95.72,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "Typecheck failed: 96 errors in 8 files.",
+          "TS2322 (type mismatch): 20 occurrences",
+          "TS2345 (argument type mismatch): 17 occurrences"
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      },
+      {
+        "id": "ts-module-not-found",
+        "preset": "typecheck-summary",
+        "title": "TypeScript missing-module concentration",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "grouped-errors",
+        "rawChars": 933,
+        "rawTokens": 237,
+        "reducedOutput": "- Typecheck failed: 8 errors in 5 files.\n- TS2307 (cannot find module): 8 occurrences across src/lib/cache.ts, src/lib/database.ts, src/services/mailer.ts.",
+        "reducedChars": 155,
+        "reducedTokens": 42,
+        "charsSaved": 778,
+        "tokensSaved": 195,
+        "reductionPct": 82.28,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "Typecheck failed: 8 errors in 5 files.",
+          "TS2307 (cannot find module): 8 occurrences"
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      },
+      {
+        "id": "ts-single-file-errors",
+        "preset": "typecheck-summary",
+        "title": "TypeScript single-file focused failure",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "grouped-errors",
+        "rawChars": 1246,
+        "rawTokens": 354,
+        "reducedOutput": "- Typecheck failed: 12 errors in 1 file.\n- TS2322 (type mismatch): 3 occurrences across src/utils/transform.ts.\n- TS2339 (missing property on type): 2 occurrences across src/utils/transform.ts.\n- TS2345 (argument type mismatch): 2 occurrences across src/utils/transform.ts.\n- 3 more error codes across 1 file.",
+        "reducedChars": 309,
+        "reducedTokens": 81,
+        "charsSaved": 937,
+        "tokensSaved": 273,
+        "reductionPct": 77.12,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "Typecheck failed: 12 errors in 1 file.",
+          "src/utils/transform.ts"
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      },
+      {
+        "id": "eslint-mixed-rules",
+        "preset": "lint-failures",
+        "title": "ESLint stylish mixed rule summary",
+        "docsSlug": "02-eslint-stylish",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "rule-summary",
+        "rawChars": 7912,
+        "rawTokens": 2046,
+        "reducedOutput": "- Lint failed: 96 problems (60 errors, 36 warnings). 18 problems potentially fixable with --fix.\n- no-unused-vars: 28 errors across src/components/Button.tsx, src/hooks/useData.ts, src/pages/Home.tsx.\n- react/react-in-jsx-scope: 18 errors across src/components/Button.tsx, src/hooks/useData.ts, src/pages/Home.tsx.\n- @typescript-eslint/no-explicit-any: 13 errors across src/components/Button.tsx, src/hooks/useData.ts, src/pages/Home.tsx.\n- 2 more rules across 4 files.",
+        "reducedChars": 469,
+        "reducedTokens": 125,
+        "charsSaved": 7443,
+        "tokensSaved": 1921,
+        "reductionPct": 93.89,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "Lint failed: 96 problems (60 errors, 36 warnings). 18 problems potentially fixable with --fix.",
+          "no-unused-vars: 28 errors",
+          "react/react-in-jsx-scope: 18 errors"
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      },
+      {
+        "id": "eslint-single-file-dense",
+        "preset": "lint-failures",
+        "title": "ESLint dense single-file report",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "rule-summary",
+        "rawChars": 1873,
+        "rawTokens": 493,
+        "reducedOutput": "- Lint failed: 22 problems (15 errors, 7 warnings).\n- no-unused-vars: 8 errors across src/legacy/DataTable.js.\n- react/react-in-jsx-scope: 5 errors across src/legacy/DataTable.js.\n- @typescript-eslint/no-explicit-any: 2 errors across src/legacy/DataTable.js.\n- 2 more rules across 1 file.",
+        "reducedChars": 288,
+        "reducedTokens": 82,
+        "charsSaved": 1585,
+        "tokensSaved": 411,
+        "reductionPct": 83.37,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "Lint failed: 22 problems (15 errors, 7 warnings).",
+          "no-unused-vars: 8 errors",
+          "react/react-in-jsx-scope: 5 errors"
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      },
+      {
+        "id": "eslint-warnings-only",
+        "preset": "lint-failures",
+        "title": "ESLint warnings-only output",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "rule-summary",
+        "rawChars": 555,
+        "rawTokens": 149,
+        "reducedOutput": "- No lint errors visible: 8 warnings.\n- no-console: 4 warnings across src/config.ts, src/index.ts.\n- prefer-const: 4 warnings across src/config.ts, src/index.ts.",
+        "reducedChars": 161,
+        "reducedTokens": 43,
+        "charsSaved": 394,
+        "tokensSaved": 106,
+        "reductionPct": 71.14,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "No lint errors visible: 8 warnings.",
+          "no-console: 4 warnings",
+          "prefer-const: 4 warnings"
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      },
+      {
+        "id": "esbuild-missing-module",
+        "preset": "build-failure",
+        "title": "esbuild missing module root cause",
+        "docsSlug": "03-esbuild-build-failure",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "brief-root-cause",
+        "rawChars": 339,
+        "rawTokens": 83,
+        "reducedOutput": "Build failed: Could not resolve \"react-query\" in src/hooks/usePosts.ts:3. Fix: Install the missing package or fix the import path.",
+        "reducedChars": 130,
+        "reducedTokens": 31,
+        "charsSaved": 209,
+        "tokensSaved": 52,
+        "reductionPct": 62.65,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "react-query",
+          "src/hooks/usePosts.ts:3",
+          "Install the missing package or fix the import path."
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      },
+      {
+        "id": "webpack-type-error",
+        "preset": "build-failure",
+        "title": "webpack TypeScript type error",
+        "docsSlug": "06-webpack-build-failure",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "brief-root-cause",
+        "rawChars": 244,
+        "rawTokens": 69,
+        "reducedOutput": "Build failed: Type 'string' is not assignable to type 'UserStatus' in src/reducers/userSlice.ts. Fix: Fix the type error at the indicated location.",
+        "reducedChars": 147,
+        "reducedTokens": 36,
+        "charsSaved": 97,
+        "tokensSaved": 33,
+        "reductionPct": 47.83,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "userSlice.ts",
+          "Type 'string' is not assignable to type 'UserStatus'",
+          "Fix the type error at the indicated location."
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      },
+      {
+        "id": "vite-syntax-error",
+        "preset": "build-failure",
+        "title": "Vite/esbuild syntax error root cause",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "brief-root-cause",
+        "rawChars": 403,
+        "rawTokens": 108,
+        "reducedOutput": "Build failed: Expected \";\" but found \"{\" in src/utils/parser.ts:18. Fix: Fix the syntax error at the indicated location.",
+        "reducedChars": 120,
+        "reducedTokens": 28,
+        "charsSaved": 283,
+        "tokensSaved": 80,
+        "reductionPct": 74.07,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "parser.ts:18",
+          "Expected \";\" but found \"{\"",
+          "Fix the syntax error at the indicated location."
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      },
+      {
+        "id": "vite-import-analysis-missing-import",
+        "preset": "build-failure",
+        "title": "Vite import-analysis missing import",
+        "docsSlug": "07-vite-import-analysis",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "brief-root-cause",
+        "rawChars": 372,
+        "rawTokens": 99,
+        "reducedOutput": "Build failed: Failed to resolve import \"@/lib/missing\" in src/routes/dashboard.tsx. Fix: Install the missing package or fix the import path.",
+        "reducedChars": 140,
+        "reducedTokens": 31,
+        "charsSaved": 232,
+        "tokensSaved": 68,
+        "reductionPct": 68.69,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "Failed to resolve import \"@/lib/missing\"",
+          "src/routes/dashboard.tsx",
+          "Install the missing package or fix the import path."
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      },
+      {
+        "id": "npm-audit-critical-only",
+        "preset": "audit-critical",
+        "title": "npm audit default report with only critical findings",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "security-findings",
+        "rawChars": 797,
+        "rawTokens": 205,
+        "reducedOutput": "{\n  \"status\": \"ok\",\n  \"vulnerabilities\": [\n    {\n      \"package\": \"lodash\",\n      \"severity\": \"critical\",\n      \"remediation\": \"Upgrade lodash to a patched version.\"\n    },\n    {\n      \"package\": \"serialize-javascript\",\n      \"severity\": \"critical\",\n      \"remediation\": \"Upgrade serialize-javascript to a patched version.\"\n    }\n  ],\n  \"summary\": \"2 high or critical vulnerabilities found in the provided input.\"\n}",
+        "reducedChars": 415,
+        "reducedTokens": 100,
+        "charsSaved": 382,
+        "tokensSaved": 105,
+        "reductionPct": 51.22,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "\"status\": \"ok\"",
+          "\"package\": \"lodash\"",
+          "\"severity\": \"critical\"",
+          "2 high or critical vulnerabilities found in the provided input."
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      },
+      {
+        "id": "npm-audit-mixed-severity",
+        "preset": "audit-critical",
+        "title": "npm audit default report with mixed critical/high/moderate severities",
+        "docsSlug": "04-npm-audit-critical",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "security-findings",
+        "rawChars": 1490,
+        "rawTokens": 435,
+        "reducedOutput": "{\n  \"status\": \"ok\",\n  \"vulnerabilities\": [\n    {\n      \"package\": \"lodash\",\n      \"severity\": \"critical\",\n      \"remediation\": \"Upgrade lodash to a patched version.\"\n    },\n    {\n      \"package\": \"@babel/traverse\",\n      \"severity\": \"critical\",\n      \"remediation\": \"Upgrade @babel/traverse to a patched version.\"\n    },\n    {\n      \"package\": \"semver\",\n      \"severity\": \"high\",\n      \"remediation\": \"Upgrade semver to a patched version.\"\n    },\n    {\n      \"package\": \"tough-cookie\",\n      \"severity\": \"high\",\n      \"remediation\": \"Upgrade tough-cookie to a patched version.\"\n    }\n  ],\n  \"summary\": \"4 high or critical vulnerabilities found in the provided input.\"\n}",
+        "reducedChars": 669,
+        "reducedTokens": 168,
+        "charsSaved": 821,
+        "tokensSaved": 267,
+        "reductionPct": 61.38,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "\"status\": \"ok\"",
+          "\"package\": \"lodash\"",
+          "\"package\": \"semver\"",
+          "4 high or critical vulnerabilities found in the provided input."
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      },
+      {
+        "id": "npm-audit-clean",
+        "preset": "audit-critical",
+        "title": "Explicitly clean audit output",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "security-findings",
+        "rawChars": 486,
+        "rawTokens": 110,
+        "reducedOutput": "{\n  \"status\": \"ok\",\n  \"vulnerabilities\": [],\n  \"summary\": \"No high or critical vulnerabilities found in the provided input.\"\n}",
+        "reducedChars": 126,
+        "reducedTokens": 32,
+        "charsSaved": 360,
+        "tokensSaved": 78,
+        "reductionPct": 70.91,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "\"status\": \"ok\"",
+          "\"vulnerabilities\": []",
+          "No high or critical vulnerabilities found in the provided input."
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      },
+      {
+        "id": "tf-plan-destroy",
+        "preset": "infra-risk",
+        "title": "Terraform plan with destructive changes",
+        "docsSlug": "05-terraform-destructive",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "risk-verdict",
+        "rawChars": 684,
+        "rawTokens": 175,
+        "reducedOutput": "{\n  \"verdict\": \"fail\",\n  \"reason\": \"Destructive or clearly risky infrastructure change signals are present.\",\n  \"evidence\": [\n    \"Plan: 1 to add, 1 to change, 2 to destroy.\",\n    \"# aws_s3_bucket.uploads will be destroyed\",\n    \"# aws_rds_instance.primary will be destroyed\",\n    \"- destroy\"\n  ],\n  \"destroy_count\": 2,\n  \"destroy_targets\": [\n    \"aws_s3_bucket.uploads\",\n    \"aws_rds_instance.primary\"\n  ],\n  \"blockers\": []\n}",
+        "reducedChars": 426,
+        "reducedTokens": 119,
+        "charsSaved": 258,
+        "tokensSaved": 56,
+        "reductionPct": 32,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "\"verdict\": \"fail\"",
+          "Destructive or clearly risky infrastructure change signals are present.",
+          "# aws_s3_bucket.uploads will be destroyed"
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      },
+      {
+        "id": "tf-plan-safe-additions",
+        "preset": "infra-risk",
+        "title": "Terraform plan with safe additive changes",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "risk-verdict",
+        "rawChars": 485,
+        "rawTokens": 131,
+        "reducedOutput": "{\n  \"verdict\": \"pass\",\n  \"reason\": \"The provided input explicitly indicates zero destructive changes.\",\n  \"evidence\": [\n    \"Plan: 2 to add, 0 to change, 0 to destroy.\"\n  ],\n  \"destroy_count\": 0,\n  \"destroy_targets\": [],\n  \"blockers\": []\n}",
+        "reducedChars": 239,
+        "reducedTokens": 71,
+        "charsSaved": 246,
+        "tokensSaved": 60,
+        "reductionPct": 45.8,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "\"verdict\": \"pass\"",
+          "The provided input explicitly indicates zero destructive changes.",
+          "0 to destroy"
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      },
+      {
+        "id": "tf-plan-mixed-risk",
+        "preset": "infra-risk",
+        "title": "Terraform plan with mixed change types but destructive risk",
+        "sourceType": "synthetic-derived",
+        "expectedReductionKind": "risk-verdict",
+        "rawChars": 511,
+        "rawTokens": 151,
+        "reducedOutput": "{\n  \"verdict\": \"fail\",\n  \"reason\": \"Destructive or clearly risky infrastructure change signals are present.\",\n  \"evidence\": [\n    \"Plan: 1 to add, 1 to change, 1 to destroy.\",\n    \"# aws_sqs_queue.dead_letter will be destroyed\",\n    \"# aws_iam_role.worker will be updated in-place\",\n    \"~ resource \\\"aws_iam_role\\\" \\\"worker\\\" {\"\n  ],\n  \"destroy_count\": 1,\n  \"destroy_targets\": [\n    \"aws_sqs_queue.dead_letter\"\n  ],\n  \"blockers\": []\n}",
+        "reducedChars": 435,
+        "reducedTokens": 123,
+        "charsSaved": 76,
+        "tokensSaved": 28,
+        "reductionPct": 18.54,
+        "heuristicFired": true,
+        "snippetsFound": [
+          "\"verdict\": \"fail\"",
+          "Destructive or clearly risky infrastructure change signals are present.",
+          "aws_sqs_queue.dead_letter will be destroyed"
+        ],
+        "snippetsMissing": [],
+        "pass": true
+      }
+    ],
+    "aggregate": {
+      "totalCases": 16,
+      "passed": 16,
+      "heuristicFiredCount": 16,
+      "totalRawTokens": 7648,
+      "totalReducedTokens": 1232,
+      "avgReductionPct": 64.79
+    },
+    "byPreset": [
+      {
+        "preset": "typecheck-summary",
+        "caseCount": 3,
+        "passed": 3,
+        "heuristicFiredCount": 3,
+        "totalRawTokens": 3394,
+        "totalReducedTokens": 243,
+        "avgReductionPct": 85.04
+      },
+      {
+        "preset": "lint-failures",
+        "caseCount": 3,
+        "passed": 3,
+        "heuristicFiredCount": 3,
+        "totalRawTokens": 2688,
+        "totalReducedTokens": 250,
+        "avgReductionPct": 82.8
+      },
+      {
+        "preset": "build-failure",
+        "caseCount": 4,
+        "passed": 4,
+        "heuristicFiredCount": 4,
+        "totalRawTokens": 359,
+        "totalReducedTokens": 126,
+        "avgReductionPct": 63.31
+      },
+      {
+        "preset": "audit-critical",
+        "caseCount": 3,
+        "passed": 3,
+        "heuristicFiredCount": 3,
+        "totalRawTokens": 750,
+        "totalReducedTokens": 300,
+        "avgReductionPct": 61.17
+      },
+      {
+        "preset": "infra-risk",
+        "caseCount": 3,
+        "passed": 3,
+        "heuristicFiredCount": 3,
+        "totalRawTokens": 457,
+        "totalReducedTokens": 313,
+        "avgReductionPct": 32.11
+      }
+    ]
+  },
+  "testStatusBenchmarks": {
+    "tokenizer": "o200k_base",
+    "fixtures": [
+      {
+        "name": "single-blocker-short",
+        "description": "One DB-backed env blocker on an otherwise short test run.",
+        "decision": "stop",
+        "primarySuspectKind": "environment",
+        "readTargetsCount": 1,
+        "unknownBucketCount": 0,
+        "completion": {
+          "complete": true,
+          "expectedBuckets": [
+            "shared_environment_blocker"
+          ],
+          "bucketTypesFound": [
+            "shared_environment_blocker"
+          ],
+          "missingBuckets": [],
+          "expectedEntitiesAny": [
+            "PGTEST_POSTGRES_DSN"
+          ],
+          "matchedEntitiesAny": [
+            "PGTEST_POSTGRES_DSN"
+          ],
+          "entitiesFound": [
+            "PGTEST_POSTGRES_DSN"
+          ],
+          "expectedMaxDetail": "standard",
+          "actualMaxDetail": "standard"
+        },
+        "primary": {
+          "raw": {
+            "chars": 1056,
+            "tokens": 221
+          },
+          "standard": {
+            "chars": 523,
+            "tokens": 133
+          },
+          "focused": {
+            "chars": 538,
+            "tokens": 136
+          },
+          "verbose": {
+            "chars": 538,
+            "tokens": 136
+          },
+          "verboseShowRaw": {
+            "chars": 1595,
+            "tokens": 358
+          },
+          "diagnoseJson": {
+            "chars": 1904,
+            "tokens": 535
+          }
+        },
+        "reductions": {
+          "standard": {
+            "chars": 523,
+            "tokens": 133,
+            "charsSaved": 533,
+            "charsPct": 50.47,
+            "tokensSaved": 88,
+            "tokensPct": 39.82
+          },
+          "focused": {
+            "chars": 538,
+            "tokens": 136,
+            "charsSaved": 518,
+            "charsPct": 49.05,
+            "tokensSaved": 85,
+            "tokensPct": 38.46
+          },
+          "verbose": {
+            "chars": 538,
+            "tokens": 136,
+            "charsSaved": 518,
+            "charsPct": 49.05,
+            "tokensSaved": 85,
+            "tokensPct": 38.46
+          },
+          "verboseShowRaw": {
+            "chars": 1595,
+            "tokens": 358,
+            "charsSaved": -539,
+            "charsPct": -51.04,
+            "tokensSaved": -137,
+            "tokensPct": -61.99
+          },
+          "diagnoseJson": {
+            "chars": 1904,
+            "tokens": 535,
+            "charsSaved": -848,
+            "charsPct": -80.3,
+            "tokensSaved": -314,
+            "tokensPct": -142.08
+          }
+        },
+        "recipe": {
+          "siftFirst": {
+            "chars": 523,
+            "tokens": 133,
+            "stepCount": 1,
+            "stepsUsed": [
+              "standard"
+            ],
+            "complete": true,
+            "completionDepth": "standard"
+          },
+          "rawFirst": {
+            "chars": 1056,
+            "tokens": 221,
+            "stepCount": 1,
+            "stepsUsed": [
+              "python -m pytest tests/ -x"
+            ],
+            "complete": true,
+            "completionDepth": null
+          }
+        },
+        "rendered": {
+          "standardText": "- Tests did not pass.\n- 1 error occurred.\n- Shared blocker: 1 errors require PGTEST_POSTGRES_DSN for DB-isolated tests.\n- Anchor: search PGTEST_POSTGRES_DSN in tests/contracts/test_db_schema_freeze.py\n- Fix: Set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-isolated tests.\n- Decision: stop and act. Do not escalate unless you need exact traceback lines.\n- Likely owner: environment setup\n- Next: Fix bucket 1 first, then rerun the full suite at standard.\n- Stop signal: diagnosis complete; raw not needed.",
+          "focusedText": "- Tests did not pass.\n- 1 error occurred.\n- Shared blocker: 1 errors require PGTEST_POSTGRES_DSN for DB-isolated tests.\n  - tests/contracts/test_db_schema_freeze.py::test_database_schema_snapshot_is_frozen -> missing test env: PGTEST_POSTGRES_DSN\n  - Hint: Set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-isolated tests.\n- Decision: stop and act. Do not escalate unless you need exact traceback lines.\n- Next: Fix bucket 1 first, then rerun the full suite at standard.\n- Stop signal: diagnosis complete; raw not needed.",
+          "verboseText": "- Tests did not pass.\n- 1 error occurred.\n- Shared blocker: 1 errors require PGTEST_POSTGRES_DSN for DB-isolated tests.\n  - tests/contracts/test_db_schema_freeze.py::test_database_schema_snapshot_is_frozen -> missing test env: PGTEST_POSTGRES_DSN\n  - Hint: Set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-isolated tests.\n- Decision: stop and act. Do not escalate unless you need exact traceback lines.\n- Next: Fix bucket 1 first, then rerun the full suite at standard.\n- Stop signal: diagnosis complete; raw not needed.",
+          "diagnoseJson": "{\n  \"status\": \"ok\",\n  \"diagnosis_complete\": true,\n  \"raw_needed\": false,\n  \"additional_source_read_likely_low_value\": true,\n  \"read_raw_only_if\": null,\n  \"decision\": \"stop\",\n  \"remaining_mode\": \"none\",\n  \"primary_suspect_kind\": \"environment\",\n  \"confidence_reason\": \"Dominant blocker (missing test env) is anchored and actionable.\",\n  \"dominant_blocker_bucket_index\": 1,\n  \"provider_used\": false,\n  \"provider_confidence\": null,\n  \"provider_failed\": false,\n  \"raw_slice_used\": false,\n  \"raw_slice_strategy\": \"none\",\n  \"main_buckets\": [\n    {\n      \"bucket_index\": 1,\n      \"label\": \"missing test env\",\n      \"count\": 1,\n      \"root_cause\": \"missing test env: PGTEST_POSTGRES_DSN\",\n      \"suspect_kind\": \"environment\",\n      \"fix_hint\": \"Set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-isolated tests.\",\n      \"evidence\": [\n        \"tests/contracts/test_db_schema_freeze.py::test_database_schema_snapshot_is_frozen -> missing test env: PGTEST_POSTGRES_DSN\"\n      ],\n      \"bucket_confidence\": 0.95,\n      \"root_cause_confidence\": 0.95,\n      \"dominant\": true,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": null\n    }\n  ],\n  \"read_targets\": [\n    {\n      \"file\": \"tests/contracts/test_db_schema_freeze.py\",\n      \"line\": null,\n      \"why\": \"it contains the PGTEST_POSTGRES_DSN setup guard\",\n      \"bucket_index\": 1,\n      \"context_hint\": {\n        \"start_line\": null,\n        \"end_line\": null,\n        \"search_hint\": \"PGTEST_POSTGRES_DSN\"\n      }\n    }\n  ],\n  \"next_best_action\": {\n    \"code\": \"fix_dominant_blocker\",\n    \"bucket_index\": 1,\n    \"note\": \"Fix bucket 1 first, then rerun the full suite at standard.\"\n  },\n  \"resolved_summary\": {\n    \"count\": 0,\n    \"families\": []\n  },\n  \"remaining_summary\": {\n    \"count\": 1,\n    \"families\": [\n      {\n        \"prefix\": \"tests/contracts/\",\n        \"count\": 1\n      }\n    ]\n  },\n  \"remaining_subset_available\": false\n}"
+        }
+      },
+      {
+        "name": "mixed-full-suite",
+        "description": "Shared DB blocker plus contract drift in a larger suite.",
+        "decision": "stop",
+        "primarySuspectKind": "environment",
+        "readTargetsCount": 2,
+        "unknownBucketCount": 0,
+        "completion": {
+          "complete": true,
+          "expectedBuckets": [
+            "shared_environment_blocker",
+            "contract_snapshot_drift"
+          ],
+          "bucketTypesFound": [
+            "shared_environment_blocker",
+            "contract_snapshot_drift"
+          ],
+          "missingBuckets": [],
+          "expectedEntitiesAny": [
+            "PGTEST_POSTGRES_DSN",
+            "openai-gpt-image-1.5",
+            "/api/v1/admin/landing-gallery"
+          ],
+          "matchedEntitiesAny": [
+            "PGTEST_POSTGRES_DSN",
+            "openai-gpt-image-1.5",
+            "/api/v1/admin/landing-gallery"
+          ],
+          "entitiesFound": [
+            "PGTEST_POSTGRES_DSN",
+            "/api/v1/admin/landing-gallery",
+            "/api/v1/admin/landing-gallery/drafts/{draft_id}/discard",
+            "/api/v1/admin/landing-gallery/publish",
+            "/api/v1/admin/landing-gallery/uploads/stream",
+            "openai-gpt-image-1.5",
+            "GET"
+          ],
+          "expectedMaxDetail": "standard",
+          "actualMaxDetail": "standard"
+        },
+        "primary": {
+          "raw": {
+            "chars": 35007,
+            "tokens": 8448
+          },
+          "standard": {
+            "chars": 887,
+            "tokens": 210
+          },
+          "focused": {
+            "chars": 1321,
+            "tokens": 313
+          },
+          "verbose": {
+            "chars": 1776,
+            "tokens": 426
+          },
+          "verboseShowRaw": {
+            "chars": 36784,
+            "tokens": 8874
+          },
+          "diagnoseJson": {
+            "chars": 3440,
+            "tokens": 917
+          }
+        },
+        "reductions": {
+          "standard": {
+            "chars": 887,
+            "tokens": 210,
+            "charsSaved": 34120,
+            "charsPct": 97.47,
+            "tokensSaved": 8238,
+            "tokensPct": 97.51
+          },
+          "focused": {
+            "chars": 1321,
+            "tokens": 313,
+            "charsSaved": 33686,
+            "charsPct": 96.23,
+            "tokensSaved": 8135,
+            "tokensPct": 96.29
+          },
+          "verbose": {
+            "chars": 1776,
+            "tokens": 426,
+            "charsSaved": 33231,
+            "charsPct": 94.93,
+            "tokensSaved": 8022,
+            "tokensPct": 94.96
+          },
+          "verboseShowRaw": {
+            "chars": 36784,
+            "tokens": 8874,
+            "charsSaved": -1777,
+            "charsPct": -5.08,
+            "tokensSaved": -426,
+            "tokensPct": -5.04
+          },
+          "diagnoseJson": {
+            "chars": 3440,
+            "tokens": 917,
+            "charsSaved": 31567,
+            "charsPct": 90.17,
+            "tokensSaved": 7531,
+            "tokensPct": 89.15
+          }
+        },
+        "recipe": {
+          "siftFirst": {
+            "chars": 887,
+            "tokens": 210,
+            "stepCount": 1,
+            "stepsUsed": [
+              "standard"
+            ],
+            "complete": true,
+            "completionDepth": "standard"
+          },
+          "rawFirst": {
+            "chars": 36010,
+            "tokens": 8704,
+            "stepCount": 4,
+            "stepsUsed": [
+              "python -m pytest tests/",
+              "python -m pytest tests/ --tb=no -q",
+              "python -m pytest tests/contracts/test_openapi_contract_freeze.py --tb=long | grep -A10 \"Left contains\"",
+              "python -m pytest tests/contracts/test_feature_manifest_freeze.py --tb=short"
+            ],
+            "complete": true,
+            "completionDepth": null
+          }
+        },
+        "rendered": {
+          "standardText": "- Tests did not pass.\n- 3 tests failed. 124 errors occurred.\n- Shared blocker: 124 errors require PGTEST_POSTGRES_DSN for DB-isolated tests.\n- Anchor: search PGTEST_POSTGRES_DSN in tests/contracts/test_db_schema_freeze.py\n- Fix: Set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-isolated tests.\n- Contract drift: 3 freeze tests are out of sync with current API/model state.\n- Anchor: search /api/v1/admin/landing-gallery in tests/contracts/test_feature_manifest_freeze.py\n- Fix: If these changes are intentional, run python scripts/update_contract_snapshots.py and rerun the freeze tests.\n- Decision: stop and act. Do not escalate unless you need exact traceback lines.\n- Likely owner: environment setup\n- Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\n- Stop signal: diagnosis complete; raw not needed.",
+          "focusedText": "- Tests did not pass.\n- 3 tests failed. 124 errors occurred.\n- Shared blocker: 124 errors require PGTEST_POSTGRES_DSN for DB-isolated tests.\n  - tests/contracts/test_db_schema_freeze.py::test_database_schema_snapshot_is_frozen -> missing test env: PGTEST_POSTGRES_DSN\n  - tests/contracts/test_frontend_catalog_payload.py::test_provider_capabilities_payload_matches_response_schema -> missing test env: PGTEST_POSTGRES_DSN\n  - Hint: Set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-isolated tests.\n- Contract drift: 3 freeze tests are out of sync with current API/model state.\n- Contract drift includes 4 added API paths and removed model ids such as openai-gpt-image-1.5.\n  - tests/contracts/test_feature_manifest_freeze.py::test_feature_manifest_is_frozen -> removed model: openai-gpt-image-1.5\n  - tests/contracts/test_openapi_contract_freeze.py::test_openapi_paths_and_methods_are_frozen -> added path: /api/v1/admin/landing-gallery\n  - Hint: If these changes are intentional, run python scripts/update_contract_snapshots.py and rerun the freeze tests.\n- Decision: stop and act. Do not escalate unless you need exact traceback lines.\n- Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\n- Stop signal: diagnosis complete; raw not needed.",
+          "verboseText": "- Tests did not pass.\n- 3 tests failed. 124 errors occurred.\n- Shared blocker: 124 errors require PGTEST_POSTGRES_DSN for DB-isolated tests.\n  - tests/contracts/test_db_schema_freeze.py::test_database_schema_snapshot_is_frozen -> missing test env: PGTEST_POSTGRES_DSN\n  - tests/contracts/test_frontend_catalog_payload.py::test_provider_capabilities_payload_matches_response_schema -> missing test env: PGTEST_POSTGRES_DSN\n  - tests/e2e/test_core_functionality.py::test_health_and_provider_capabilities -> missing test env: PGTEST_POSTGRES_DSN\n  - tests/unit/providers/test_provider_capabilities_and_schema.py::test_scene_reference_schema_auto_migrates -> missing test env: PGTEST_POSTGRES_DSN\n  - Hint: Set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-isolated tests.\n- Contract drift: 3 freeze tests are out of sync with current API/model state.\n- Contract drift includes 4 added API paths and removed model ids such as openai-gpt-image-1.5.\n  - tests/contracts/test_feature_manifest_freeze.py::test_feature_manifest_is_frozen -> removed model: openai-gpt-image-1.5\n  - tests/contracts/test_openapi_contract_freeze.py::test_openapi_paths_and_methods_are_frozen -> added path: /api/v1/admin/landing-gallery\n  - tests/contracts/test_task_matrix_snapshot_freeze.py::test_task_matrix_snapshot_is_frozen -> removed model: openai-gpt-image-1.5\n  - mini-diff: {\"added_paths\":4,\"removed_models\":2}\n  - Hint: If these changes are intentional, run python scripts/update_contract_snapshots.py and rerun the freeze tests.\n- Decision: stop and act. Do not escalate unless you need exact traceback lines.\n- Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\n- Stop signal: diagnosis complete; raw not needed.",
+          "diagnoseJson": "{\n  \"status\": \"ok\",\n  \"diagnosis_complete\": true,\n  \"raw_needed\": false,\n  \"additional_source_read_likely_low_value\": true,\n  \"read_raw_only_if\": null,\n  \"decision\": \"stop\",\n  \"remaining_mode\": \"none\",\n  \"primary_suspect_kind\": \"environment\",\n  \"confidence_reason\": \"Dominant blocker (missing test env) is anchored and actionable.\",\n  \"dominant_blocker_bucket_index\": 1,\n  \"provider_used\": false,\n  \"provider_confidence\": null,\n  \"provider_failed\": false,\n  \"raw_slice_used\": false,\n  \"raw_slice_strategy\": \"none\",\n  \"main_buckets\": [\n    {\n      \"bucket_index\": 1,\n      \"label\": \"missing test env\",\n      \"count\": 124,\n      \"root_cause\": \"missing test env: PGTEST_POSTGRES_DSN\",\n      \"suspect_kind\": \"environment\",\n      \"fix_hint\": \"Set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-isolated tests.\",\n      \"evidence\": [\n        \"tests/contracts/test_db_schema_freeze.py::test_database_schema_snapshot_is_frozen -> missing test env: PGTEST_POSTGRES_DSN\",\n        \"tests/contracts/test_frontend_catalog_payload.py::test_provider_capabilities_payload_matches_response_schema -> missing test env: PGTEST_POSTGRES_DSN\"\n      ],\n      \"bucket_confidence\": 0.95,\n      \"root_cause_confidence\": 0.95,\n      \"dominant\": true,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": null\n    },\n    {\n      \"bucket_index\": 2,\n      \"label\": \"route drift\",\n      \"count\": 3,\n      \"root_cause\": \"freeze snapshots are out of sync with current API/model state\",\n      \"suspect_kind\": \"test\",\n      \"fix_hint\": \"If these changes are intentional, run python scripts/update_contract_snapshots.py and rerun the freeze tests.\",\n      \"evidence\": [\n        \"tests/contracts/test_feature_manifest_freeze.py::test_feature_manifest_is_frozen -> removed model: openai-gpt-image-1.5\",\n        \"tests/contracts/test_openapi_contract_freeze.py::test_openapi_paths_and_methods_are_frozen -> added path: /api/v1/admin/landing-gallery\"\n      ],\n      \"bucket_confidence\": 0.95,\n      \"root_cause_confidence\": 0.92,\n      \"dominant\": false,\n      \"secondary_visible_despite_blocker\": true,\n      \"mini_diff\": {\n        \"added_paths\": 4,\n        \"removed_models\": 2\n      }\n    }\n  ],\n  \"read_targets\": [\n    {\n      \"file\": \"tests/contracts/test_db_schema_freeze.py\",\n      \"line\": null,\n      \"why\": \"it contains the PGTEST_POSTGRES_DSN setup guard\",\n      \"bucket_index\": 1,\n      \"context_hint\": {\n        \"start_line\": null,\n        \"end_line\": null,\n        \"search_hint\": \"PGTEST_POSTGRES_DSN\"\n      }\n    },\n    {\n      \"file\": \"tests/contracts/test_feature_manifest_freeze.py\",\n      \"line\": null,\n      \"why\": \"it maps to the visible route drift bucket\",\n      \"bucket_index\": 2,\n      \"context_hint\": {\n        \"start_line\": null,\n        \"end_line\": null,\n        \"search_hint\": \"/api/v1/admin/landing-gallery\"\n      }\n    }\n  ],\n  \"next_best_action\": {\n    \"code\": \"fix_dominant_blocker\",\n    \"bucket_index\": 1,\n    \"note\": \"Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\"\n  },\n  \"resolved_summary\": {\n    \"count\": 0,\n    \"families\": []\n  },\n  \"remaining_summary\": {\n    \"count\": 7,\n    \"families\": [\n      {\n        \"prefix\": \"tests/contracts/\",\n        \"count\": 5\n      },\n      {\n        \"prefix\": \"tests/e2e/\",\n        \"count\": 1\n      },\n      {\n        \"prefix\": \"tests/unit/\",\n        \"count\": 1\n      }\n    ]\n  },\n  \"remaining_subset_available\": false\n}"
+        }
+      },
+      {
+        "name": "snapshot-drift-only",
+        "description": "Only freeze tests are failing because snapshots are stale.",
+        "decision": "read_source",
+        "primarySuspectKind": "test",
+        "readTargetsCount": 1,
+        "unknownBucketCount": 0,
+        "completion": {
+          "complete": true,
+          "expectedBuckets": [
+            "contract_snapshot_drift"
+          ],
+          "bucketTypesFound": [
+            "contract_snapshot_drift"
+          ],
+          "missingBuckets": [],
+          "expectedEntitiesAny": [
+            "openai-gpt-image-1.5",
+            "/api/v1/admin/landing-gallery"
+          ],
+          "matchedEntitiesAny": [
+            "openai-gpt-image-1.5",
+            "/api/v1/admin/landing-gallery"
+          ],
+          "entitiesFound": [
+            "/api/v1/admin/landing-gallery",
+            "openai-gpt-image-1.5",
+            "GET"
+          ],
+          "expectedMaxDetail": "standard",
+          "actualMaxDetail": "standard"
+        },
+        "primary": {
+          "raw": {
+            "chars": 1258,
+            "tokens": 292
+          },
+          "standard": {
+            "chars": 653,
+            "tokens": 146
+          },
+          "focused": {
+            "chars": 891,
+            "tokens": 207
+          },
+          "verbose": {
+            "chars": 1075,
+            "tokens": 257
+          },
+          "verboseShowRaw": {
+            "chars": 2334,
+            "tokens": 550
+          },
+          "diagnoseJson": {
+            "chars": 2270,
+            "tokens": 600
+          }
+        },
+        "reductions": {
+          "standard": {
+            "chars": 653,
+            "tokens": 146,
+            "charsSaved": 605,
+            "charsPct": 48.09,
+            "tokensSaved": 146,
+            "tokensPct": 50
+          },
+          "focused": {
+            "chars": 891,
+            "tokens": 207,
+            "charsSaved": 367,
+            "charsPct": 29.17,
+            "tokensSaved": 85,
+            "tokensPct": 29.11
+          },
+          "verbose": {
+            "chars": 1075,
+            "tokens": 257,
+            "charsSaved": 183,
+            "charsPct": 14.55,
+            "tokensSaved": 35,
+            "tokensPct": 11.99
+          },
+          "verboseShowRaw": {
+            "chars": 2334,
+            "tokens": 550,
+            "charsSaved": -1076,
+            "charsPct": -85.53,
+            "tokensSaved": -258,
+            "tokensPct": -88.36
+          },
+          "diagnoseJson": {
+            "chars": 2270,
+            "tokens": 600,
+            "charsSaved": -1012,
+            "charsPct": -80.45,
+            "tokensSaved": -308,
+            "tokensPct": -105.48
+          }
+        },
+        "recipe": {
+          "siftFirst": {
+            "chars": 653,
+            "tokens": 146,
+            "stepCount": 1,
+            "stepsUsed": [
+              "standard"
+            ],
+            "complete": true,
+            "completionDepth": "standard"
+          },
+          "rawFirst": {
+            "chars": 1538,
+            "tokens": 370,
+            "stepCount": 2,
+            "stepsUsed": [
+              "python -m pytest tests/contracts/test_feature_manifest_freeze.py tests/contracts/test_openapi_contract_freeze.py tests/contracts/test_task_matrix_snapshot_freeze.py",
+              "python -m pytest tests/contracts/test_openapi_contract_freeze.py --tb=long | grep -A10 \"Left contains\""
+            ],
+            "complete": true,
+            "completionDepth": null
+          }
+        },
+        "rendered": {
+          "standardText": "- Tests did not pass.\n- 3 tests failed.\n- Contract drift: 3 freeze tests are out of sync with current API/model state.\n- Anchor: search /api/v1/admin/landing-gallery in tests/contracts/test_feature_manifest_freeze.py\n- Fix: If these changes are intentional, run python scripts/update_contract_snapshots.py and rerun the freeze tests.\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Likely owner: test code\n- Next: Search for /api/v1/admin/landing-gallery in tests/contracts/test_feature_manifest_freeze.py first; it maps to the visible route drift bucket.\n- Stop signal: diagnosis complete; raw not needed.",
+          "focusedText": "- Tests did not pass.\n- 3 tests failed.\n- Contract drift: 3 freeze tests are out of sync with current API/model state.\n- Contract drift includes 1 added API path and removed model ids such as openai-gpt-image-1.5.\n  - tests/contracts/test_feature_manifest_freeze.py::test_feature_manifest_is_frozen -> removed model: openai-gpt-image-1.5\n  - tests/contracts/test_openapi_contract_freeze.py::test_openapi_paths_and_methods_are_frozen -> added path: /api/v1/admin/landing-gallery\n  - Hint: If these changes are intentional, run python scripts/update_contract_snapshots.py and rerun the freeze tests.\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Next: Search for /api/v1/admin/landing-gallery in tests/contracts/test_feature_manifest_freeze.py first; it maps to the visible route drift bucket.\n- Stop signal: diagnosis complete; raw not needed.",
+          "verboseText": "- Tests did not pass.\n- 3 tests failed.\n- Contract drift: 3 freeze tests are out of sync with current API/model state.\n- Contract drift includes 1 added API path and removed model ids such as openai-gpt-image-1.5.\n  - tests/contracts/test_feature_manifest_freeze.py::test_feature_manifest_is_frozen -> removed model: openai-gpt-image-1.5\n  - tests/contracts/test_openapi_contract_freeze.py::test_openapi_paths_and_methods_are_frozen -> added path: /api/v1/admin/landing-gallery\n  - tests/contracts/test_task_matrix_snapshot_freeze.py::test_task_matrix_snapshot_is_frozen -> removed model: openai-gpt-image-1.5\n  - mini-diff: {\"added_paths\":1,\"removed_models\":2}\n  - Hint: If these changes are intentional, run python scripts/update_contract_snapshots.py and rerun the freeze tests.\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Next: Search for /api/v1/admin/landing-gallery in tests/contracts/test_feature_manifest_freeze.py first; it maps to the visible route drift bucket.\n- Stop signal: diagnosis complete; raw not needed.",
+          "diagnoseJson": "{\n  \"status\": \"ok\",\n  \"diagnosis_complete\": true,\n  \"raw_needed\": false,\n  \"additional_source_read_likely_low_value\": true,\n  \"read_raw_only_if\": null,\n  \"decision\": \"read_source\",\n  \"remaining_mode\": \"none\",\n  \"primary_suspect_kind\": \"test\",\n  \"confidence_reason\": \"The bucket is identified, but source context is still needed to make the next fix clear.\",\n  \"dominant_blocker_bucket_index\": null,\n  \"provider_used\": false,\n  \"provider_confidence\": null,\n  \"provider_failed\": false,\n  \"raw_slice_used\": false,\n  \"raw_slice_strategy\": \"none\",\n  \"main_buckets\": [\n    {\n      \"bucket_index\": 1,\n      \"label\": \"route drift\",\n      \"count\": 3,\n      \"root_cause\": \"freeze snapshots are out of sync with current API/model state\",\n      \"suspect_kind\": \"test\",\n      \"fix_hint\": \"If these changes are intentional, run python scripts/update_contract_snapshots.py and rerun the freeze tests.\",\n      \"evidence\": [\n        \"tests/contracts/test_feature_manifest_freeze.py::test_feature_manifest_is_frozen -> removed model: openai-gpt-image-1.5\",\n        \"tests/contracts/test_openapi_contract_freeze.py::test_openapi_paths_and_methods_are_frozen -> added path: /api/v1/admin/landing-gallery\"\n      ],\n      \"bucket_confidence\": 0.95,\n      \"root_cause_confidence\": 0.92,\n      \"dominant\": true,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": {\n        \"added_paths\": 1,\n        \"removed_models\": 2\n      }\n    }\n  ],\n  \"read_targets\": [\n    {\n      \"file\": \"tests/contracts/test_feature_manifest_freeze.py\",\n      \"line\": null,\n      \"why\": \"it maps to the visible route drift bucket\",\n      \"bucket_index\": 1,\n      \"context_hint\": {\n        \"start_line\": null,\n        \"end_line\": null,\n        \"search_hint\": \"/api/v1/admin/landing-gallery\"\n      }\n    }\n  ],\n  \"next_best_action\": {\n    \"code\": \"read_source_for_bucket\",\n    \"bucket_index\": 1,\n    \"note\": \"Search for /api/v1/admin/landing-gallery in tests/contracts/test_feature_manifest_freeze.py first; it maps to the visible route drift bucket.\"\n  },\n  \"resolved_summary\": {\n    \"count\": 0,\n    \"families\": []\n  },\n  \"remaining_summary\": {\n    \"count\": 3,\n    \"families\": [\n      {\n        \"prefix\": \"tests/contracts/\",\n        \"count\": 3\n      }\n    ]\n  },\n  \"remaining_subset_available\": false\n}"
+        }
+      },
+      {
+        "name": "missing-module-collection",
+        "description": "Collection fails because multiple dependencies are missing.",
+        "decision": "stop",
+        "primarySuspectKind": "config",
+        "readTargetsCount": 3,
+        "unknownBucketCount": 0,
+        "completion": {
+          "complete": true,
+          "expectedBuckets": [
+            "import_dependency_failure"
+          ],
+          "bucketTypesFound": [
+            "import_dependency_failure"
+          ],
+          "missingBuckets": [],
+          "expectedEntitiesAny": [
+            "botocore",
+            "pydantic",
+            "fastapi",
+            "PIL",
+            "httpx",
+            "numpy"
+          ],
+          "matchedEntitiesAny": [
+            "botocore",
+            "pydantic",
+            "fastapi",
+            "PIL",
+            "httpx",
+            "numpy"
+          ],
+          "entitiesFound": [
+            "botocore",
+            "pydantic",
+            "fastapi",
+            "PIL",
+            "httpx",
+            "numpy"
+          ],
+          "expectedMaxDetail": "standard",
+          "actualMaxDetail": "standard"
+        },
+        "primary": {
+          "raw": {
+            "chars": 1848,
+            "tokens": 359
+          },
+          "standard": {
+            "chars": 939,
+            "tokens": 209
+          },
+          "focused": {
+            "chars": 937,
+            "tokens": 215
+          },
+          "verbose": {
+            "chars": 1079,
+            "tokens": 248
+          },
+          "verboseShowRaw": {
+            "chars": 2928,
+            "tokens": 608
+          },
+          "diagnoseJson": {
+            "chars": 3605,
+            "tokens": 953
+          }
+        },
+        "reductions": {
+          "standard": {
+            "chars": 939,
+            "tokens": 209,
+            "charsSaved": 909,
+            "charsPct": 49.19,
+            "tokensSaved": 150,
+            "tokensPct": 41.78
+          },
+          "focused": {
+            "chars": 937,
+            "tokens": 215,
+            "charsSaved": 911,
+            "charsPct": 49.3,
+            "tokensSaved": 144,
+            "tokensPct": 40.11
+          },
+          "verbose": {
+            "chars": 1079,
+            "tokens": 248,
+            "charsSaved": 769,
+            "charsPct": 41.61,
+            "tokensSaved": 111,
+            "tokensPct": 30.92
+          },
+          "verboseShowRaw": {
+            "chars": 2928,
+            "tokens": 608,
+            "charsSaved": -1080,
+            "charsPct": -58.44,
+            "tokensSaved": -249,
+            "tokensPct": -69.36
+          },
+          "diagnoseJson": {
+            "chars": 3605,
+            "tokens": 953,
+            "charsSaved": -1757,
+            "charsPct": -95.08,
+            "tokensSaved": -594,
+            "tokensPct": -165.46
+          }
+        },
+        "recipe": {
+          "siftFirst": {
+            "chars": 939,
+            "tokens": 209,
+            "stepCount": 1,
+            "stepsUsed": [
+              "standard"
+            ],
+            "complete": true,
+            "completionDepth": "standard"
+          },
+          "rawFirst": {
+            "chars": 2147,
+            "tokens": 444,
+            "stepCount": 2,
+            "stepsUsed": [
+              "python -m pytest tests/",
+              "python -m pytest tests/ --tb=short -q | tail -40"
+            ],
+            "complete": true,
+            "completionDepth": null
+          }
+        },
+        "rendered": {
+          "standardText": "- Tests did not pass.\n- 12 errors occurred.\n- Import/dependency blocker: 12 errors are caused by missing dependencies during test collection.\n- Anchor: /repo/tests/unit/test_auth_refresh.py\n- Fix: Install the missing dependencies and rerun the affected tests.\n- Import/dependency failures: 1 visible failure share missing module: httpx.\n- Anchor: search httpx in /repo/tests/unit/test_seed_import.py\n- Fix: Install httpx and rerun the affected tests.\n- Import/dependency failures: 1 visible failure share missing module: numpy.\n- Anchor: search numpy in /repo/tests/unit/test_reference_utils.py\n- Fix: Install numpy and rerun the affected tests.\n- Decision: stop and act. Do not escalate unless you need exact traceback lines.\n- Likely owner: test or project configuration\n- Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\n- Stop signal: diagnosis complete; raw not needed.",
+          "focusedText": "- Tests did not pass.\n- 12 errors occurred.\n- Import/dependency blocker: 12 errors are caused by missing dependencies during test collection.\n- Missing modules include botocore, pydantic, fastapi, PIL, httpx, numpy.\n  - tests/unit/test_auth_refresh.py -> missing module: botocore\n  - tests/unit/test_cognito.py -> missing module: pydantic\n  - Hint: Install the missing dependencies and rerun the affected tests.\n- Import/dependency failures: 1 visible failure share missing module: httpx.\n  - tests/unit/test_seed_import.py -> missing module: httpx\n- Import/dependency failures: 1 visible failure share missing module: numpy.\n  - tests/unit/test_reference_utils.py -> missing module: numpy\n- Decision: stop and act. Do not escalate unless you need exact traceback lines.\n- Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\n- Stop signal: diagnosis complete; raw not needed.",
+          "verboseText": "- Tests did not pass.\n- 12 errors occurred.\n- Import/dependency blocker: 12 errors are caused by missing dependencies during test collection.\n- Missing modules include botocore, pydantic, fastapi, PIL, httpx, numpy.\n  - tests/unit/test_auth_refresh.py -> missing module: botocore\n  - tests/unit/test_cognito.py -> missing module: pydantic\n  - tests/unit/test_dataset_use_case_facade.py -> missing module: fastapi\n  - tests/unit/test_image_quality_helpers.py -> missing module: PIL\n  - Hint: Install the missing dependencies and rerun the affected tests.\n- Import/dependency failures: 1 visible failure share missing module: httpx.\n  - tests/unit/test_seed_import.py -> missing module: httpx\n- Import/dependency failures: 1 visible failure share missing module: numpy.\n  - tests/unit/test_reference_utils.py -> missing module: numpy\n- Decision: stop and act. Do not escalate unless you need exact traceback lines.\n- Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\n- Stop signal: diagnosis complete; raw not needed.",
+          "diagnoseJson": "{\n  \"status\": \"ok\",\n  \"diagnosis_complete\": true,\n  \"raw_needed\": false,\n  \"additional_source_read_likely_low_value\": true,\n  \"read_raw_only_if\": null,\n  \"decision\": \"stop\",\n  \"remaining_mode\": \"none\",\n  \"primary_suspect_kind\": \"config\",\n  \"confidence_reason\": \"Dominant blocker (import dependency failure) is anchored and actionable.\",\n  \"dominant_blocker_bucket_index\": 1,\n  \"provider_used\": false,\n  \"provider_confidence\": null,\n  \"provider_failed\": false,\n  \"raw_slice_used\": false,\n  \"raw_slice_strategy\": \"none\",\n  \"main_buckets\": [\n    {\n      \"bucket_index\": 1,\n      \"label\": \"import dependency failure\",\n      \"count\": 12,\n      \"root_cause\": \"missing dependencies during test collection\",\n      \"suspect_kind\": \"config\",\n      \"fix_hint\": \"Install the missing dependencies and rerun the affected tests.\",\n      \"evidence\": [\n        \"tests/unit/test_auth_refresh.py -> missing module: botocore\",\n        \"tests/unit/test_cognito.py -> missing module: pydantic\"\n      ],\n      \"bucket_confidence\": 0.95,\n      \"root_cause_confidence\": 0.88,\n      \"dominant\": true,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": null\n    },\n    {\n      \"bucket_index\": 2,\n      \"label\": \"import dependency failure\",\n      \"count\": 1,\n      \"root_cause\": \"missing module: httpx\",\n      \"suspect_kind\": \"config\",\n      \"fix_hint\": \"Install httpx and rerun the affected tests.\",\n      \"evidence\": [\n        \"tests/unit/test_seed_import.py -> missing module: httpx\"\n      ],\n      \"bucket_confidence\": 0.62,\n      \"root_cause_confidence\": 0.95,\n      \"dominant\": false,\n      \"secondary_visible_despite_blocker\": true,\n      \"mini_diff\": null\n    },\n    {\n      \"bucket_index\": 3,\n      \"label\": \"import dependency failure\",\n      \"count\": 1,\n      \"root_cause\": \"missing module: numpy\",\n      \"suspect_kind\": \"config\",\n      \"fix_hint\": \"Install numpy and rerun the affected tests.\",\n      \"evidence\": [\n        \"tests/unit/test_reference_utils.py -> missing module: numpy\"\n      ],\n      \"bucket_confidence\": 0.62,\n      \"root_cause_confidence\": 0.95,\n      \"dominant\": false,\n      \"secondary_visible_despite_blocker\": true,\n      \"mini_diff\": null\n    }\n  ],\n  \"read_targets\": [\n    {\n      \"file\": \"/repo/tests/unit/test_auth_refresh.py\",\n      \"line\": null,\n      \"why\": \"it is the first visible failing module in this missing dependency bucket\",\n      \"bucket_index\": 1,\n      \"context_hint\": {\n        \"start_line\": null,\n        \"end_line\": null,\n        \"search_hint\": null\n      }\n    },\n    {\n      \"file\": \"/repo/tests/unit/test_seed_import.py\",\n      \"line\": null,\n      \"why\": \"it is the first visible failing module in this missing dependency bucket\",\n      \"bucket_index\": 2,\n      \"context_hint\": {\n        \"start_line\": null,\n        \"end_line\": null,\n        \"search_hint\": \"httpx\"\n      }\n    },\n    {\n      \"file\": \"/repo/tests/unit/test_reference_utils.py\",\n      \"line\": null,\n      \"why\": \"it is the first visible failing module in this missing dependency bucket\",\n      \"bucket_index\": 3,\n      \"context_hint\": {\n        \"start_line\": null,\n        \"end_line\": null,\n        \"search_hint\": \"numpy\"\n      }\n    }\n  ],\n  \"next_best_action\": {\n    \"code\": \"fix_dominant_blocker\",\n    \"bucket_index\": 1,\n    \"note\": \"Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\"\n  },\n  \"resolved_summary\": {\n    \"count\": 0,\n    \"families\": []\n  },\n  \"remaining_summary\": {\n    \"count\": 6,\n    \"families\": [\n      {\n        \"prefix\": \"tests/unit/\",\n        \"count\": 6\n      }\n    ]\n  },\n  \"remaining_subset_available\": false\n}"
+        }
+      },
+      {
+        "name": "vitest-snapshot-mismatch",
+        "description": "Vitest reports a single snapshot mismatch with a traceback anchor.",
+        "decision": "read_source",
+        "primarySuspectKind": "test",
+        "readTargetsCount": 1,
+        "unknownBucketCount": 0,
+        "completion": {
+          "complete": true,
+          "expectedBuckets": [
+            "snapshot_mismatch"
+          ],
+          "bucketTypesFound": [
+            "snapshot_mismatch"
+          ],
+          "missingBuckets": [],
+          "expectedEntitiesAny": [
+            "Button > renders primary"
+          ],
+          "matchedEntitiesAny": [
+            "Button > renders primary"
+          ],
+          "entitiesFound": [
+            "Button > renders primary"
+          ],
+          "expectedMaxDetail": "standard",
+          "actualMaxDetail": "standard"
+        },
+        "primary": {
+          "raw": {
+            "chars": 632,
+            "tokens": 193
+          },
+          "standard": {
+            "chars": 538,
+            "tokens": 119
+          },
+          "focused": {
+            "chars": 600,
+            "tokens": 126
+          },
+          "verbose": {
+            "chars": 600,
+            "tokens": 126
+          },
+          "verboseShowRaw": {
+            "chars": 1233,
+            "tokens": 319
+          },
+          "diagnoseJson": {
+            "chars": 1988,
+            "tokens": 520
+          }
+        },
+        "reductions": {
+          "standard": {
+            "chars": 538,
+            "tokens": 119,
+            "charsSaved": 94,
+            "charsPct": 14.87,
+            "tokensSaved": 74,
+            "tokensPct": 38.34
+          },
+          "focused": {
+            "chars": 600,
+            "tokens": 126,
+            "charsSaved": 32,
+            "charsPct": 5.06,
+            "tokensSaved": 67,
+            "tokensPct": 34.72
+          },
+          "verbose": {
+            "chars": 600,
+            "tokens": 126,
+            "charsSaved": 32,
+            "charsPct": 5.06,
+            "tokensSaved": 67,
+            "tokensPct": 34.72
+          },
+          "verboseShowRaw": {
+            "chars": 1233,
+            "tokens": 319,
+            "charsSaved": -601,
+            "charsPct": -95.09,
+            "tokensSaved": -126,
+            "tokensPct": -65.28
+          },
+          "diagnoseJson": {
+            "chars": 1988,
+            "tokens": 520,
+            "charsSaved": -1356,
+            "charsPct": -214.56,
+            "tokensSaved": -327,
+            "tokensPct": -169.43
+          }
+        },
+        "recipe": {
+          "siftFirst": {
+            "chars": 538,
+            "tokens": 119,
+            "stepCount": 1,
+            "stepsUsed": [
+              "standard"
+            ],
+            "complete": true,
+            "completionDepth": "standard"
+          },
+          "rawFirst": {
+            "chars": 632,
+            "tokens": 193,
+            "stepCount": 1,
+            "stepsUsed": [
+              "npx vitest run src/components/button.test.ts"
+            ],
+            "complete": true,
+            "completionDepth": null
+          }
+        },
+        "rendered": {
+          "standardText": "- Tests did not pass.\n- 1 test failed.\n- Snapshot mismatches: 1 snapshot expectation is out of date with current output.\n- Anchor: src/components/button.test.ts lines 37-47\n- Fix: Update the snapshots if these output changes are intentional.\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Likely owner: test code\n- Next: Read src/components/button.test.ts lines 37-47 first; it contains the failing snapshot expectation behind this bucket.\n- Stop signal: diagnosis complete; raw not needed.",
+          "focusedText": "- Tests did not pass.\n- 1 test failed.\n- Snapshot mismatches: 1 snapshot expectation is out of date with current output.\n  - src/components/button.test.ts > Button > renders primary -> snapshot mismatch: Error: Snapshot `Button > renders primary` mismatched\n  - Hint: Update the snapshots if these output changes are intentional.\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Next: Read src/components/button.test.ts lines 37-47 first; it contains the failing snapshot expectation behind this bucket.\n- Stop signal: diagnosis complete; raw not needed.",
+          "verboseText": "- Tests did not pass.\n- 1 test failed.\n- Snapshot mismatches: 1 snapshot expectation is out of date with current output.\n  - src/components/button.test.ts > Button > renders primary -> snapshot mismatch: Error: Snapshot `Button > renders primary` mismatched\n  - Hint: Update the snapshots if these output changes are intentional.\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Next: Read src/components/button.test.ts lines 37-47 first; it contains the failing snapshot expectation behind this bucket.\n- Stop signal: diagnosis complete; raw not needed.",
+          "diagnoseJson": "{\n  \"status\": \"ok\",\n  \"diagnosis_complete\": true,\n  \"raw_needed\": false,\n  \"additional_source_read_likely_low_value\": true,\n  \"read_raw_only_if\": null,\n  \"decision\": \"read_source\",\n  \"remaining_mode\": \"none\",\n  \"primary_suspect_kind\": \"test\",\n  \"confidence_reason\": \"The bucket is identified, but source context is still needed to make the next fix clear.\",\n  \"dominant_blocker_bucket_index\": null,\n  \"provider_used\": false,\n  \"provider_confidence\": null,\n  \"provider_failed\": false,\n  \"raw_slice_used\": false,\n  \"raw_slice_strategy\": \"none\",\n  \"main_buckets\": [\n    {\n      \"bucket_index\": 1,\n      \"label\": \"snapshot mismatch\",\n      \"count\": 1,\n      \"root_cause\": \"snapshot mismatch: snapshot expectations differ from current output\",\n      \"suspect_kind\": \"test\",\n      \"fix_hint\": \"Update the snapshots if these output changes are intentional.\",\n      \"evidence\": [\n        \"src/components/button.test.ts > Button > renders primary -> snapshot mismatch: Error: Snapshot `Button > renders primary` mismatched\"\n      ],\n      \"bucket_confidence\": 0.92,\n      \"root_cause_confidence\": 0.84,\n      \"dominant\": true,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": null\n    }\n  ],\n  \"read_targets\": [\n    {\n      \"file\": \"src/components/button.test.ts\",\n      \"line\": 42,\n      \"why\": \"it contains the failing snapshot expectation behind this bucket\",\n      \"bucket_index\": 1,\n      \"context_hint\": {\n        \"start_line\": 37,\n        \"end_line\": 47,\n        \"search_hint\": null\n      }\n    }\n  ],\n  \"next_best_action\": {\n    \"code\": \"read_source_for_bucket\",\n    \"bucket_index\": 1,\n    \"note\": \"Read src/components/button.test.ts lines 37-47 first; it contains the failing snapshot expectation behind this bucket.\"\n  },\n  \"resolved_summary\": {\n    \"count\": 0,\n    \"families\": []\n  },\n  \"remaining_summary\": {\n    \"count\": 1,\n    \"families\": [\n      {\n        \"prefix\": \"src/components/\",\n        \"count\": 1\n      }\n    ]\n  },\n  \"remaining_subset_available\": false\n}"
+        }
+      },
+      {
+        "name": "vitest-mixed-js",
+        "description": "Vitest shows a snapshot mismatch, timeout, and missing import in one run.",
+        "decision": "read_source",
+        "primarySuspectKind": "config",
+        "readTargetsCount": 3,
+        "unknownBucketCount": 0,
+        "completion": {
+          "complete": true,
+          "expectedBuckets": [
+            "import_dependency_failure",
+            "snapshot_mismatch",
+            "timeout_failure"
+          ],
+          "bucketTypesFound": [
+            "import_dependency_failure",
+            "snapshot_mismatch",
+            "timeout_failure"
+          ],
+          "missingBuckets": [],
+          "expectedEntitiesAny": [
+            "@/missing-client",
+            "Button > renders primary"
+          ],
+          "matchedEntitiesAny": [
+            "@/missing-client",
+            "Button > renders primary"
+          ],
+          "entitiesFound": [
+            "@/missing-client",
+            "Button > renders primary",
+            "useSlowHook > resolves"
+          ],
+          "expectedMaxDetail": "standard",
+          "actualMaxDetail": "standard"
+        },
+        "primary": {
+          "raw": {
+            "chars": 823,
+            "tokens": 269
+          },
+          "standard": {
+            "chars": 989,
+            "tokens": 222
+          },
+          "focused": {
+            "chars": 1146,
+            "tokens": 251
+          },
+          "verbose": {
+            "chars": 1146,
+            "tokens": 251
+          },
+          "verboseShowRaw": {
+            "chars": 1970,
+            "tokens": 520
+          },
+          "diagnoseJson": {
+            "chars": 3816,
+            "tokens": 1022
+          }
+        },
+        "reductions": {
+          "standard": {
+            "chars": 989,
+            "tokens": 222,
+            "charsSaved": -166,
+            "charsPct": -20.17,
+            "tokensSaved": 47,
+            "tokensPct": 17.47
+          },
+          "focused": {
+            "chars": 1146,
+            "tokens": 251,
+            "charsSaved": -323,
+            "charsPct": -39.25,
+            "tokensSaved": 18,
+            "tokensPct": 6.69
+          },
+          "verbose": {
+            "chars": 1146,
+            "tokens": 251,
+            "charsSaved": -323,
+            "charsPct": -39.25,
+            "tokensSaved": 18,
+            "tokensPct": 6.69
+          },
+          "verboseShowRaw": {
+            "chars": 1970,
+            "tokens": 520,
+            "charsSaved": -1147,
+            "charsPct": -139.37,
+            "tokensSaved": -251,
+            "tokensPct": -93.31
+          },
+          "diagnoseJson": {
+            "chars": 3816,
+            "tokens": 1022,
+            "charsSaved": -2993,
+            "charsPct": -363.67,
+            "tokensSaved": -753,
+            "tokensPct": -279.93
+          }
+        },
+        "recipe": {
+          "siftFirst": {
+            "chars": 989,
+            "tokens": 222,
+            "stepCount": 1,
+            "stepsUsed": [
+              "standard"
+            ],
+            "complete": true,
+            "completionDepth": "standard"
+          },
+          "rawFirst": {
+            "chars": 823,
+            "tokens": 269,
+            "stepCount": 1,
+            "stepsUsed": [
+              "npx vitest run src/components/button.test.ts src/hooks/timeout.test.ts src/setup/auth.test.ts"
+            ],
+            "complete": true,
+            "completionDepth": null
+          }
+        },
+        "rendered": {
+          "standardText": "- Tests did not pass.\n- 2 tests failed.\n- Import/dependency blocker: at least 1 visible failure are caused by missing dependencies during test collection.\n- Anchor: src/setup/auth.test.ts lines 1-6\n- Fix: Install @/missing-client and rerun the affected tests.\n- Snapshot mismatches: 1 snapshot expectation is out of date with current output.\n- Anchor: src/components/button.test.ts lines 37-47\n- Fix: Update the snapshots if these output changes are intentional.\n- Timeout failures: 1 test exceeded the configured timeout threshold.\n- Anchor: src/hooks/timeout.test.ts lines 16-26\n- Fix: Check for deadlocks, slow setup, or increase the timeout threshold before rerunning.\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Likely owner: test or project configuration\n- Next: Read src/setup/auth.test.ts lines 1-6 first; it is the first visible failing module in this missing dependency bucket.\n- Stop signal: diagnosis complete; raw not needed.",
+          "focusedText": "- Tests did not pass.\n- 2 tests failed.\n- Import/dependency blocker: at least 1 visible failure are caused by missing dependencies during test collection.\n- Missing modules include @/missing-client.\n  - src/setup/auth.test.ts -> missing module: @/missing-client\n  - Hint: Install @/missing-client and rerun the affected tests.\n- Snapshot mismatches: 1 snapshot expectation is out of date with current output.\n  - src/components/button.test.ts > Button > renders primary -> snapshot mismatch: Error: Snapshot `Button > renders primary` mismatched\n  - Hint: Update the snapshots if these output changes are intentional.\n- Timeout failures: 1 test exceeded the configured timeout threshold.\n  - src/hooks/timeout.test.ts > useSlowHook > resolves -> timeout: Test timed out in 5000ms.\n  - Hint: Check for deadlocks, slow setup, or increase the timeout threshold before rerunning.\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Next: Read src/setup/auth.test.ts lines 1-6 first; it is the first visible failing module in this missing dependency bucket.\n- Stop signal: diagnosis complete; raw not needed.",
+          "verboseText": "- Tests did not pass.\n- 2 tests failed.\n- Import/dependency blocker: at least 1 visible failure are caused by missing dependencies during test collection.\n- Missing modules include @/missing-client.\n  - src/setup/auth.test.ts -> missing module: @/missing-client\n  - Hint: Install @/missing-client and rerun the affected tests.\n- Snapshot mismatches: 1 snapshot expectation is out of date with current output.\n  - src/components/button.test.ts > Button > renders primary -> snapshot mismatch: Error: Snapshot `Button > renders primary` mismatched\n  - Hint: Update the snapshots if these output changes are intentional.\n- Timeout failures: 1 test exceeded the configured timeout threshold.\n  - src/hooks/timeout.test.ts > useSlowHook > resolves -> timeout: Test timed out in 5000ms.\n  - Hint: Check for deadlocks, slow setup, or increase the timeout threshold before rerunning.\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Next: Read src/setup/auth.test.ts lines 1-6 first; it is the first visible failing module in this missing dependency bucket.\n- Stop signal: diagnosis complete; raw not needed.",
+          "diagnoseJson": "{\n  \"status\": \"ok\",\n  \"diagnosis_complete\": true,\n  \"raw_needed\": false,\n  \"additional_source_read_likely_low_value\": true,\n  \"read_raw_only_if\": null,\n  \"decision\": \"read_source\",\n  \"remaining_mode\": \"none\",\n  \"primary_suspect_kind\": \"config\",\n  \"confidence_reason\": \"The bucket is identified, but source context is still needed to make the next fix clear.\",\n  \"dominant_blocker_bucket_index\": null,\n  \"provider_used\": false,\n  \"provider_confidence\": null,\n  \"provider_failed\": false,\n  \"raw_slice_used\": false,\n  \"raw_slice_strategy\": \"none\",\n  \"main_buckets\": [\n    {\n      \"bucket_index\": 1,\n      \"label\": \"import dependency failure\",\n      \"count\": 1,\n      \"root_cause\": \"missing module: @/missing-client\",\n      \"suspect_kind\": \"config\",\n      \"fix_hint\": \"Install @/missing-client and rerun the affected tests.\",\n      \"evidence\": [\n        \"src/setup/auth.test.ts -> missing module: @/missing-client\"\n      ],\n      \"bucket_confidence\": 0.8,\n      \"root_cause_confidence\": 0.95,\n      \"dominant\": false,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": null\n    },\n    {\n      \"bucket_index\": 2,\n      \"label\": \"snapshot mismatch\",\n      \"count\": 1,\n      \"root_cause\": \"snapshot mismatch: snapshot expectations differ from current output\",\n      \"suspect_kind\": \"test\",\n      \"fix_hint\": \"Update the snapshots if these output changes are intentional.\",\n      \"evidence\": [\n        \"src/components/button.test.ts > Button > renders primary -> snapshot mismatch: Error: Snapshot `Button > renders primary` mismatched\"\n      ],\n      \"bucket_confidence\": 0.92,\n      \"root_cause_confidence\": 0.84,\n      \"dominant\": true,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": null\n    },\n    {\n      \"bucket_index\": 3,\n      \"label\": \"timeout\",\n      \"count\": 1,\n      \"root_cause\": \"timeout: Test timed out in 5000ms.\",\n      \"suspect_kind\": \"tooling\",\n      \"fix_hint\": \"Check for deadlocks, slow setup, or increase the timeout threshold before rerunning.\",\n      \"evidence\": [\n        \"src/hooks/timeout.test.ts > useSlowHook > resolves -> timeout: Test timed out in 5000ms.\"\n      ],\n      \"bucket_confidence\": 0.84,\n      \"root_cause_confidence\": 0.9,\n      \"dominant\": false,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": null\n    }\n  ],\n  \"read_targets\": [\n    {\n      \"file\": \"src/setup/auth.test.ts\",\n      \"line\": 1,\n      \"why\": \"it is the first visible failing module in this missing dependency bucket\",\n      \"bucket_index\": 1,\n      \"context_hint\": {\n        \"start_line\": 1,\n        \"end_line\": 6,\n        \"search_hint\": null\n      }\n    },\n    {\n      \"file\": \"src/components/button.test.ts\",\n      \"line\": 42,\n      \"why\": \"it contains the failing snapshot expectation behind this bucket\",\n      \"bucket_index\": 2,\n      \"context_hint\": {\n        \"start_line\": 37,\n        \"end_line\": 47,\n        \"search_hint\": null\n      }\n    },\n    {\n      \"file\": \"src/hooks/timeout.test.ts\",\n      \"line\": 21,\n      \"why\": \"it contains the test or fixture that exceeded the timeout threshold\",\n      \"bucket_index\": 3,\n      \"context_hint\": {\n        \"start_line\": 16,\n        \"end_line\": 26,\n        \"search_hint\": null\n      }\n    }\n  ],\n  \"next_best_action\": {\n    \"code\": \"read_source_for_bucket\",\n    \"bucket_index\": 1,\n    \"note\": \"Read src/setup/auth.test.ts lines 1-6 first; it is the first visible failing module in this missing dependency bucket.\"\n  },\n  \"resolved_summary\": {\n    \"count\": 0,\n    \"families\": []\n  },\n  \"remaining_summary\": {\n    \"count\": 3,\n    \"families\": [\n      {\n        \"prefix\": \"src/components/\",\n        \"count\": 1\n      },\n      {\n        \"prefix\": \"src/hooks/\",\n        \"count\": 1\n      },\n      {\n        \"prefix\": \"src/setup/\",\n        \"count\": 1\n      }\n    ]\n  },\n  \"remaining_subset_available\": false\n}"
+        }
+      },
+      {
+        "name": "jest-mixed-js",
+        "description": "Jest reports a config error and a snapshot mismatch in the same run.",
+        "decision": "stop",
+        "primarySuspectKind": "config",
+        "readTargetsCount": 2,
+        "unknownBucketCount": 0,
+        "completion": {
+          "complete": true,
+          "expectedBuckets": [
+            "configuration_error",
+            "snapshot_mismatch"
+          ],
+          "bucketTypesFound": [
+            "configuration_error",
+            "snapshot_mismatch"
+          ],
+          "missingBuckets": [],
+          "expectedEntitiesAny": [
+            "src/components/card.test.ts"
+          ],
+          "matchedEntitiesAny": [
+            "src/components/card.test.ts"
+          ],
+          "entitiesFound": [
+            "src/components/card.test.ts"
+          ],
+          "expectedMaxDetail": "standard",
+          "actualMaxDetail": "standard"
+        },
+        "primary": {
+          "raw": {
+            "chars": 777,
+            "tokens": 205
+          },
+          "standard": {
+            "chars": 848,
+            "tokens": 178
+          },
+          "focused": {
+            "chars": 813,
+            "tokens": 175
+          },
+          "verbose": {
+            "chars": 813,
+            "tokens": 175
+          },
+          "verboseShowRaw": {
+            "chars": 1591,
+            "tokens": 381
+          },
+          "diagnoseJson": {
+            "chars": 2986,
+            "tokens": 768
+          }
+        },
+        "reductions": {
+          "standard": {
+            "chars": 848,
+            "tokens": 178,
+            "charsSaved": -71,
+            "charsPct": -9.14,
+            "tokensSaved": 27,
+            "tokensPct": 13.17
+          },
+          "focused": {
+            "chars": 813,
+            "tokens": 175,
+            "charsSaved": -36,
+            "charsPct": -4.63,
+            "tokensSaved": 30,
+            "tokensPct": 14.63
+          },
+          "verbose": {
+            "chars": 813,
+            "tokens": 175,
+            "charsSaved": -36,
+            "charsPct": -4.63,
+            "tokensSaved": 30,
+            "tokensPct": 14.63
+          },
+          "verboseShowRaw": {
+            "chars": 1591,
+            "tokens": 381,
+            "charsSaved": -814,
+            "charsPct": -104.76,
+            "tokensSaved": -176,
+            "tokensPct": -85.85
+          },
+          "diagnoseJson": {
+            "chars": 2986,
+            "tokens": 768,
+            "charsSaved": -2209,
+            "charsPct": -284.3,
+            "tokensSaved": -563,
+            "tokensPct": -274.63
+          }
+        },
+        "recipe": {
+          "siftFirst": {
+            "chars": 848,
+            "tokens": 178,
+            "stepCount": 1,
+            "stepsUsed": [
+              "standard"
+            ],
+            "complete": true,
+            "completionDepth": "standard"
+          },
+          "rawFirst": {
+            "chars": 777,
+            "tokens": 205,
+            "stepCount": 1,
+            "stepsUsed": [
+              "npx jest src/components/card.test.ts src/config/setup.test.ts"
+            ],
+            "complete": true,
+            "completionDepth": null
+          }
+        },
+        "rendered": {
+          "standardText": "- Tests did not pass.\n- 1 test failed.\n- Shared blocker: At least 1 visible failure are caused by a pytest configuration error.\n- Anchor: search Cannot use import statement outside a module in src/config/setup.test.ts\n- Fix: Fix the pytest configuration or conftest import error before rerunning the suite.\n- Snapshot mismatches: 1 snapshot expectation is out of date with current output.\n- Anchor: search snapshot expectations differ from current output in src/components/card.test.ts\n- Fix: Update the snapshots if these output changes are intentional.\n- Decision: stop and act. Do not escalate unless you need exact traceback lines.\n- Likely owner: test or project configuration\n- Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\n- Stop signal: diagnosis complete; raw not needed.",
+          "focusedText": "- Tests did not pass.\n- 1 test failed.\n- Shared blocker: At least 1 visible failure are caused by a pytest configuration error.\n  - src/config/setup.test.ts -> configuration: Cannot use import statement outside a module\n  - Hint: Fix the pytest configuration or conftest import error before rerunning the suite.\n- Snapshot mismatches: 1 snapshot expectation is out of date with current output.\n  - src/components/card.test.ts -> snapshot mismatch: Error: Snapshot `renders the card` mismatched\n  - Hint: Update the snapshots if these output changes are intentional.\n- Decision: stop and act. Do not escalate unless you need exact traceback lines.\n- Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\n- Stop signal: diagnosis complete; raw not needed.",
+          "verboseText": "- Tests did not pass.\n- 1 test failed.\n- Shared blocker: At least 1 visible failure are caused by a pytest configuration error.\n  - src/config/setup.test.ts -> configuration: Cannot use import statement outside a module\n  - Hint: Fix the pytest configuration or conftest import error before rerunning the suite.\n- Snapshot mismatches: 1 snapshot expectation is out of date with current output.\n  - src/components/card.test.ts -> snapshot mismatch: Error: Snapshot `renders the card` mismatched\n  - Hint: Update the snapshots if these output changes are intentional.\n- Decision: stop and act. Do not escalate unless you need exact traceback lines.\n- Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\n- Stop signal: diagnosis complete; raw not needed.",
+          "diagnoseJson": "{\n  \"status\": \"ok\",\n  \"diagnosis_complete\": true,\n  \"raw_needed\": false,\n  \"additional_source_read_likely_low_value\": true,\n  \"read_raw_only_if\": null,\n  \"decision\": \"stop\",\n  \"remaining_mode\": \"none\",\n  \"primary_suspect_kind\": \"config\",\n  \"confidence_reason\": \"Dominant blocker (configuration error) is anchored and actionable.\",\n  \"dominant_blocker_bucket_index\": 1,\n  \"provider_used\": false,\n  \"provider_confidence\": null,\n  \"provider_failed\": false,\n  \"raw_slice_used\": false,\n  \"raw_slice_strategy\": \"none\",\n  \"main_buckets\": [\n    {\n      \"bucket_index\": 1,\n      \"label\": \"configuration error\",\n      \"count\": 1,\n      \"root_cause\": \"configuration: Cannot use import statement outside a module\",\n      \"suspect_kind\": \"config\",\n      \"fix_hint\": \"Fix the pytest configuration or conftest import error before rerunning the suite.\",\n      \"evidence\": [\n        \"src/config/setup.test.ts -> configuration: Cannot use import statement outside a module\"\n      ],\n      \"bucket_confidence\": 0.82,\n      \"root_cause_confidence\": 0.95,\n      \"dominant\": true,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": null\n    },\n    {\n      \"bucket_index\": 2,\n      \"label\": \"snapshot mismatch\",\n      \"count\": 1,\n      \"root_cause\": \"snapshot mismatch: snapshot expectations differ from current output\",\n      \"suspect_kind\": \"test\",\n      \"fix_hint\": \"Update the snapshots if these output changes are intentional.\",\n      \"evidence\": [\n        \"src/components/card.test.ts -> snapshot mismatch: Error: Snapshot `renders the card` mismatched\"\n      ],\n      \"bucket_confidence\": 0.8,\n      \"root_cause_confidence\": 0.84,\n      \"dominant\": false,\n      \"secondary_visible_despite_blocker\": true,\n      \"mini_diff\": null\n    }\n  ],\n  \"read_targets\": [\n    {\n      \"file\": \"src/config/setup.test.ts\",\n      \"line\": null,\n      \"why\": \"it contains the pytest configuration or conftest setup error that blocks the run\",\n      \"bucket_index\": 1,\n      \"context_hint\": {\n        \"start_line\": null,\n        \"end_line\": null,\n        \"search_hint\": \"Cannot use import statement outside a module\"\n      }\n    },\n    {\n      \"file\": \"src/components/card.test.ts\",\n      \"line\": null,\n      \"why\": \"it contains the failing snapshot expectation behind this bucket\",\n      \"bucket_index\": 2,\n      \"context_hint\": {\n        \"start_line\": null,\n        \"end_line\": null,\n        \"search_hint\": \"snapshot expectations differ from current output\"\n      }\n    }\n  ],\n  \"next_best_action\": {\n    \"code\": \"fix_dominant_blocker\",\n    \"bucket_index\": 1,\n    \"note\": \"Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\"\n  },\n  \"resolved_summary\": {\n    \"count\": 0,\n    \"families\": []\n  },\n  \"remaining_summary\": {\n    \"count\": 2,\n    \"families\": [\n      {\n        \"prefix\": \"src/components/\",\n        \"count\": 1\n      },\n      {\n        \"prefix\": \"src/config/\",\n        \"count\": 1\n      }\n    ]\n  },\n  \"remaining_subset_available\": false\n}"
+        }
+      },
+      {
+        "name": "pytest-small-runtime-suite",
+        "description": "A single concrete runtime failure should be self-sufficient at standard detail.",
+        "decision": "read_source",
+        "primarySuspectKind": "test",
+        "readTargetsCount": 1,
+        "unknownBucketCount": 0,
+        "completion": {
+          "complete": true,
+          "expectedBuckets": [
+            "runtime_failure"
+          ],
+          "bucketTypesFound": [
+            "runtime_failure"
+          ],
+          "missingBuckets": [],
+          "expectedEntitiesAny": [],
+          "matchedEntitiesAny": [],
+          "entitiesFound": [],
+          "expectedMaxDetail": "standard",
+          "actualMaxDetail": "standard"
+        },
+        "primary": {
+          "raw": {
+            "chars": 878,
+            "tokens": 161
+          },
+          "standard": {
+            "chars": 568,
+            "tokens": 125
+          },
+          "focused": {
+            "chars": 491,
+            "tokens": 105
+          },
+          "verbose": {
+            "chars": 491,
+            "tokens": 105
+          },
+          "verboseShowRaw": {
+            "chars": 1370,
+            "tokens": 267
+          },
+          "diagnoseJson": {
+            "chars": 1929,
+            "tokens": 516
+          }
+        },
+        "reductions": {
+          "standard": {
+            "chars": 568,
+            "tokens": 125,
+            "charsSaved": 310,
+            "charsPct": 35.31,
+            "tokensSaved": 36,
+            "tokensPct": 22.36
+          },
+          "focused": {
+            "chars": 491,
+            "tokens": 105,
+            "charsSaved": 387,
+            "charsPct": 44.08,
+            "tokensSaved": 56,
+            "tokensPct": 34.78
+          },
+          "verbose": {
+            "chars": 491,
+            "tokens": 105,
+            "charsSaved": 387,
+            "charsPct": 44.08,
+            "tokensSaved": 56,
+            "tokensPct": 34.78
+          },
+          "verboseShowRaw": {
+            "chars": 1370,
+            "tokens": 267,
+            "charsSaved": -492,
+            "charsPct": -56.04,
+            "tokensSaved": -106,
+            "tokensPct": -65.84
+          },
+          "diagnoseJson": {
+            "chars": 1929,
+            "tokens": 516,
+            "charsSaved": -1051,
+            "charsPct": -119.7,
+            "tokensSaved": -355,
+            "tokensPct": -220.5
+          }
+        },
+        "recipe": {
+          "siftFirst": {
+            "chars": 568,
+            "tokens": 125,
+            "stepCount": 1,
+            "stepsUsed": [
+              "standard"
+            ],
+            "complete": true,
+            "completionDepth": "standard"
+          },
+          "rawFirst": {
+            "chars": 878,
+            "tokens": 161,
+            "stepCount": 1,
+            "stepsUsed": [
+              "python -m pytest tests/unit/test_payloads.py"
+            ],
+            "complete": true,
+            "completionDepth": null
+          }
+        },
+        "rendered": {
+          "standardText": "- Tests did not pass.\n- 1 test failed.\n- Runtime failures: 1 visible failure share RuntimeError: payload subject missing.\n- Anchor: search test_payload_round_trip in tests/unit/test_payloads.py\n- Fix: Fix the visible runtime failure and rerun the full suite at standard.\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Likely owner: test code\n- Next: Search for test_payload_round_trip in tests/unit/test_payloads.py first; it maps to the visible runtime failure bucket.\n- Stop signal: diagnosis complete; raw not needed.",
+          "focusedText": "- Tests did not pass.\n- 1 test failed.\n- Runtime failures: 1 visible failure share RuntimeError: payload subject missing.\n  - tests/unit/test_payloads.py::test_payload_round_trip -> RuntimeError: payload subject missing\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Next: Search for test_payload_round_trip in tests/unit/test_payloads.py first; it maps to the visible runtime failure bucket.\n- Stop signal: diagnosis complete; raw not needed.",
+          "verboseText": "- Tests did not pass.\n- 1 test failed.\n- Runtime failures: 1 visible failure share RuntimeError: payload subject missing.\n  - tests/unit/test_payloads.py::test_payload_round_trip -> RuntimeError: payload subject missing\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Next: Search for test_payload_round_trip in tests/unit/test_payloads.py first; it maps to the visible runtime failure bucket.\n- Stop signal: diagnosis complete; raw not needed.",
+          "diagnoseJson": "{\n  \"status\": \"ok\",\n  \"diagnosis_complete\": true,\n  \"raw_needed\": false,\n  \"additional_source_read_likely_low_value\": true,\n  \"read_raw_only_if\": null,\n  \"decision\": \"read_source\",\n  \"remaining_mode\": \"none\",\n  \"primary_suspect_kind\": \"test\",\n  \"confidence_reason\": \"The bucket is identified, but source context is still needed to make the next fix clear.\",\n  \"dominant_blocker_bucket_index\": null,\n  \"provider_used\": false,\n  \"provider_confidence\": null,\n  \"provider_failed\": false,\n  \"raw_slice_used\": false,\n  \"raw_slice_strategy\": \"none\",\n  \"main_buckets\": [\n    {\n      \"bucket_index\": 1,\n      \"label\": \"runtime failure\",\n      \"count\": 1,\n      \"root_cause\": \"RuntimeError: payload subject missing\",\n      \"suspect_kind\": \"test\",\n      \"fix_hint\": \"Fix the visible runtime failure and rerun the full suite at standard.\",\n      \"evidence\": [\n        \"tests/unit/test_payloads.py::test_payload_round_trip -> RuntimeError: payload subject missing\"\n      ],\n      \"bucket_confidence\": 0.74,\n      \"root_cause_confidence\": 0.74,\n      \"dominant\": true,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": null\n    }\n  ],\n  \"read_targets\": [\n    {\n      \"file\": \"tests/unit/test_payloads.py\",\n      \"line\": null,\n      \"why\": \"it maps to the visible runtime failure bucket\",\n      \"bucket_index\": 1,\n      \"context_hint\": {\n        \"start_line\": null,\n        \"end_line\": null,\n        \"search_hint\": \"test_payload_round_trip\"\n      }\n    }\n  ],\n  \"next_best_action\": {\n    \"code\": \"read_source_for_bucket\",\n    \"bucket_index\": 1,\n    \"note\": \"Search for test_payload_round_trip in tests/unit/test_payloads.py first; it maps to the visible runtime failure bucket.\"\n  },\n  \"resolved_summary\": {\n    \"count\": 0,\n    \"families\": []\n  },\n  \"remaining_summary\": {\n    \"count\": 1,\n    \"families\": [\n      {\n        \"prefix\": \"tests/unit/\",\n        \"count\": 1\n      }\n    ]\n  },\n  \"remaining_subset_available\": false\n}"
+        }
+      },
+      {
+        "name": "vitest-expect-assertions",
+        "description": "Vitest matcher failures should classify into assertion buckets without raw fallback.",
+        "decision": "read_source",
+        "primarySuspectKind": "app_code",
+        "readTargetsCount": 2,
+        "unknownBucketCount": 0,
+        "completion": {
+          "complete": true,
+          "expectedBuckets": [
+            "assertion_failure"
+          ],
+          "bucketTypesFound": [
+            "assertion_failure"
+          ],
+          "missingBuckets": [],
+          "expectedEntitiesAny": [],
+          "matchedEntitiesAny": [],
+          "entitiesFound": [],
+          "expectedMaxDetail": "standard",
+          "actualMaxDetail": "standard"
+        },
+        "primary": {
+          "raw": {
+            "chars": 624,
+            "tokens": 195
+          },
+          "standard": {
+            "chars": 849,
+            "tokens": 192
+          },
+          "focused": {
+            "chars": 754,
+            "tokens": 166
+          },
+          "verbose": {
+            "chars": 754,
+            "tokens": 166
+          },
+          "verboseShowRaw": {
+            "chars": 1379,
+            "tokens": 361
+          },
+          "diagnoseJson": {
+            "chars": 3026,
+            "tokens": 809
+          }
+        },
+        "reductions": {
+          "standard": {
+            "chars": 849,
+            "tokens": 192,
+            "charsSaved": -225,
+            "charsPct": -36.06,
+            "tokensSaved": 3,
+            "tokensPct": 1.54
+          },
+          "focused": {
+            "chars": 754,
+            "tokens": 166,
+            "charsSaved": -130,
+            "charsPct": -20.83,
+            "tokensSaved": 29,
+            "tokensPct": 14.87
+          },
+          "verbose": {
+            "chars": 754,
+            "tokens": 166,
+            "charsSaved": -130,
+            "charsPct": -20.83,
+            "tokensSaved": 29,
+            "tokensPct": 14.87
+          },
+          "verboseShowRaw": {
+            "chars": 1379,
+            "tokens": 361,
+            "charsSaved": -755,
+            "charsPct": -120.99,
+            "tokensSaved": -166,
+            "tokensPct": -85.13
+          },
+          "diagnoseJson": {
+            "chars": 3026,
+            "tokens": 809,
+            "charsSaved": -2402,
+            "charsPct": -384.94,
+            "tokensSaved": -614,
+            "tokensPct": -314.87
+          }
+        },
+        "recipe": {
+          "siftFirst": {
+            "chars": 849,
+            "tokens": 192,
+            "stepCount": 1,
+            "stepsUsed": [
+              "standard"
+            ],
+            "complete": true,
+            "completionDepth": "standard"
+          },
+          "rawFirst": {
+            "chars": 624,
+            "tokens": 195,
+            "stepCount": 1,
+            "stepsUsed": [
+              "npx vitest run src/auth/refresh.test.ts src/routes/landing.test.ts"
+            ],
+            "complete": true,
+            "completionDepth": null
+          }
+        },
+        "rendered": {
+          "standardText": "- Tests did not pass.\n- 2 tests failed.\n- Assertion failures: 1 visible failure share assertion failed: expect(received).toBe(expected).\n- Anchor: src/auth/refresh.test.ts lines 22-32\n- Fix: Read the assertion diff or expectation and fix the code or expected value before rerunning.\n- Assertion failures: 1 visible failure share assertion failed: expect(received).toEqual(expected).\n- Anchor: src/routes/landing.test.ts lines 9-19\n- Fix: Read the assertion diff or expectation and fix the code or expected value before rerunning.\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Likely owner: application code\n- Next: Read src/auth/refresh.test.ts lines 22-32 first; it contains the expected-versus-actual assertion that failed inside the visible test.\n- Stop signal: diagnosis complete; raw not needed.",
+          "focusedText": "- Tests did not pass.\n- 2 tests failed.\n- Assertion failures: 1 visible failure share assertion failed: expect(received).toBe(expected).\n  - src/auth/refresh.test.ts > refresh token > rotates token -> assertion failed: expect(received).toBe(expected)\n- Assertion failures: 1 visible failure share assertion failed: expect(received).toEqual(expected).\n  - src/routes/landing.test.ts > landing page > renders hero -> assertion failed: expect(received).toEqual(expected)\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Next: Read src/auth/refresh.test.ts lines 22-32 first; it contains the expected-versus-actual assertion that failed inside the visible test.\n- Stop signal: diagnosis complete; raw not needed.",
+          "verboseText": "- Tests did not pass.\n- 2 tests failed.\n- Assertion failures: 1 visible failure share assertion failed: expect(received).toBe(expected).\n  - src/auth/refresh.test.ts > refresh token > rotates token -> assertion failed: expect(received).toBe(expected)\n- Assertion failures: 1 visible failure share assertion failed: expect(received).toEqual(expected).\n  - src/routes/landing.test.ts > landing page > renders hero -> assertion failed: expect(received).toEqual(expected)\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Next: Read src/auth/refresh.test.ts lines 22-32 first; it contains the expected-versus-actual assertion that failed inside the visible test.\n- Stop signal: diagnosis complete; raw not needed.",
+          "diagnoseJson": "{\n  \"status\": \"ok\",\n  \"diagnosis_complete\": true,\n  \"raw_needed\": false,\n  \"additional_source_read_likely_low_value\": true,\n  \"read_raw_only_if\": null,\n  \"decision\": \"read_source\",\n  \"remaining_mode\": \"none\",\n  \"primary_suspect_kind\": \"app_code\",\n  \"confidence_reason\": \"The bucket is identified, but source context is still needed to make the next fix clear.\",\n  \"dominant_blocker_bucket_index\": null,\n  \"provider_used\": false,\n  \"provider_confidence\": null,\n  \"provider_failed\": false,\n  \"raw_slice_used\": false,\n  \"raw_slice_strategy\": \"none\",\n  \"main_buckets\": [\n    {\n      \"bucket_index\": 1,\n      \"label\": \"assertion failure\",\n      \"count\": 1,\n      \"root_cause\": \"assertion failed: expect(received).toBe(expected)\",\n      \"suspect_kind\": \"app_code\",\n      \"fix_hint\": \"Read the assertion diff or expectation and fix the code or expected value before rerunning.\",\n      \"evidence\": [\n        \"src/auth/refresh.test.ts > refresh token > rotates token -> assertion failed: expect(received).toBe(expected)\"\n      ],\n      \"bucket_confidence\": 0.76,\n      \"root_cause_confidence\": 0.76,\n      \"dominant\": true,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": null\n    },\n    {\n      \"bucket_index\": 2,\n      \"label\": \"assertion failure\",\n      \"count\": 1,\n      \"root_cause\": \"assertion failed: expect(received).toEqual(expected)\",\n      \"suspect_kind\": \"app_code\",\n      \"fix_hint\": \"Read the assertion diff or expectation and fix the code or expected value before rerunning.\",\n      \"evidence\": [\n        \"src/routes/landing.test.ts > landing page > renders hero -> assertion failed: expect(received).toEqual(expected)\"\n      ],\n      \"bucket_confidence\": 0.76,\n      \"root_cause_confidence\": 0.76,\n      \"dominant\": false,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": null\n    }\n  ],\n  \"read_targets\": [\n    {\n      \"file\": \"src/auth/refresh.test.ts\",\n      \"line\": 27,\n      \"why\": \"it contains the expected-versus-actual assertion that failed inside the visible test\",\n      \"bucket_index\": 1,\n      \"context_hint\": {\n        \"start_line\": 22,\n        \"end_line\": 32,\n        \"search_hint\": null\n      }\n    },\n    {\n      \"file\": \"src/routes/landing.test.ts\",\n      \"line\": 14,\n      \"why\": \"it contains the expected-versus-actual assertion that failed inside the visible test\",\n      \"bucket_index\": 2,\n      \"context_hint\": {\n        \"start_line\": 9,\n        \"end_line\": 19,\n        \"search_hint\": null\n      }\n    }\n  ],\n  \"next_best_action\": {\n    \"code\": \"read_source_for_bucket\",\n    \"bucket_index\": 1,\n    \"note\": \"Read src/auth/refresh.test.ts lines 22-32 first; it contains the expected-versus-actual assertion that failed inside the visible test.\"\n  },\n  \"resolved_summary\": {\n    \"count\": 0,\n    \"families\": []\n  },\n  \"remaining_summary\": {\n    \"count\": 2,\n    \"families\": [\n      {\n        \"prefix\": \"src/auth/\",\n        \"count\": 1\n      },\n      {\n        \"prefix\": \"src/routes/\",\n        \"count\": 1\n      }\n    ]\n  },\n  \"remaining_subset_available\": false\n}"
+        }
+      },
+      {
+        "name": "pytest-network-reset",
+        "description": "Network reset and gateway timeout errors should collapse into a network bucket.",
+        "decision": "read_source",
+        "primarySuspectKind": "environment",
+        "readTargetsCount": 3,
+        "unknownBucketCount": 0,
+        "completion": {
+          "complete": true,
+          "expectedBuckets": [
+            "network_failure"
+          ],
+          "bucketTypesFound": [
+            "network_failure"
+          ],
+          "missingBuckets": [],
+          "expectedEntitiesAny": [],
+          "matchedEntitiesAny": [],
+          "entitiesFound": [],
+          "expectedMaxDetail": "standard",
+          "actualMaxDetail": "standard"
+        },
+        "primary": {
+          "raw": {
+            "chars": 1805,
+            "tokens": 406
+          },
+          "standard": {
+            "chars": 1256,
+            "tokens": 296
+          },
+          "focused": {
+            "chars": 1068,
+            "tokens": 257
+          },
+          "verbose": {
+            "chars": 1068,
+            "tokens": 257
+          },
+          "verboseShowRaw": {
+            "chars": 2874,
+            "tokens": 664
+          },
+          "diagnoseJson": {
+            "chars": 4066,
+            "tokens": 1089
+          }
+        },
+        "reductions": {
+          "standard": {
+            "chars": 1256,
+            "tokens": 296,
+            "charsSaved": 549,
+            "charsPct": 30.42,
+            "tokensSaved": 110,
+            "tokensPct": 27.09
+          },
+          "focused": {
+            "chars": 1068,
+            "tokens": 257,
+            "charsSaved": 737,
+            "charsPct": 40.83,
+            "tokensSaved": 149,
+            "tokensPct": 36.7
+          },
+          "verbose": {
+            "chars": 1068,
+            "tokens": 257,
+            "charsSaved": 737,
+            "charsPct": 40.83,
+            "tokensSaved": 149,
+            "tokensPct": 36.7
+          },
+          "verboseShowRaw": {
+            "chars": 2874,
+            "tokens": 664,
+            "charsSaved": -1069,
+            "charsPct": -59.22,
+            "tokensSaved": -258,
+            "tokensPct": -63.55
+          },
+          "diagnoseJson": {
+            "chars": 4066,
+            "tokens": 1089,
+            "charsSaved": -2261,
+            "charsPct": -125.26,
+            "tokensSaved": -683,
+            "tokensPct": -168.23
+          }
+        },
+        "recipe": {
+          "siftFirst": {
+            "chars": 1256,
+            "tokens": 296,
+            "stepCount": 1,
+            "stepsUsed": [
+              "standard"
+            ],
+            "complete": true,
+            "completionDepth": "standard"
+          },
+          "rawFirst": {
+            "chars": 1805,
+            "tokens": 406,
+            "stepCount": 1,
+            "stepsUsed": [
+              "python -m pytest tests/integration/test_stream.py tests/integration/test_feed.py tests/integration/test_api.py"
+            ],
+            "complete": true,
+            "completionDepth": null
+          }
+        },
+        "rendered": {
+          "standardText": "- Tests did not pass.\n- 3 errors occurred.\n- Network failures: 1 visible failure share network: BrokenPipeError: [Errno 32] Broken pipe.\n- Anchor: search BrokenPipeError: [Errno 32] Broken pipe in tests/integration/test_feed.py\n- Fix: Check DNS, outbound network access, retries, or TLS trust before rerunning.\n- Network failures: 1 visible failure share network: ConnectionResetError: [Errno 54] Connection reset by peer.\n- Anchor: search ConnectionResetError: [Errno 54] Connection reset by peer in tests/integration/test_stream.py\n- Fix: Check DNS, outbound network access, retries, or TLS trust before rerunning.\n- Network failures: 1 visible failure share network: HTTPError: 502 Server Error: Bad Gateway for url: https://api.example.com/feed.\n- Anchor: search https://api.example.com/feed in tests/integration/test_api.py\n- Fix: Check DNS, outbound network access, retries, or TLS trust before rerunning.\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Likely owner: environment setup\n- Next: Search for BrokenPipeError: [Errno 32] Broken pipe in tests/integration/test_feed.py first; it contains the host, URL, or TLS path behind the network failure.\n- Stop signal: diagnosis complete; raw not needed.",
+          "focusedText": "- Tests did not pass.\n- 3 errors occurred.\n- Network failures: 1 visible failure share network: BrokenPipeError: [Errno 32] Broken pipe.\n  - tests/integration/test_feed.py::test_feed_sync -> network: BrokenPipeError: [Errno 32] Broken pipe\n- Network failures: 1 visible failure share network: ConnectionResetError: [Errno 54] Connection reset by peer.\n  - tests/integration/test_stream.py::test_socket_flush -> network: ConnectionResetError: [Errno 54] Connection reset by peer\n- Network failures: 1 visible failure share network: HTTPError: 502 Server Error: Bad Gateway for url: https://api.example.com/feed.\n  - tests/integration/test_api.py::test_remote_fallback -> network: HTTPError: 502 Server Error: Bad Gateway for url: https://api.example.com/feed\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Next: Search for BrokenPipeError: [Errno 32] Broken pipe in tests/integration/test_feed.py first; it contains the host, URL, or TLS path behind the network failure.\n- Stop signal: diagnosis complete; raw not needed.",
+          "verboseText": "- Tests did not pass.\n- 3 errors occurred.\n- Network failures: 1 visible failure share network: BrokenPipeError: [Errno 32] Broken pipe.\n  - tests/integration/test_feed.py::test_feed_sync -> network: BrokenPipeError: [Errno 32] Broken pipe\n- Network failures: 1 visible failure share network: ConnectionResetError: [Errno 54] Connection reset by peer.\n  - tests/integration/test_stream.py::test_socket_flush -> network: ConnectionResetError: [Errno 54] Connection reset by peer\n- Network failures: 1 visible failure share network: HTTPError: 502 Server Error: Bad Gateway for url: https://api.example.com/feed.\n  - tests/integration/test_api.py::test_remote_fallback -> network: HTTPError: 502 Server Error: Bad Gateway for url: https://api.example.com/feed\n- Decision: read source next. Do not escalate unless exact traceback lines are still needed.\n- Next: Search for BrokenPipeError: [Errno 32] Broken pipe in tests/integration/test_feed.py first; it contains the host, URL, or TLS path behind the network failure.\n- Stop signal: diagnosis complete; raw not needed.",
+          "diagnoseJson": "{\n  \"status\": \"ok\",\n  \"diagnosis_complete\": true,\n  \"raw_needed\": false,\n  \"additional_source_read_likely_low_value\": true,\n  \"read_raw_only_if\": null,\n  \"decision\": \"read_source\",\n  \"remaining_mode\": \"none\",\n  \"primary_suspect_kind\": \"environment\",\n  \"confidence_reason\": \"The bucket is identified, but source context is still needed to make the next fix clear.\",\n  \"dominant_blocker_bucket_index\": null,\n  \"provider_used\": false,\n  \"provider_confidence\": null,\n  \"provider_failed\": false,\n  \"raw_slice_used\": false,\n  \"raw_slice_strategy\": \"none\",\n  \"main_buckets\": [\n    {\n      \"bucket_index\": 1,\n      \"label\": \"network failure\",\n      \"count\": 1,\n      \"root_cause\": \"network: BrokenPipeError: [Errno 32] Broken pipe\",\n      \"suspect_kind\": \"environment\",\n      \"fix_hint\": \"Check DNS, outbound network access, retries, or TLS trust before rerunning.\",\n      \"evidence\": [\n        \"tests/integration/test_feed.py::test_feed_sync -> network: BrokenPipeError: [Errno 32] Broken pipe\"\n      ],\n      \"bucket_confidence\": 0.82,\n      \"root_cause_confidence\": 0.88,\n      \"dominant\": true,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": null\n    },\n    {\n      \"bucket_index\": 2,\n      \"label\": \"network failure\",\n      \"count\": 1,\n      \"root_cause\": \"network: ConnectionResetError: [Errno 54] Connection reset by peer\",\n      \"suspect_kind\": \"environment\",\n      \"fix_hint\": \"Check DNS, outbound network access, retries, or TLS trust before rerunning.\",\n      \"evidence\": [\n        \"tests/integration/test_stream.py::test_socket_flush -> network: ConnectionResetError: [Errno 54] Connection reset by peer\"\n      ],\n      \"bucket_confidence\": 0.82,\n      \"root_cause_confidence\": 0.88,\n      \"dominant\": false,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": null\n    },\n    {\n      \"bucket_index\": 3,\n      \"label\": \"network failure\",\n      \"count\": 1,\n      \"root_cause\": \"network: HTTPError: 502 Server Error: Bad Gateway for url: https://api.example.com/feed\",\n      \"suspect_kind\": \"environment\",\n      \"fix_hint\": \"Check DNS, outbound network access, retries, or TLS trust before rerunning.\",\n      \"evidence\": [\n        \"tests/integration/test_api.py::test_remote_fallback -> network: HTTPError: 502 Server Error: Bad Gateway for url: https://api.example.com/feed\"\n      ],\n      \"bucket_confidence\": 0.82,\n      \"root_cause_confidence\": 0.88,\n      \"dominant\": false,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": null\n    }\n  ],\n  \"read_targets\": [\n    {\n      \"file\": \"tests/integration/test_feed.py\",\n      \"line\": null,\n      \"why\": \"it contains the host, URL, or TLS path behind the network failure\",\n      \"bucket_index\": 1,\n      \"context_hint\": {\n        \"start_line\": null,\n        \"end_line\": null,\n        \"search_hint\": \"BrokenPipeError: [Errno 32] Broken pipe\"\n      }\n    },\n    {\n      \"file\": \"tests/integration/test_stream.py\",\n      \"line\": null,\n      \"why\": \"it contains the host, URL, or TLS path behind the network failure\",\n      \"bucket_index\": 2,\n      \"context_hint\": {\n        \"start_line\": null,\n        \"end_line\": null,\n        \"search_hint\": \"ConnectionResetError: [Errno 54] Connection reset by peer\"\n      }\n    },\n    {\n      \"file\": \"tests/integration/test_api.py\",\n      \"line\": null,\n      \"why\": \"it contains the host, URL, or TLS path behind the network failure\",\n      \"bucket_index\": 3,\n      \"context_hint\": {\n        \"start_line\": null,\n        \"end_line\": null,\n        \"search_hint\": \"https://api.example.com/feed\"\n      }\n    }\n  ],\n  \"next_best_action\": {\n    \"code\": \"read_source_for_bucket\",\n    \"bucket_index\": 1,\n    \"note\": \"Search for BrokenPipeError: [Errno 32] Broken pipe in tests/integration/test_feed.py first; it contains the host, URL, or TLS path behind the network failure.\"\n  },\n  \"resolved_summary\": {\n    \"count\": 0,\n    \"families\": []\n  },\n  \"remaining_summary\": {\n    \"count\": 3,\n    \"families\": [\n      {\n        \"prefix\": \"tests/integration/\",\n        \"count\": 3\n      }\n    ]\n  },\n  \"remaining_subset_available\": false\n}"
+        }
+      },
+      {
+        "name": "pytest-oserror-setup",
+        "description": "Setup OSErrors should map to configuration and permission buckets.",
+        "decision": "stop",
+        "primarySuspectKind": "config",
+        "readTargetsCount": 2,
+        "unknownBucketCount": 0,
+        "completion": {
+          "complete": true,
+          "expectedBuckets": [
+            "configuration_error",
+            "permission_denied_failure"
+          ],
+          "bucketTypesFound": [
+            "configuration_error",
+            "permission_denied_failure"
+          ],
+          "missingBuckets": [],
+          "expectedEntitiesAny": [],
+          "matchedEntitiesAny": [],
+          "entitiesFound": [],
+          "expectedMaxDetail": "standard",
+          "actualMaxDetail": "standard"
+        },
+        "primary": {
+          "raw": {
+            "chars": 1040,
+            "tokens": 234
+          },
+          "standard": {
+            "chars": 906,
+            "tokens": 212
+          },
+          "focused": {
+            "chars": 873,
+            "tokens": 209
+          },
+          "verbose": {
+            "chars": 873,
+            "tokens": 209
+          },
+          "verboseShowRaw": {
+            "chars": 1914,
+            "tokens": 444
+          },
+          "diagnoseJson": {
+            "chars": 3067,
+            "tokens": 839
+          }
+        },
+        "reductions": {
+          "standard": {
+            "chars": 906,
+            "tokens": 212,
+            "charsSaved": 134,
+            "charsPct": 12.88,
+            "tokensSaved": 22,
+            "tokensPct": 9.4
+          },
+          "focused": {
+            "chars": 873,
+            "tokens": 209,
+            "charsSaved": 167,
+            "charsPct": 16.06,
+            "tokensSaved": 25,
+            "tokensPct": 10.68
+          },
+          "verbose": {
+            "chars": 873,
+            "tokens": 209,
+            "charsSaved": 167,
+            "charsPct": 16.06,
+            "tokensSaved": 25,
+            "tokensPct": 10.68
+          },
+          "verboseShowRaw": {
+            "chars": 1914,
+            "tokens": 444,
+            "charsSaved": -874,
+            "charsPct": -84.04,
+            "tokensSaved": -210,
+            "tokensPct": -89.74
+          },
+          "diagnoseJson": {
+            "chars": 3067,
+            "tokens": 839,
+            "charsSaved": -2027,
+            "charsPct": -194.9,
+            "tokensSaved": -605,
+            "tokensPct": -258.55
+          }
+        },
+        "recipe": {
+          "siftFirst": {
+            "chars": 906,
+            "tokens": 212,
+            "stepCount": 1,
+            "stepsUsed": [
+              "standard"
+            ],
+            "complete": true,
+            "completionDepth": "standard"
+          },
+          "rawFirst": {
+            "chars": 1040,
+            "tokens": 234,
+            "stepCount": 1,
+            "stepsUsed": [
+              "python -m pytest tests/storage/test_tmpdir.py tests/storage/test_lockfile.py"
+            ],
+            "complete": true,
+            "completionDepth": null
+          }
+        },
+        "rendered": {
+          "standardText": "- Tests did not pass.\n- 2 errors occurred.\n- Shared blocker: At least 1 visible failure are caused by a pytest configuration error.\n- Anchor: search disk full (OSError: [Errno 28] No space left on device: '/tmp/pytest-scratch') in tests/storage/test_tmpdir.py\n- Fix: Fix the pytest configuration or conftest import error before rerunning the suite.\n- Permission failures: 1 visible failure share permission: OSError: [Errno 13] Permission denied: '/tmp/pytest-lock'.\n- Anchor: search /tmp/pytest-lock in tests/storage/test_lockfile.py\n- Fix: Check file or port permissions in the CI environment before rerunning.\n- Decision: stop and act. Do not escalate unless you need exact traceback lines.\n- Likely owner: test or project configuration\n- Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\n- Stop signal: diagnosis complete; raw not needed.",
+          "focusedText": "- Tests did not pass.\n- 2 errors occurred.\n- Shared blocker: At least 1 visible failure are caused by a pytest configuration error.\n  - tests/storage/test_tmpdir.py::test_tmpdir_bootstrap -> configuration: disk full (OSError: [Errno 28] No space left on device: '/tmp/pytest-scratch')\n  - Hint: Fix the pytest configuration or conftest import error before rerunning the suite.\n- Permission failures: 1 visible failure share permission: OSError: [Errno 13] Permission denied: '/tmp/pytest-lock'.\n  - tests/storage/test_lockfile.py::test_lockfile_cleanup -> permission: OSError: [Errno 13] Permission denied: '/tmp/pytest-lock'\n- Decision: stop and act. Do not escalate unless you need exact traceback lines.\n- Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\n- Stop signal: diagnosis complete; raw not needed.",
+          "verboseText": "- Tests did not pass.\n- 2 errors occurred.\n- Shared blocker: At least 1 visible failure are caused by a pytest configuration error.\n  - tests/storage/test_tmpdir.py::test_tmpdir_bootstrap -> configuration: disk full (OSError: [Errno 28] No space left on device: '/tmp/pytest-scratch')\n  - Hint: Fix the pytest configuration or conftest import error before rerunning the suite.\n- Permission failures: 1 visible failure share permission: OSError: [Errno 13] Permission denied: '/tmp/pytest-lock'.\n  - tests/storage/test_lockfile.py::test_lockfile_cleanup -> permission: OSError: [Errno 13] Permission denied: '/tmp/pytest-lock'\n- Decision: stop and act. Do not escalate unless you need exact traceback lines.\n- Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\n- Stop signal: diagnosis complete; raw not needed.",
+          "diagnoseJson": "{\n  \"status\": \"ok\",\n  \"diagnosis_complete\": true,\n  \"raw_needed\": false,\n  \"additional_source_read_likely_low_value\": true,\n  \"read_raw_only_if\": null,\n  \"decision\": \"stop\",\n  \"remaining_mode\": \"none\",\n  \"primary_suspect_kind\": \"config\",\n  \"confidence_reason\": \"Dominant blocker (configuration error) is anchored and actionable.\",\n  \"dominant_blocker_bucket_index\": 1,\n  \"provider_used\": false,\n  \"provider_confidence\": null,\n  \"provider_failed\": false,\n  \"raw_slice_used\": false,\n  \"raw_slice_strategy\": \"none\",\n  \"main_buckets\": [\n    {\n      \"bucket_index\": 1,\n      \"label\": \"configuration error\",\n      \"count\": 1,\n      \"root_cause\": \"configuration: disk full (OSError: [Errno 28] No space left on device: '/tmp/pytest-scratch')\",\n      \"suspect_kind\": \"config\",\n      \"fix_hint\": \"Fix the pytest configuration or conftest import error before rerunning the suite.\",\n      \"evidence\": [\n        \"tests/storage/test_tmpdir.py::test_tmpdir_bootstrap -> configuration: disk full (OSError: [Errno 28] No space left on device: '/tmp/pytest-scratch')\"\n      ],\n      \"bucket_confidence\": 0.82,\n      \"root_cause_confidence\": 0.95,\n      \"dominant\": true,\n      \"secondary_visible_despite_blocker\": false,\n      \"mini_diff\": null\n    },\n    {\n      \"bucket_index\": 2,\n      \"label\": \"permission denied\",\n      \"count\": 1,\n      \"root_cause\": \"permission: OSError: [Errno 13] Permission denied: '/tmp/pytest-lock'\",\n      \"suspect_kind\": \"environment\",\n      \"fix_hint\": \"Check file or port permissions in the CI environment before rerunning.\",\n      \"evidence\": [\n        \"tests/storage/test_lockfile.py::test_lockfile_cleanup -> permission: OSError: [Errno 13] Permission denied: '/tmp/pytest-lock'\"\n      ],\n      \"bucket_confidence\": 0.82,\n      \"root_cause_confidence\": 0.85,\n      \"dominant\": false,\n      \"secondary_visible_despite_blocker\": true,\n      \"mini_diff\": null\n    }\n  ],\n  \"read_targets\": [\n    {\n      \"file\": \"tests/storage/test_tmpdir.py\",\n      \"line\": null,\n      \"why\": \"it contains the pytest configuration or conftest setup error that blocks the run\",\n      \"bucket_index\": 1,\n      \"context_hint\": {\n        \"start_line\": null,\n        \"end_line\": null,\n        \"search_hint\": \"disk full (OSError: [Errno 28] No space left on device: '/tmp/pytest-scratch')\"\n      }\n    },\n    {\n      \"file\": \"tests/storage/test_lockfile.py\",\n      \"line\": null,\n      \"why\": \"it contains the file, socket, or port access that was denied\",\n      \"bucket_index\": 2,\n      \"context_hint\": {\n        \"start_line\": null,\n        \"end_line\": null,\n        \"search_hint\": \"/tmp/pytest-lock\"\n      }\n    }\n  ],\n  \"next_best_action\": {\n    \"code\": \"fix_dominant_blocker\",\n    \"bucket_index\": 1,\n    \"note\": \"Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.\"\n  },\n  \"resolved_summary\": {\n    \"count\": 0,\n    \"families\": []\n  },\n  \"remaining_summary\": {\n    \"count\": 2,\n    \"families\": [\n      {\n        \"prefix\": \"tests/storage/\",\n        \"count\": 2\n      }\n    ]\n  },\n  \"remaining_subset_available\": false\n}"
+        }
+      }
+    ],
+    "aggregate": {
+      "primary": {
+        "raw": {
+          "chars": 45748,
+          "tokens": 10983
+        },
+        "standard": {
+          "chars": 8956,
+          "tokens": 2042
+        },
+        "focused": {
+          "chars": 9432,
+          "tokens": 2160
+        },
+        "verbose": {
+          "chars": 10213,
+          "tokens": 2356
+        },
+        "verboseShowRaw": {
+          "chars": 55972,
+          "tokens": 13346
+        },
+        "diagnoseJson": {
+          "chars": 32097,
+          "tokens": 8568
+        }
+      },
+      "recipe": {
+        "siftFirst": {
+          "chars": 8956,
+          "tokens": 2042,
+          "stepCount": 11,
+          "completeCount": 11
+        },
+        "rawFirst": {
+          "chars": 47330,
+          "tokens": 11402,
+          "stepCount": 16
+        }
+      }
+    }
+  }
+}

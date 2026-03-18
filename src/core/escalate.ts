@@ -5,6 +5,7 @@ import { runSiftWithStats } from "./run.js";
 import { emitStatsFooter } from "./stats.js";
 import {
   getNextEscalationDetail,
+  isRemainingSubsetAvailable,
   readCachedTestStatusRun,
   writeCachedTestStatusRun,
   type CachedTestStatusRun
@@ -81,7 +82,8 @@ export async function runEscalate(request: EscalateRequest): Promise<number> {
     fallbackJson: request.fallbackJson,
     testStatusContext: {
       remainingSubsetAvailable:
-        Boolean(state.pytest?.subsetCapable) && (state.pytest?.failingNodeIds.length ?? 0) > 0
+        isRemainingSubsetAvailable(state) && state.runner.failingTargets.length > 0,
+      remainingMode: "none"
     }
   });
   let output = result.output;

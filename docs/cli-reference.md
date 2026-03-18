@@ -35,7 +35,8 @@ sift rerun --remaining --detail verbose --show-raw
 
 Notes:
 - `sift rerun` reruns the cached full command at standard detail.
-- `sift rerun --remaining` narrows to the remaining failing subset only when the cached run was `pytest` or `python -m pytest`.
+- `sift rerun --remaining` narrows automatically for cached `pytest` runs.
+- For cached `vitest` and `jest` runs, `sift rerun --remaining` reruns the original full command and keeps the diagnosis focused on what still fails relative to the cached baseline.
 
 ### `sift escalate`
 

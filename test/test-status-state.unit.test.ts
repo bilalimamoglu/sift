@@ -8,7 +8,6 @@ import {
   MissingCachedTestStatusRunError,
   buildTestStatusCommandKey,
   createCachedTestStatusRun,
-  diffTestStatusRuns,
   getNextEscalationDetail,
   getRemainingPytestNodeIds,
   readCachedTestStatusRun,
@@ -59,8 +58,9 @@ describe("test-status state helpers", () => {
       mode: "argv",
       argv: ["pytest"]
     });
-    expect(state.pytest?.subsetCapable).toBe(true);
-    expect(state.pytest?.failingNodeIds).toEqual([
+    expect(state.runner.name).toBe("pytest");
+    expect(state.runner.subset.available).toBe(true);
+    expect(state.runner.failingTargets).toEqual([
       "tests/db/test_users.py",
       "tests/db/test_posts.py"
     ]);
@@ -111,16 +111,10 @@ describe("test-status state helpers", () => {
       previous,
       current
     });
-    const diff = diffTestStatusRuns({
-      previous,
-      current
-    });
-
     expect(delta).toHaveLength(2);
     expect(delta[0]).toContain("- Resolved:");
     expect(delta[1]).toContain("- New:");
-    expect(diff.remainingNodeIds).toEqual([]);
-    expect(getRemainingPytestNodeIds(current)).toEqual(current.pytest?.failingNodeIds ?? []);
+    expect(getRemainingPytestNodeIds(current)).toEqual(current.runner.failingTargets);
     expect(getNextEscalationDetail("standard")).toBe("focused");
     expect(getNextEscalationDetail("focused")).toBe("verbose");
     expect(getNextEscalationDetail("verbose")).toBeNull();

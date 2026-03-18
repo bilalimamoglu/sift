@@ -766,14 +766,20 @@ export function createCliApp(args: {
     });
 
   applySharedOptions(
-    cli.command("rerun", "Rerun the cached test-status command or only the remaining pytest subset")
+    cli.command(
+      "rerun",
+      "Rerun the cached test-status command or focus on what still fails from the cached baseline"
+    )
   )
     .usage("rerun [options]")
     .example("rerun")
     .example("rerun --remaining")
     .example("rerun --remaining --detail focused")
     .example("rerun --remaining --detail verbose --show-raw")
-    .option("--remaining", "Rerun only the remaining failing pytest node IDs from the cached full run")
+    .option(
+      "--remaining",
+      "Focus on what still fails from the cached baseline; narrows automatically for pytest and diffs a full rerun for vitest/jest"
+    )
     .action(async (options: Record<string, unknown>) => {
       const remaining = Boolean(options.remaining);
       if (!remaining && Boolean(options.showRaw)) {

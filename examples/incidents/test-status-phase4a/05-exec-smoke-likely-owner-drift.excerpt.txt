@@ -1,0 +1,41 @@
+FAIL  test/exec.smoke.test.ts > exec mode > uses a local summary for obvious pytest success output
+AssertionError: expected '- Tests passed.\n- 12 tests, 1 skip.\…' to be '- Tests passed.\n- 12 tests, 1 skip.\…' // Object.is equality
+
+- Expected
++ Received
+
+  - Tests passed.
+  - 12 tests, 1 skip.
+  - Decision: stop and act. Do not escalate unless you need exact traceback lines.
++ - Likely owner: unknown
+  - Next: No failing buckets remain.
+  - Stop signal: diagnosis complete; raw not needed.
+
+FAIL  test/exec.smoke.test.ts > exec mode > uses a local summary for pytest collection errors
+AssertionError: expected '- Tests did not complete.\n- 134 erro…' to be '- Tests did not complete.\n- 134 erro…' // Object.is equality
+
+- Expected
++ Received
+
+  - Tests did not complete.
+  - 134 errors occurred during collection.
+  - Decision: read source next. Do not escalate unless exact traceback lines are still needed.
++ - Likely owner: unknown
+  - Next: Inspect the collection traceback or setup code next; the run failed before tests executed.
+  - Stop signal: diagnosis complete; raw not needed.
+
+FAIL  test/exec.smoke.test.ts > exec mode > groups repeated import-time root causes for collection failures
+AssertionError: expected '- Tests did not complete.\n- 114 erro…' to be '- Tests did not complete.\n- 114 erro…' // Object.is equality
+
+- Expected
++ Received
+
+@@ -2,7 +2,8 @@
+ - 114 errors occurred during collection.
+ - Import/dependency blocker: 114 errors are caused by missing dependencies during test collection.
+ - Anchor: /tmp/tests/unit/test_api.py
+ - Fix: Install the missing dependencies and rerun the affected tests.
+ - Decision: stop and act. Do not escalate unless you need exact traceback lines.
++ - Likely owner: test or project configuration
+ - Next: Fix bucket 1 first, then rerun the full suite at standard.
+ - Stop signal: diagnosis complete; raw not needed.

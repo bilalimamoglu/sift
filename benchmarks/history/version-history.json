@@ -1,0 +1,108 @@
+{
+  "since": "v0.3.0",
+  "generatedAt": "2026-03-18T14:43:07.229Z",
+  "rows": [
+    {
+      "tag": "v0.3.0",
+      "version": "0.3.0",
+      "fixtureCount": 4,
+      "presetBenchmarksAvailable": false,
+      "presetCaseCount": null,
+      "presetPassed": null,
+      "standardTokens": 664,
+      "standardReductionPct": 92.88,
+      "focusedTokens": 871,
+      "verboseTokens": 1067,
+      "diagnoseJsonTokens": null
+    },
+    {
+      "tag": "v0.3.1",
+      "version": "0.3.1",
+      "fixtureCount": 4,
+      "presetBenchmarksAvailable": false,
+      "presetCaseCount": null,
+      "presetPassed": null,
+      "standardTokens": 664,
+      "standardReductionPct": 92.88,
+      "focusedTokens": 871,
+      "verboseTokens": 1067,
+      "diagnoseJsonTokens": null
+    },
+    {
+      "tag": "v0.3.2",
+      "version": "0.3.2",
+      "fixtureCount": 7,
+      "presetBenchmarksAvailable": false,
+      "presetCaseCount": null,
+      "presetPassed": null,
+      "standardTokens": 1155,
+      "standardReductionPct": 88.43,
+      "focusedTokens": 1423,
+      "verboseTokens": 1619,
+      "diagnoseJsonTokens": null
+    },
+    {
+      "tag": "v0.3.3",
+      "version": "0.3.3",
+      "fixtureCount": 11,
+      "presetBenchmarksAvailable": true,
+      "presetCaseCount": 16,
+      "presetPassed": 16,
+      "standardTokens": 2042,
+      "standardReductionPct": 81.41,
+      "focusedTokens": 2160,
+      "verboseTokens": 2356,
+      "diagnoseJsonTokens": 8400
+    }
+  ],
+  "commonFixtureBaseline": {
+    "names": [
+      "missing-module-collection",
+      "mixed-full-suite",
+      "single-blocker-short",
+      "snapshot-drift-only"
+    ],
+    "byTag": [
+      {
+        "tag": "v0.3.0",
+        "version": "0.3.0",
+        "rawTokens": 9320,
+        "standardTokens": 664,
+        "focusedTokens": 871,
+        "verboseTokens": 1067,
+        "diagnoseJsonTokens": null,
+        "standardReductionPct": 92.88
+      },
+      {
+        "tag": "v0.3.1",
+        "version": "0.3.1",
+        "rawTokens": 9320,
+        "standardTokens": 664,
+        "focusedTokens": 871,
+        "verboseTokens": 1067,
+        "diagnoseJsonTokens": null,
+        "standardReductionPct": 92.88
+      },
+      {
+        "tag": "v0.3.2",
+        "version": "0.3.2",
+        "rawTokens": 9320,
+        "standardTokens": 664,
+        "focusedTokens": 871,
+        "verboseTokens": 1067,
+        "diagnoseJsonTokens": null,
+        "standardReductionPct": 92.88
+      },
+      {
+        "tag": "v0.3.3",
+        "version": "0.3.3",
+        "rawTokens": 9320,
+        "standardTokens": 698,
+        "focusedTokens": 871,
+        "verboseTokens": 1067,
+        "diagnoseJsonTokens": 2973,
+        "standardReductionPct": 92.51
+      }
+    ]
+  }
+}
