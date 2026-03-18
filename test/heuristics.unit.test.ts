@@ -424,6 +424,7 @@ function buildWebpackLoaderFailure(): string {
     "ERROR in ./src/index.ts",
     "Module build failed (from ./node_modules/ts-loader/index.js):",
     "Error: TypeScript compilation failed",
+    "TS2322: Type 'string' is not assignable to type 'AppConfig'.",
     "webpack 5.90.0 compiled with 1 error in 1900 ms"
   ].join("\n");
 }
@@ -449,6 +450,49 @@ function buildViteWrappedEsbuildError(): string {
     "        ╵           ~~~",
     "",
     "1 error"
+  ].join("\n");
+}
+
+function buildViteImportAnalysisFailure(): string {
+  return [
+    "vite v5.4.11 building for production...",
+    "transforming (1) src/main.ts",
+    "[plugin:vite:import-analysis] Failed to resolve import \"@/lib/missing\" from \"src/routes/dashboard.tsx\". Does the file exist?",
+    "transforming (2) src/routes/settings.tsx",
+    "error during build:"
+  ].join("\n");
+}
+
+function buildRawNpmAuditDefaultReport(): string {
+  return [
+    "# npm audit report",
+    "",
+    "lodash  <4.17.21",
+    "Severity: critical",
+    "Prototype Pollution - https://github.com/advisories/GHSA-jf85-cpcp-j695",
+    "fix available via `npm audit fix`",
+    "node_modules/lodash",
+    "",
+    "semver  <7.5.2",
+    "Severity: high",
+    "Regular Expression Denial of Service - https://github.com/advisories/GHSA-c2qf-rxjj-qqgw",
+    "fix available via `npm audit fix`",
+    "node_modules/semver",
+    "",
+    "follow-redirects  <1.15.6",
+    "Severity: moderate",
+    "Improper Input Validation - https://github.com/advisories/GHSA-jchw-25xp-jwwc",
+    "node_modules/follow-redirects",
+    "",
+    "3 vulnerabilities (1 critical, 1 high, 1 moderate)"
+  ].join("\n");
+}
+
+function buildCompactAuditSeverityReport(): string {
+  return [
+    "lodash: critical - Prototype Pollution (GHSA-jf85-cpcp-j695)",
+    "axios: high - SSRF advisory (GHSA-4w2v-q235-vp99)",
+    "follow-redirects: moderate - Improper Input Validation"
   ].join("\n");
 }
 
@@ -1679,7 +1723,7 @@ describe("heuristic policies", () => {
     const output = applyHeuristicPolicy("build-failure", buildWebpackLoaderFailure());
 
     expect(output).toBe(
-      "Build failed: Module build failed (from ./node_modules/ts-loader/index.js) in src/index.ts. Fix: Fix the first reported error and rebuild."
+      "Build failed: TS2322: Type 'string' is not assignable to type 'AppConfig' in src/index.ts. Fix: Fix the type error at the indicated location."
     );
   });
 
@@ -1696,6 +1740,14 @@ describe("heuristic policies", () => {
 
     expect(output).toBe(
       'Build failed: No matching export in "src/utils.ts" for import "bar" in src/app.ts:5. Fix: Check the export name in the source module.'
+    );
+  });
+
+  it("summarizes vite import-analysis failures as module resolution errors", () => {
+    const output = applyHeuristicPolicy("build-failure", buildViteImportAnalysisFailure());
+
+    expect(output).toBe(
+      'Build failed: Failed to resolve import "@/lib/missing" in src/routes/dashboard.tsx. Fix: Install the missing package or fix the import path.'
     );
   });
 
@@ -1769,6 +1821,24 @@ describe("heuristic policies", () => {
         )
       )
     ).toBeNull();
+    expect(applyHeuristicPolicy("audit-critical", buildRawNpmAuditDefaultReport())).toContain(
+      '"package": "lodash"'
+    );
+    expect(applyHeuristicPolicy("audit-critical", buildRawNpmAuditDefaultReport())).toContain(
+      '"package": "semver"'
+    );
+    expect(applyHeuristicPolicy("audit-critical", buildRawNpmAuditDefaultReport())).not.toContain(
+      '"package": "follow-redirects"'
+    );
+    expect(applyHeuristicPolicy("audit-critical", buildCompactAuditSeverityReport())).toContain(
+      '"package": "lodash"'
+    );
+    expect(applyHeuristicPolicy("audit-critical", buildCompactAuditSeverityReport())).toContain(
+      '"package": "axios"'
+    );
+    expect(applyHeuristicPolicy("audit-critical", buildCompactAuditSeverityReport())).not.toContain(
+      '"package": "follow-redirects"'
+    );
 
     expect(applyHeuristicPolicy("infra-risk", "Plan: 1 to add, 2 to destroy")).toContain(
       '"verdict": "fail"'

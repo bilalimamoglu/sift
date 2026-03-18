@@ -60,6 +60,111 @@ function inferRemediation(pkg: string): string {
   return `Upgrade ${pkg} to a patched version.`;
 }
 
+function parseCompactAuditVulnerability(line: string): {
+  package: string;
+  severity: "critical" | "high";
+  remediation: string;
+} | null {
+  if (/^Severity:\s*/i.test(line)) {
+    return null;
+  }
+
+  if (!/\b(critical|high)\b/i.test(line)) {
+    return null;
+  }
+
+  const pkg = inferPackage(line);
+  if (!pkg) {
+    return null;
+  }
+
+  return {
+    package: pkg,
+    severity: inferSeverity(line),
+    remediation: inferRemediation(pkg)
+  };
+}
+
+function inferAuditPackageHeader(line: string): string | null {
+  const trimmed = line.trim();
+  if (
+    trimmed.length === 0 ||
+    trimmed.startsWith("#") ||
+    trimmed.includes(":") ||
+    /^node_modules\//i.test(trimmed)
+  ) {
+    return null;
+  }
+
+  const match = trimmed.match(/^([@a-z0-9._/-]+)(?:\s{2,}|\s+(?:[<>=~^*]|\d))/i);
+  return match?.[1] ?? null;
+}
+
+function collectAuditCriticalVulnerabilities(input: string): {
+  package: string;
+  severity: "critical" | "high";
+  remediation: string;
+}[] {
+  const lines = input.split("\n");
+  const vulnerabilities: {
+    package: string;
+    severity: "critical" | "high";
+    remediation: string;
+  }[] = [];
+  const seen = new Set<string>();
+
+  const pushVulnerability = (pkg: string, severity: "critical" | "high") => {
+    const key = `${pkg}:${severity}`;
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    vulnerabilities.push({
+      package: pkg,
+      severity,
+      remediation: inferRemediation(pkg)
+    });
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]!.trim();
+    if (!line) {
+      continue;
+    }
+
+    const compact = parseCompactAuditVulnerability(line);
+    if (compact) {
+      pushVulnerability(compact.package, compact.severity);
+      continue;
+    }
+
+    const pkg = inferAuditPackageHeader(line);
+    if (!pkg) {
+      continue;
+    }
+
+    for (let cursor = index + 1; cursor < Math.min(lines.length, index + 5); cursor += 1) {
+      const candidate = lines[cursor]!.trim();
+      if (!candidate) {
+        continue;
+      }
+
+      const severityMatch = candidate.match(/^Severity:\s*(critical|high)\b/i);
+      if (severityMatch) {
+        pushVulnerability(pkg, severityMatch[1]!.toLowerCase() as "critical" | "high");
+        break;
+      }
+
+      if (inferAuditPackageHeader(candidate) || parseCompactAuditVulnerability(candidate)) {
+        break;
+      }
+    }
+  }
+
+  return vulnerabilities;
+}
+
 function getCount(input: string, label: string): number {
   const matches = [...input.matchAll(new RegExp(`(\\d+)\\s+${label}`, "gi"))];
   const lastMatch = matches.at(-1);
@@ -2928,27 +3033,7 @@ function auditCriticalHeuristic(input: string): string | null {
     );
   }
 
-  const vulnerabilities = input
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      if (!/\b(critical|high)\b/i.test(line)) {
-        return null;
-      }
-
-      const pkg = inferPackage(line);
-      if (!pkg) {
-        return null;
-      }
-
-      return {
-        package: pkg,
-        severity: inferSeverity(line),
-        remediation: inferRemediation(pkg)
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => item !== null);
+  const vulnerabilities = collectAuditCriticalVulnerabilities(input);
 
   if (vulnerabilities.length === 0) {
     return null;
@@ -3514,7 +3599,7 @@ function extractWebpackBuildFailure(input: string): BuildFailureMatch | null {
       continue;
     }
 
-    let message = "Compilation error";
+    const candidates: string[] = [];
     for (let cursor = index + 1; cursor < Math.min(lines.length, index + 6); cursor += 1) {
       const candidate = lines[cursor]?.trim();
       if (!candidate) {
@@ -3529,8 +3614,26 @@ function extractWebpackBuildFailure(input: string): BuildFailureMatch | null {
         continue;
       }
 
-      message = candidate;
-      break;
+      candidates.push(candidate);
+    }
+
+    let message = "Compilation error";
+    if (candidates.length > 0) {
+      const preferred =
+        candidates.find(
+          (candidate) =>
+            !/^Module build failed\b/i.test(candidate) &&
+            !/^Error:\s+TypeScript compilation failed\b/i.test(candidate) &&
+            inferBuildFailureCategory(candidate) !== "generic"
+        ) ??
+        candidates.find(
+          (candidate) =>
+            !/^Module build failed\b/i.test(candidate) &&
+            !/^Error:\s+TypeScript compilation failed\b/i.test(candidate)
+        ) ??
+        candidates[0];
+
+      message = preferred ?? message;
     }
 
     return {
@@ -3539,6 +3642,29 @@ function extractWebpackBuildFailure(input: string): BuildFailureMatch | null {
       line: match[2] ? Number(match[2]) : null,
       column: match[3] ? Number(match[3]) : null,
       category: inferBuildFailureCategory(message)
+    };
+  }
+
+  return null;
+}
+
+function extractViteImportAnalysisBuildFailure(input: string): BuildFailureMatch | null {
+  const lines = stripAnsiText(input).split("\n").map((line) => line.trim());
+
+  for (const line of lines) {
+    const match = line.match(
+      /^\[plugin:vite:import-analysis\]\s+Failed to resolve import\s+"([^"]+)"\s+from\s+"([^"]+)"/i
+    );
+    if (!match) {
+      continue;
+    }
+
+    return {
+      message: `Failed to resolve import "${match[1]}"`,
+      file: normalizeBuildPath(match[2]!),
+      line: null,
+      column: null,
+      category: "module-resolution"
     };
   }
 
@@ -3693,6 +3819,7 @@ function buildFailureHeuristic(input: string): string | null {
   }
 
   const match =
+    extractViteImportAnalysisBuildFailure(input) ??
     extractWebpackBuildFailure(input) ??
     extractEsbuildBuildFailure(input) ??
     extractCargoBuildFailure(input) ??

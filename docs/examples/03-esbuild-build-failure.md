@@ -29,7 +29,8 @@ Build failed: Could not resolve "react-query" in src/hooks/usePosts.ts:3. Fix: I
 - Reduced: `130` chars / `31` tokens
 - Reduction: `62.65%`
 
-## Full Example
+## Related Files
 
-- Raw log: [vite-build-failure-full.raw.txt](/Users/bilalimamoglu/repos/sift/examples/build-failure/vite-build-failure-full.raw.txt)
-- Reduced output: [vite-build-failure-full.reduced.txt](/Users/bilalimamoglu/repos/sift/examples/build-failure/vite-build-failure-full.reduced.txt)
+- Benchmark raw input: [benchmarks/cases/build-failure/esbuild-missing-module.raw.txt](../../benchmarks/cases/build-failure/esbuild-missing-module.raw.txt)
+- Companion raw log: [examples/build-failure/vite-build-failure-full.raw.txt](../../examples/build-failure/vite-build-failure-full.raw.txt)
+- Companion reduced output: [examples/build-failure/vite-build-failure-full.reduced.txt](../../examples/build-failure/vite-build-failure-full.reduced.txt)

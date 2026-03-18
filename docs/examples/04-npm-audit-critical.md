@@ -13,16 +13,22 @@ Project: platform-api
 Workspace: services/api
 Dependencies scanned: 2319
 
-lodash: critical - Prototype Pollution (GHSA-jf85-cpcp-j695) - fix: npm audit fix
-  Introduced via: request, webpack-dev-server
+lodash  <4.17.21
+Severity: critical
+Prototype Pollution - https://github.com/advisories/GHSA-jf85-cpcp-j695
 
-@babel/traverse: critical - Code injection via malicious package (GHSA-67hx-6x53-jw92)
-  Introduced via: jest > @jest/core > @babel/traverse
+@babel/traverse  <7.23.2
+Severity: critical
+Code injection via malicious package - https://github.com/advisories/GHSA-67hx-6x53-jw92
 
-semver: high - Regular Expression Denial of Service (GHSA-c2qf-rxjj-qqgw)
-tough-cookie: high - Prototype Pollution (GHSA-72xf-g2v4-qvf3)
-node-fetch: moderate - Exposure of Sensitive Information
-follow-redirects: moderate - Improper Input Validation
+semver  <7.5.2
+Severity: high
+tough-cookie  <4.1.3
+Severity: high
+node-fetch  <2.6.7
+Severity: moderate
+follow-redirects  <1.15.6
+Severity: moderate
 
 6 vulnerabilities (2 critical, 2 high, 2 moderate)
 ```
@@ -60,11 +66,12 @@ follow-redirects: moderate - Improper Input Validation
 
 ## Impact
 
-- Raw: `1706` chars / `514` tokens
+- Raw: `1490` chars / `435` tokens
 - Reduced: `669` chars / `168` tokens
-- Reduction: `67.32%`
+- Reduction: `61.38%`
 
-## Full Example
+## Related Files
 
-- Raw log: [npm-audit-mixed-severity-full.raw.txt](/Users/bilalimamoglu/repos/sift/examples/audit-critical/npm-audit-mixed-severity-full.raw.txt)
-- Reduced output: [npm-audit-mixed-severity-full.reduced.txt](/Users/bilalimamoglu/repos/sift/examples/audit-critical/npm-audit-mixed-severity-full.reduced.txt)
+- Benchmark raw input: [benchmarks/cases/audit-critical/npm-audit-mixed-severity.raw.txt](../../benchmarks/cases/audit-critical/npm-audit-mixed-severity.raw.txt)
+- Companion raw log: [examples/audit-critical/npm-audit-mixed-severity-full.raw.txt](../../examples/audit-critical/npm-audit-mixed-severity-full.raw.txt)
+- Companion reduced output: [examples/audit-critical/npm-audit-mixed-severity-full.reduced.txt](../../examples/audit-critical/npm-audit-mixed-severity-full.reduced.txt)

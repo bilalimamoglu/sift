@@ -40,10 +40,11 @@ src/hooks/useData.ts
 ## Impact
 
 - Raw: `7912` chars / `2046` tokens
-- Reduced: `465` chars / `125` tokens
+- Reduced: `469` chars / `125` tokens
 - Reduction: `93.89%`
 
-## Full Example
+## Related Files
 
-- Raw log: [eslint-mixed-rules.raw.txt](/Users/bilalimamoglu/repos/sift/examples/lint-failures/eslint-mixed-rules.raw.txt)
-- Reduced output: [eslint-mixed-rules.reduced.txt](/Users/bilalimamoglu/repos/sift/examples/lint-failures/eslint-mixed-rules.reduced.txt)
+- Benchmark raw input: [benchmarks/cases/lint-failures/eslint-mixed-rules.raw.txt](../../benchmarks/cases/lint-failures/eslint-mixed-rules.raw.txt)
+- Companion raw log: [examples/lint-failures/eslint-mixed-rules.raw.txt](../../examples/lint-failures/eslint-mixed-rules.raw.txt)
+- Companion reduced output: [examples/lint-failures/eslint-mixed-rules.reduced.txt](../../examples/lint-failures/eslint-mixed-rules.reduced.txt)

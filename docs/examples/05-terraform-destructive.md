@@ -55,7 +55,8 @@ Plan: 1 to add, 1 to change, 2 to destroy.
 - Reduced: `426` chars / `119` tokens
 - Reduction: `32%`
 
-## Full Example
+## Related Files
 
-- Raw log: [terraform-destructive-plan-full.raw.txt](/Users/bilalimamoglu/repos/sift/examples/infra-risk/terraform-destructive-plan-full.raw.txt)
-- Reduced output: [terraform-destructive-plan-full.reduced.txt](/Users/bilalimamoglu/repos/sift/examples/infra-risk/terraform-destructive-plan-full.reduced.txt)
+- Benchmark raw input: [benchmarks/cases/infra-risk/tf-plan-destroy.raw.txt](../../benchmarks/cases/infra-risk/tf-plan-destroy.raw.txt)
+- Companion raw log: [examples/infra-risk/terraform-destructive-plan-full.raw.txt](../../examples/infra-risk/terraform-destructive-plan-full.raw.txt)
+- Companion reduced output: [examples/infra-risk/terraform-destructive-plan-full.reduced.txt](../../examples/infra-risk/terraform-destructive-plan-full.reduced.txt)

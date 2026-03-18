@@ -15,59 +15,75 @@ Security baseline: weekly lockfile refresh required
 Policy mode: report-only
 Owner contact: platform-security@example.invalid
 
-lodash: critical - Prototype Pollution (GHSA-jf85-cpcp-j695) - fix: npm audit fix
-  Introduced via: request, webpack-dev-server
-  Affected range: <4.17.21
-  First patched version: 4.17.21
-  Dependency path: platform-api > internal-ui-proxy > webpack-dev-server > selfsigned > lodash
-  Advisory URL: https://github.com/advisories/GHSA-jf85-cpcp-j695
-  CVSS score: 9.1
-  node_modules/lodash
+lodash  <4.17.21
+Severity: critical
+Prototype Pollution - https://github.com/advisories/GHSA-jf85-cpcp-j695
+Introduced via: request, webpack-dev-server
+Affected range: <4.17.21
+First patched version: 4.17.21
+Dependency path: platform-api > internal-ui-proxy > webpack-dev-server > selfsigned > lodash
+Advisory URL: https://github.com/advisories/GHSA-jf85-cpcp-j695
+CVSS score: 9.1
+fix available via `npm audit fix`
+node_modules/lodash
 
-@babel/traverse: critical - Code injection via malicious package (GHSA-67hx-6x53-jw92)
-  Introduced via: jest > @jest/core > @babel/traverse
-  Affected range: <7.23.2
-  First patched version: 7.23.2
-  Dependency path: platform-api > jest > @jest/core > @babel/traverse
-  Advisory URL: https://github.com/advisories/GHSA-67hx-6x53-jw92
-  CVSS score: 9.3
-  node_modules/@babel/traverse
+@babel/traverse  <7.23.2
+Severity: critical
+Code injection via malicious package - https://github.com/advisories/GHSA-67hx-6x53-jw92
+Introduced via: jest > @jest/core > @babel/traverse
+Affected range: <7.23.2
+First patched version: 7.23.2
+Dependency path: platform-api > jest > @jest/core > @babel/traverse
+Advisory URL: https://github.com/advisories/GHSA-67hx-6x53-jw92
+CVSS score: 9.3
+fix available via `npm audit fix`
+node_modules/@babel/traverse
 
-semver: high - Regular Expression Denial of Service (GHSA-c2qf-rxjj-qqgw)
-  Introduced via: npm-package-arg > hosted-git-info > semver
-  Affected range: <7.5.2
-  First patched version: 7.5.2
-  Dependency path: platform-api > release-pipeline > npm-package-arg > hosted-git-info > semver
-  Advisory URL: https://github.com/advisories/GHSA-c2qf-rxjj-qqgw
-  CVSS score: 7.5
-  node_modules/semver
+semver  <7.5.2
+Severity: high
+Regular Expression Denial of Service - https://github.com/advisories/GHSA-c2qf-rxjj-qqgw
+Introduced via: npm-package-arg > hosted-git-info > semver
+Affected range: <7.5.2
+First patched version: 7.5.2
+Dependency path: platform-api > release-pipeline > npm-package-arg > hosted-git-info > semver
+Advisory URL: https://github.com/advisories/GHSA-c2qf-rxjj-qqgw
+CVSS score: 7.5
+fix available via `npm audit fix`
+node_modules/semver
 
-tough-cookie: high - Prototype Pollution (GHSA-72xf-g2v4-qvf3)
-  Introduced via: request > tough-cookie
-  Affected range: <4.1.3
-  First patched version: 4.1.3
-  Dependency path: platform-api > internal-sync > request > tough-cookie
-  Advisory URL: https://github.com/advisories/GHSA-72xf-g2v4-qvf3
-  CVSS score: 7.2
-  node_modules/tough-cookie
+tough-cookie  <4.1.3
+Severity: high
+Prototype Pollution - https://github.com/advisories/GHSA-72xf-g2v4-qvf3
+Introduced via: request > tough-cookie
+Affected range: <4.1.3
+First patched version: 4.1.3
+Dependency path: platform-api > internal-sync > request > tough-cookie
+Advisory URL: https://github.com/advisories/GHSA-72xf-g2v4-qvf3
+CVSS score: 7.2
+fix available via `npm audit fix`
+node_modules/tough-cookie
 
-node-fetch: moderate - Exposure of Sensitive Information
-  Introduced via: internal-tooling > node-fetch
-  Affected range: <2.6.7
-  First patched version: 2.6.7
-  Dependency path: platform-api > deploy-preview > node-fetch
-  Advisory URL: https://github.com/advisories/GHSA-r683-j2x4-v87g
-  CVSS score: 5.3
-  node_modules/node-fetch
+node-fetch  <2.6.7
+Severity: moderate
+Exposure of Sensitive Information - https://github.com/advisories/GHSA-r683-j2x4-v87g
+Introduced via: internal-tooling > node-fetch
+Affected range: <2.6.7
+First patched version: 2.6.7
+Dependency path: platform-api > deploy-preview > node-fetch
+Advisory URL: https://github.com/advisories/GHSA-r683-j2x4-v87g
+CVSS score: 5.3
+node_modules/node-fetch
 
-follow-redirects: moderate - Improper Input Validation
-  Introduced via: axios > follow-redirects
-  Affected range: <1.15.6
-  First patched version: 1.15.6
-  Dependency path: platform-api > api-client > axios > follow-redirects
-  Advisory URL: https://github.com/advisories/GHSA-jchw-25xp-jwwc
-  CVSS score: 5.4
-  node_modules/follow-redirects
+follow-redirects  <1.15.6
+Severity: moderate
+Improper Input Validation - https://github.com/advisories/GHSA-jchw-25xp-jwwc
+Introduced via: axios > follow-redirects
+Affected range: <1.15.6
+First patched version: 1.15.6
+Dependency path: platform-api > api-client > axios > follow-redirects
+Advisory URL: https://github.com/advisories/GHSA-jchw-25xp-jwwc
+CVSS score: 5.4
+node_modules/follow-redirects
 
 Dependency tree notes:
   - request is only used in the legacy sync worker.

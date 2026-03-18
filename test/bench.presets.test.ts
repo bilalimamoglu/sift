@@ -2,12 +2,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
+import { benchmarkCases } from "../benchmarks/catalog.js";
 import { repoRoot } from "./helpers/cli.js";
 
 type CaseReport = {
   id: string;
   preset: string;
   docsSlug?: string;
+  reducedOutput: string | null;
+  rawChars: number;
+  rawTokens: number;
+  reducedChars: number | null;
+  reducedTokens: number | null;
   heuristicFired: boolean;
   reductionPct: number | null;
   snippetsMissing: string[];
@@ -122,10 +128,23 @@ describe("preset reduction benchmark", () => {
       const docPath = path.join(repoRoot(), "docs", "examples", `${candidate.docsSlug}.md`);
       expect(fs.existsSync(docPath), `${candidate.docsSlug} should exist`).toBe(true);
       const content = fs.readFileSync(docPath, "utf8");
+      const catalogCase = benchmarkCases.find((entry) => entry.id === candidate.id);
 
       expect(content).toContain(`**Preset:** \`${candidate.preset}\``);
       expect(content).toContain(`**Case ID:** \`${candidate.id}\``);
+      expect(content).toContain(`## After\n\n\`\`\`text\n${candidate.reducedOutput}\n\`\`\``);
       expect(content).toContain("## Impact");
+      expect(content).toContain(
+        `- Raw: \`${candidate.rawChars}\` chars / \`${candidate.rawTokens}\` tokens`
+      );
+      expect(content).toContain(
+        `- Reduced: \`${candidate.reducedChars}\` chars / \`${candidate.reducedTokens}\` tokens`
+      );
+      expect(content).toContain(`- Reduction: \`${candidate.reductionPct}%\``);
+      expect(catalogCase, `${candidate.id} should exist in benchmark catalog`).toBeDefined();
+      expect(content).toContain(
+        `- Benchmark raw input: [benchmarks/cases/${catalogCase!.relativeRawPath}]`
+      );
     }
   });
 

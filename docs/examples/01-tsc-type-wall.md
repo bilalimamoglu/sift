@@ -37,7 +37,8 @@ Found 96 errors in 8 files.
 - Reduced: `476` chars / `120` tokens
 - Reduction: `95.72%`
 
-## Full Example
+## Related Files
 
-- Raw log: [ts-wall-mixed.raw.txt](/Users/bilalimamoglu/repos/sift/examples/typecheck-summary/ts-wall-mixed.raw.txt)
-- Reduced output: [ts-wall-mixed.reduced.txt](/Users/bilalimamoglu/repos/sift/examples/typecheck-summary/ts-wall-mixed.reduced.txt)
+- Benchmark raw input: [benchmarks/cases/typecheck-summary/ts-wall-mixed.raw.txt](../../benchmarks/cases/typecheck-summary/ts-wall-mixed.raw.txt)
+- Companion raw log: [examples/typecheck-summary/ts-wall-mixed.raw.txt](../../examples/typecheck-summary/ts-wall-mixed.raw.txt)
+- Companion reduced output: [examples/typecheck-summary/ts-wall-mixed.reduced.txt](../../examples/typecheck-summary/ts-wall-mixed.reduced.txt)

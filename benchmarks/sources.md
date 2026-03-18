@@ -15,8 +15,8 @@ These benchmark cases are the source of truth for `raw -> reduced` shrinkage acr
 | `esbuild-missing-module` | `build-failure` | `synthetic-derived` | `brief-root-cause` | esbuild `[ERROR]` module-resolution sample with a file/line anchor. |
 | `webpack-type-error` | `build-failure` | `synthetic-derived` | `brief-root-cause` | webpack `ERROR in` sample where the first concrete line is a type error. |
 | `vite-syntax-error` | `build-failure` | `synthetic-derived` | `brief-root-cause` | Vite/esbuild syntax error sample with stable location formatting. |
-| `npm-audit-critical-only` | `audit-critical` | `synthetic-derived` | `security-findings` | Compact security findings with only critical severities retained in the reduced JSON. |
-| `npm-audit-mixed-severity` | `audit-critical` | `synthetic-derived` | `security-findings` | Mixed critical/high/moderate audit sample where only high and critical findings survive reduction. |
+| `npm-audit-critical-only` | `audit-critical` | `synthetic-derived` | `security-findings` | Default npm audit report blocks with `Severity:` lines; only critical findings survive reduction. |
+| `npm-audit-mixed-severity` | `audit-critical` | `synthetic-derived` | `security-findings` | Default npm audit report blocks where only high and critical findings survive reduction. |
 | `npm-audit-clean` | `audit-critical` | `synthetic-derived` | `security-findings` | Explicit zero-vulnerability audit output used to prove the clean-pass heuristic path. |
 | `tf-plan-destroy` | `infra-risk` | `synthetic-derived` | `risk-verdict` | Terraform plan with destructive evidence and a non-zero destroy summary. |
 | `tf-plan-safe-additions` | `infra-risk` | `synthetic-derived` | `risk-verdict` | Terraform plan with explicit zero destructive actions and a pass verdict. |

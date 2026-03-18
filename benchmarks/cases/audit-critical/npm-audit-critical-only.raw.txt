@@ -7,21 +7,17 @@ Production dependencies scanned: 812
 Registry: https://registry.npmjs.org/
 Audit run id: synthetic-derived-critical-only
 
-lodash: critical - Prototype Pollution in lodash (GHSA-jf85-cpcp-j695)
-  Dependency chain: web-app > webpack-dev-server > selfsigned > lodash
-  Affected range: <4.17.21
-  First patched version: 4.17.21
-  Advisory URL: https://github.com/advisories/GHSA-jf85-cpcp-j695
-  Fix available via npm audit fix --force
-  node_modules/lodash
+lodash  <4.17.21
+Severity: critical
+Prototype Pollution in lodash - https://github.com/advisories/GHSA-jf85-cpcp-j695
+fix available via `npm audit fix --force`
+node_modules/lodash
 
-serialize-javascript: critical - Cross-Site Scripting via regex (GHSA-h9rv-jmmf-4pgx)
-  Dependency chain: web-app > react-scripts > terser-webpack-plugin > serialize-javascript
-  Affected range: <3.1.0
-  First patched version: 3.1.0
-  Advisory URL: https://github.com/advisories/GHSA-h9rv-jmmf-4pgx
-  Fix available via npm audit fix
-  node_modules/serialize-javascript
+serialize-javascript  <3.1.0
+Severity: critical
+Cross-Site Scripting via regex - https://github.com/advisories/GHSA-h9rv-jmmf-4pgx
+fix available via `npm audit fix`
+node_modules/serialize-javascript
 
 Suggested actions:
   1. Review lockfile drift in CI.
