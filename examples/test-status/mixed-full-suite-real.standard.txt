@@ -1,0 +1,12 @@
+- Tests did not pass.
+- 3 tests failed. 124 errors occurred.
+- Shared blocker: 124 errors require PGTEST_POSTGRES_DSN for DB-isolated tests.
+- Anchor: search PGTEST_POSTGRES_DSN in tests/contracts/test_db_schema_freeze.py
+- Fix: Set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-isolated tests.
+- Contract drift: 3 freeze tests are out of sync with current API/model state.
+- Anchor: search /api/v1/admin/landing-gallery in tests/contracts/test_feature_manifest_freeze.py
+- Fix: If these API/model changes are intentional, regenerate the contract snapshots and rerun the freeze tests.
+- Decision: stop and act. Do not escalate unless you need exact traceback lines.
+- Likely owner: environment setup
+- Next: Fix bucket 1 first, then rerun the full suite at standard. Secondary buckets are already visible behind it.
+- Stop signal: diagnosis complete; raw not needed.

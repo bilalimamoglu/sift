@@ -1,11 +1,13 @@
 import { getEncoding } from "js-tiktoken";
 import {
   analyzeTestStatus,
-  applyHeuristicPolicy,
   type FailureBucketType,
   type TestStatusAnalysis
 } from "../../src/core/heuristics.js";
-import { buildTestStatusDiagnoseContract } from "../../src/core/testStatusDecision.js";
+import {
+  buildTestStatusDiagnoseContract,
+  buildTestStatusPublicDiagnoseContract
+} from "../../src/core/testStatusDecision.js";
 import type { DetailLevel } from "../../src/types.js";
 import {
   benchFixtures,
@@ -55,6 +57,10 @@ interface RecipeReport extends OutputBudget {
 interface FixtureReport {
   name: string;
   description: string;
+  decision: "stop" | "zoom" | "read_source" | "read_raw";
+  primarySuspectKind: "test" | "app_code" | "config" | "environment" | "tooling" | "unknown";
+  readTargetsCount: number;
+  unknownBucketCount: number;
   completion: CompletionReport;
   primary: {
     raw: OutputBudget;
@@ -62,16 +68,24 @@ interface FixtureReport {
     focused: OutputBudget;
     verbose: OutputBudget;
     verboseShowRaw: OutputBudget;
+    diagnoseJson: OutputBudget;
   };
   reductions: {
     standard: ReductionReport;
     focused: ReductionReport;
     verbose: ReductionReport;
     verboseShowRaw: ReductionReport;
+    diagnoseJson: ReductionReport;
   };
   recipe: {
     siftFirst: RecipeReport;
     rawFirst: RecipeReport;
+  };
+  rendered?: {
+    standardText: string;
+    focusedText: string;
+    verboseText: string;
+    diagnoseJson: string;
   };
 }
 
@@ -85,6 +99,7 @@ interface BenchmarkReport {
       focused: OutputBudget;
       verbose: OutputBudget;
       verboseShowRaw: OutputBudget;
+      diagnoseJson: OutputBudget;
     };
     recipe: {
       siftFirst: OutputBudget & {
@@ -199,18 +214,6 @@ function buildReduction(raw: OutputBudget, candidate: OutputBudget): ReductionRe
     tokensSaved,
     tokensPct: raw.tokens === 0 ? 0 : Number(((tokensSaved / raw.tokens) * 100).toFixed(2))
   };
-}
-
-function renderSiftOutput(fixture: BenchFixture, mode: SiftMode): string {
-  const detail: DetailLevel =
-    mode === "standard" ? "standard" : mode === "focused" ? "focused" : "verbose";
-  const heuristic = applyHeuristicPolicy("test-status", fixture.rawOutput, detail) ?? INSUFFICIENT_SIGNAL;
-
-  if (mode === "verboseShowRaw") {
-    return `${fixture.rawOutput}\n${heuristic}`;
-  }
-
-  return heuristic;
 }
 
 function collectEntities(analysis: TestStatusAnalysis): string[] {
@@ -335,18 +338,28 @@ function buildRawRecipe(
 
 function buildFixtureReport(
   fixture: BenchFixture,
-  encode: (value: string) => number
+  encode: (value: string) => number,
+  options: {
+    includeRendered: boolean;
+  }
 ): FixtureReport {
   const analysis = analyzeTestStatus(fixture.rawOutput);
   const decision = buildTestStatusDiagnoseContract({
     input: fixture.rawOutput,
     analysis
   });
+  const publicDiagnoseJson = JSON.stringify(
+    buildTestStatusPublicDiagnoseContract({
+      contract: decision.contract
+    }),
+    null,
+    2
+  );
   const outputs: Record<SiftMode, string> = {
-    standard: renderSiftOutput(fixture, "standard"),
-    focused: renderSiftOutput(fixture, "focused"),
-    verbose: renderSiftOutput(fixture, "verbose"),
-    verboseShowRaw: renderSiftOutput(fixture, "verboseShowRaw")
+    standard: decision.standardText,
+    focused: decision.focusedText,
+    verbose: decision.verboseText,
+    verboseShowRaw: `${fixture.rawOutput}\n${decision.verboseText}`
   };
   const completion = buildCompletionReport(fixture.completion, analysis, decision.contract);
   const primary = {
@@ -354,24 +367,42 @@ function buildFixtureReport(
     standard: measureOutput(outputs.standard, encode),
     focused: measureOutput(outputs.focused, encode),
     verbose: measureOutput(outputs.verbose, encode),
-    verboseShowRaw: measureOutput(outputs.verboseShowRaw, encode)
+    verboseShowRaw: measureOutput(outputs.verboseShowRaw, encode),
+    diagnoseJson: measureOutput(publicDiagnoseJson, encode)
   };
 
   return {
     name: fixture.name,
     description: fixture.description,
+    decision: decision.contract.decision,
+    primarySuspectKind: decision.contract.primary_suspect_kind,
+    readTargetsCount: decision.contract.read_targets.length,
+    unknownBucketCount: decision.contract.main_buckets.filter(
+      (bucket) => bucket.suspect_kind === "unknown"
+    ).length,
     completion,
     primary,
     reductions: {
       standard: buildReduction(primary.raw, primary.standard),
       focused: buildReduction(primary.raw, primary.focused),
       verbose: buildReduction(primary.raw, primary.verbose),
-      verboseShowRaw: buildReduction(primary.raw, primary.verboseShowRaw)
+      verboseShowRaw: buildReduction(primary.raw, primary.verboseShowRaw),
+      diagnoseJson: buildReduction(primary.raw, primary.diagnoseJson)
     },
     recipe: {
       siftFirst: buildSiftRecipe(completion, outputs, encode),
       rawFirst: buildRawRecipe(fixture, encode)
-    }
+    },
+    ...(options.includeRendered
+      ? {
+          rendered: {
+            standardText: outputs.standard,
+            focusedText: outputs.focused,
+            verboseText: outputs.verbose,
+            diagnoseJson: publicDiagnoseJson
+          }
+        }
+      : {})
   };
 }
 
@@ -394,7 +425,8 @@ function buildAggregate(fixtures: FixtureReport[]): BenchmarkReport["aggregate"]
     standard: sumBudgets(fixtures.map((fixture) => fixture.primary.standard)),
     focused: sumBudgets(fixtures.map((fixture) => fixture.primary.focused)),
     verbose: sumBudgets(fixtures.map((fixture) => fixture.primary.verbose)),
-    verboseShowRaw: sumBudgets(fixtures.map((fixture) => fixture.primary.verboseShowRaw))
+    verboseShowRaw: sumBudgets(fixtures.map((fixture) => fixture.primary.verboseShowRaw)),
+    diagnoseJson: sumBudgets(fixtures.map((fixture) => fixture.primary.diagnoseJson))
   };
 
   return {
@@ -572,9 +604,11 @@ function renderHumanReport(report: BenchmarkReport): string {
     lines.push(`  ${formatBudget("focused", fixture.primary.focused)}`);
     lines.push(`  ${formatBudget("verbose", fixture.primary.verbose)}`);
     lines.push(`  ${formatBudget("verbose+show-raw", fixture.primary.verboseShowRaw)}`);
+    lines.push(`  ${formatBudget("diagnose-json", fixture.primary.diagnoseJson)}`);
     lines.push(`  ${formatReduction("standard", fixture.reductions.standard)}`);
     lines.push(`  ${formatReduction("focused", fixture.reductions.focused)}`);
     lines.push(`  ${formatReduction("verbose", fixture.reductions.verbose)}`);
+    lines.push(`  ${formatReduction("diagnose-json", fixture.reductions.diagnoseJson)}`);
     lines.push(
       `  sift-first recipe: ${fixture.recipe.siftFirst.stepCount} step(s), ${fixture.recipe.siftFirst.tokens} tokens, complete=${fixture.recipe.siftFirst.complete}, steps=${fixture.recipe.siftFirst.stepsUsed.join(" -> ")}`
     );
@@ -590,6 +624,7 @@ function renderHumanReport(report: BenchmarkReport): string {
   lines.push(`  ${formatBudget("focused", report.aggregate.primary.focused)}`);
   lines.push(`  ${formatBudget("verbose", report.aggregate.primary.verbose)}`);
   lines.push(`  ${formatBudget("verbose+show-raw", report.aggregate.primary.verboseShowRaw)}`);
+  lines.push(`  ${formatBudget("diagnose-json", report.aggregate.primary.diagnoseJson)}`);
   lines.push(
     `  sift-first recipe: ${report.aggregate.recipe.siftFirst.stepCount} total steps, ${report.aggregate.recipe.siftFirst.tokens} tokens, completed fixtures=${report.aggregate.recipe.siftFirst.completeCount}/${report.fixtures.length}`
   );
@@ -702,6 +737,7 @@ function main(): void {
   const onlyReal = process.argv.includes("--only-real");
   const includeLive = process.argv.includes("--live");
   const onlyLive = process.argv.includes("--only-live");
+  const includeRendered = process.argv.includes("--include-rendered");
   const encoding = getEncoding("o200k_base");
   const encode = (value: string) => encoding.encode(value).length;
 
@@ -710,7 +746,11 @@ function main(): void {
     const realFixtures = onlyLive ? [] : includeReal || onlyReal ? buildRealFixtures() : [];
     const liveFixtures = includeLive || onlyLive ? buildLiveSessionFixtures() : [];
     const allFixtures = [...syntheticFixtures, ...realFixtures];
-    const fixtures = allFixtures.map((fixture) => buildFixtureReport(fixture, encode));
+    const fixtures = allFixtures.map((fixture) =>
+      buildFixtureReport(fixture, encode, {
+        includeRendered
+      })
+    );
     const liveSessions = liveFixtures.map((fixture) => buildLiveSessionReport(fixture));
     const report: BenchmarkReport = {
       tokenizer: "o200k_base",

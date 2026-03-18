@@ -1,0 +1,15 @@
+- Tests did not pass.
+- 2 tests failed.
+- Import/dependency blocker: at least 1 visible failure are caused by missing dependencies during test collection.
+- Anchor: src/setup/auth.test.ts lines 1-6
+- Fix: Install @/missing-client and rerun the affected tests.
+- Snapshot mismatches: 1 snapshot expectation is out of date with current output.
+- Anchor: src/components/button.test.ts lines 37-47
+- Fix: Update the snapshots if these output changes are intentional.
+- Timeout failures: 1 test exceeded the configured timeout threshold.
+- Anchor: src/hooks/timeout.test.ts lines 16-26
+- Fix: Check for deadlocks, slow setup, or increase the timeout threshold before rerunning.
+- Decision: read source next. Do not escalate unless exact traceback lines are still needed.
+- Likely owner: test or project configuration
+- Next: Read src/setup/auth.test.ts lines 1-6 first; it is the first visible failing module in this missing dependency bucket.
+- Stop signal: diagnosis complete; raw not needed.

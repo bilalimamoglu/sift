@@ -12,6 +12,13 @@ export type DiagnoseActionCode =
   | "read_raw_for_exact_traceback"
   | "insufficient_signal";
 export type TestStatusDecisionKind = "stop" | "zoom" | "read_source" | "read_raw";
+export type TestStatusSuspectKind =
+  | "test"
+  | "app_code"
+  | "config"
+  | "environment"
+  | "tooling"
+  | "unknown";
 
 export interface TestStatusMiniDiff {
   added_paths?: number;
@@ -24,6 +31,8 @@ export interface TestStatusDiagnoseBucket {
   label: string;
   count: number;
   root_cause: string;
+  suspect_kind: TestStatusSuspectKind;
+  fix_hint: string;
   evidence: string[];
   bucket_confidence: number;
   root_cause_confidence: number;
@@ -61,6 +70,8 @@ export interface TestStatusDiagnoseContract {
   additional_source_read_likely_low_value: boolean;
   read_raw_only_if: string | null;
   decision: TestStatusDecisionKind;
+  primary_suspect_kind: TestStatusSuspectKind;
+  confidence_reason: string;
   dominant_blocker_bucket_index: number | null;
   provider_used: boolean;
   provider_confidence: number | null;
@@ -135,7 +146,7 @@ export interface TestStatusContractOverrides {
 }
 
 export const TEST_STATUS_DIAGNOSE_JSON_CONTRACT =
-  '{"status":"ok|insufficient","diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","dominant_blocker_bucket_index":number|null,"provider_used":boolean,"provider_confidence":number|null,"provider_failed":boolean,"raw_slice_used":boolean,"raw_slice_strategy":"none|bucket_evidence|traceback_window|head_tail","resolved_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_subset_available":boolean,"main_buckets":[{"bucket_index":number,"label":string,"count":number,"root_cause":string,"evidence":string[],"bucket_confidence":number,"root_cause_confidence":number,"dominant":boolean,"secondary_visible_despite_blocker":boolean,"mini_diff":{"added_paths"?:number,"removed_models"?:number,"changed_task_mappings"?:number}|null}],"read_targets":[{"file":string,"line":number|null,"why":string,"bucket_index":number,"context_hint":{"start_line":number|null,"end_line":number|null,"search_hint":string|null}}],"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string},"resolved_tests"?:string[],"remaining_tests"?:string[]}';
+  '{"status":"ok|insufficient","diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","primary_suspect_kind":"test|app_code|config|environment|tooling|unknown","confidence_reason":string,"dominant_blocker_bucket_index":number|null,"provider_used":boolean,"provider_confidence":number|null,"provider_failed":boolean,"raw_slice_used":boolean,"raw_slice_strategy":"none|bucket_evidence|traceback_window|head_tail","resolved_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_subset_available":boolean,"main_buckets":[{"bucket_index":number,"label":string,"count":number,"root_cause":string,"suspect_kind":"test|app_code|config|environment|tooling|unknown","fix_hint":string,"evidence":string[],"bucket_confidence":number,"root_cause_confidence":number,"dominant":boolean,"secondary_visible_despite_blocker":boolean,"mini_diff":{"added_paths"?:number,"removed_models"?:number,"changed_task_mappings"?:number}|null}],"read_targets":[{"file":string,"line":number|null,"why":string,"bucket_index":number,"context_hint":{"start_line":number|null,"end_line":number|null,"search_hint":string|null}}],"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string},"resolved_tests"?:string[],"remaining_tests"?:string[]}';
 export const TEST_STATUS_PROVIDER_SUPPLEMENT_JSON_CONTRACT =
   '{"diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","provider_confidence":number|null,"bucket_supplements":[{"label":string,"count":number,"root_cause":string,"anchor":{"file":string|null,"line":number|null,"search_hint":string|null},"fix_hint":string|null,"confidence":number}],"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string}}';
 
@@ -183,6 +194,15 @@ export const testStatusDiagnoseContractSchema = z.object({
   additional_source_read_likely_low_value: z.boolean(),
   read_raw_only_if: z.string().nullable(),
   decision: z.enum(["stop", "zoom", "read_source", "read_raw"]),
+  primary_suspect_kind: z.enum([
+    "test",
+    "app_code",
+    "config",
+    "environment",
+    "tooling",
+    "unknown"
+  ]),
+  confidence_reason: z.string().min(1),
   dominant_blocker_bucket_index: z.number().int().nullable(),
   provider_used: z.boolean(),
   provider_confidence: z.number().min(0).max(1).nullable(),
@@ -197,6 +217,15 @@ export const testStatusDiagnoseContractSchema = z.object({
       label: z.string(),
       count: z.number().int(),
       root_cause: z.string(),
+      suspect_kind: z.enum([
+        "test",
+        "app_code",
+        "config",
+        "environment",
+        "tooling",
+        "unknown"
+      ]),
+      fix_hint: z.string().min(1),
       evidence: z.array(z.string()).max(2),
       bucket_confidence: z.number(),
       root_cause_confidence: z.number(),
@@ -1841,10 +1870,10 @@ function buildStandardAnchorText(target: TestStatusReadTarget | undefined): stri
   return formatReadTargetLocation(target);
 }
 
-function buildStandardFixText(args: {
+function resolveBucketFixHint(args: {
   bucket: GenericBucket;
   bucketLabel: string;
-}): string | null {
+}): string {
   if (args.bucket.hint) {
     return args.bucket.hint;
   }
@@ -1908,7 +1937,132 @@ function buildStandardFixText(args: {
     return `Fix the visible ${args.bucketLabel} and rerun the full suite at standard.`;
   }
 
-  return null;
+  return "Inspect the first visible anchor for this bucket, apply the smallest fix that explains it, then rerun the full suite at standard.";
+}
+
+function deriveBucketSuspectKind(args: {
+  bucket: GenericBucket;
+  readTarget?: TestStatusReadTarget;
+}): TestStatusSuspectKind {
+  if (
+    args.bucket.type === "shared_environment_blocker" ||
+    args.bucket.type === "fixture_guard_failure" ||
+    args.bucket.type === "permission_denied_failure" ||
+    args.bucket.type === "django_db_access_denied" ||
+    args.bucket.type === "network_failure" ||
+    args.bucket.type === "service_unavailable" ||
+    args.bucket.type === "db_connection_failure" ||
+    args.bucket.type === "auth_bypass_absent" ||
+    args.bucket.type === "fixture_teardown_failure"
+  ) {
+    return "environment";
+  }
+
+  if (
+    args.bucket.type === "configuration_error" ||
+    args.bucket.type === "db_migration_failure" ||
+    args.bucket.type === "import_dependency_failure" ||
+    args.bucket.type === "collection_failure" ||
+    args.bucket.type === "no_tests_collected" ||
+    args.bucket.type === "deprecation_warning_as_error" ||
+    args.bucket.type === "file_not_found_failure"
+  ) {
+    return "config";
+  }
+
+  if (
+    args.bucket.type === "contract_snapshot_drift" ||
+    args.bucket.type === "snapshot_mismatch" ||
+    args.bucket.type === "flaky_test_detected" ||
+    args.bucket.type === "xfail_strict_unexpected_pass"
+  ) {
+    return "test";
+  }
+
+  if (
+    args.bucket.type === "xdist_worker_crash" ||
+    args.bucket.type === "timeout_failure" ||
+    args.bucket.type === "async_event_loop_failure" ||
+    args.bucket.type === "subprocess_crash_segfault" ||
+    args.bucket.type === "memory_error" ||
+    args.bucket.type === "resource_leak_warning" ||
+    args.bucket.type === "interrupted_run"
+  ) {
+    return "tooling";
+  }
+
+  if (args.bucket.type === "unknown_failure") {
+    return "unknown";
+  }
+
+  if (
+    args.bucket.type === "assertion_failure" ||
+    args.bucket.type === "runtime_failure" ||
+    args.bucket.type === "type_error_failure" ||
+    args.bucket.type === "serialization_encoding_failure"
+  ) {
+    const file = args.readTarget?.file ?? "";
+    if (file.startsWith("src/")) {
+      return "app_code";
+    }
+    if (file.startsWith("test/") || file.startsWith("tests/")) {
+      return "test";
+    }
+    return "unknown";
+  }
+
+  return "unknown";
+}
+
+function derivePrimarySuspectKind(args: {
+  mainBuckets: TestStatusDiagnoseBucket[];
+  dominantBlockerBucketIndex: number | null;
+}): TestStatusSuspectKind {
+  const primaryBucket =
+    (args.dominantBlockerBucketIndex !== null
+      ? args.mainBuckets.find((bucket) => bucket.bucket_index === args.dominantBlockerBucketIndex)
+      : null) ?? args.mainBuckets[0];
+
+  return primaryBucket?.suspect_kind ?? "unknown";
+}
+
+function buildConfidenceReason(args: {
+  decision: TestStatusDecisionKind;
+  mainBuckets: TestStatusDiagnoseBucket[];
+  primarySuspectKind: TestStatusSuspectKind;
+}): string {
+  const primaryBucket = args.mainBuckets.find((bucket) => bucket.dominant) ?? args.mainBuckets[0];
+
+  if (args.decision === "stop" && primaryBucket && args.primarySuspectKind !== "unknown") {
+    return `Dominant blocker (${primaryBucket.label}) is anchored and actionable.`;
+  }
+
+  if (args.decision === "zoom") {
+    return "Unknown or low-confidence buckets remain; one deeper sift pass is justified.";
+  }
+
+  if (args.decision === "read_source") {
+    return "The bucket is identified, but source context is still needed to make the next fix clear.";
+  }
+
+  return "Heuristic signal is still insufficient; exact traceback lines are needed.";
+}
+
+function formatSuspectKindLabel(kind: TestStatusSuspectKind): string {
+  switch (kind) {
+    case "test":
+      return "test code";
+    case "app_code":
+      return "application code";
+    case "config":
+      return "test or project configuration";
+    case "environment":
+      return "environment setup";
+    case "tooling":
+      return "test runner or tooling";
+    default:
+      return "unknown";
+  }
 }
 
 function buildStandardBucketSupport(args: {
@@ -1923,7 +2077,7 @@ function buildStandardBucketSupport(args: {
     firstConcreteSignalText:
       args.bucket.source === "unknown" ? args.bucket.summaryLines[1] ?? null : null,
     anchorText: buildStandardAnchorText(args.readTarget),
-    fixText: buildStandardFixText({
+    fixText: resolveBucketFixHint({
       bucket: args.bucket,
       bucketLabel: args.contractBucket.label
     })
@@ -1964,6 +2118,7 @@ function renderStandard(args: {
     }
   }
   lines.push(buildDecisionLine(args.contract));
+  lines.push(`- Likely owner: ${formatSuspectKindLabel(args.contract.primary_suspect_kind)}`);
   lines.push(`- Next: ${args.contract.next_best_action.note}`);
   lines.push(buildStopSignal(args.contract));
 
@@ -2131,23 +2286,41 @@ export function buildTestStatusDiagnoseContract(args: {
     : !diagnosisComplete &&
       !hasUnknownBucket &&
       buckets.every((bucket) => bucket.confidence < 0.7);
-  const mainBuckets = buckets.map((bucket, index) => ({
-    bucket_index: index + 1,
-    label: labelForBucket(bucket),
-    count: bucket.count,
-    root_cause: bucket.reason,
-    evidence: buildBucketEvidence(bucket),
-    bucket_confidence: Number(bucket.confidence.toFixed(2)),
-    root_cause_confidence: Number(rootCauseConfidenceFor(bucket).toFixed(2)),
-    dominant: dominantBucket?.index === index,
-    secondary_visible_despite_blocker:
-      dominantBlockerBucketIndex !== null && dominantBlockerBucketIndex !== index + 1,
-    mini_diff: extractMiniDiff(args.input, bucket)
-  }));
+  const mainBuckets = buckets.map((bucket, index) => {
+    const bucketIndex = index + 1;
+    const label = labelForBucket(bucket);
+    const readTarget = readTargets.find((target) => target.bucket_index === bucketIndex);
+
+    return {
+      bucket_index: bucketIndex,
+      label,
+      count: bucket.count,
+      root_cause: bucket.reason,
+      suspect_kind: deriveBucketSuspectKind({
+        bucket,
+        readTarget
+      }),
+      fix_hint: resolveBucketFixHint({
+        bucket,
+        bucketLabel: label
+      }),
+      evidence: buildBucketEvidence(bucket),
+      bucket_confidence: Number(bucket.confidence.toFixed(2)),
+      root_cause_confidence: Number(rootCauseConfidenceFor(bucket).toFixed(2)),
+      dominant: dominantBucket?.index === index,
+      secondary_visible_despite_blocker:
+        dominantBlockerBucketIndex !== null && dominantBlockerBucketIndex !== bucketIndex,
+      mini_diff: extractMiniDiff(args.input, bucket)
+    };
+  });
   const resolvedTests = unique(args.resolvedTests ?? []);
   const remainingTests = unique(
     args.remainingTests ?? unique([...args.analysis.visibleErrorLabels, ...args.analysis.visibleFailedLabels])
   );
+  const primarySuspectKind = derivePrimarySuspectKind({
+    mainBuckets,
+    dominantBlockerBucketIndex
+  });
 
   let nextBestAction: TestStatusDiagnoseContract["next_best_action"];
   if (args.analysis.failed === 0 && args.analysis.errors === 0 && args.analysis.passed > 0) {
@@ -2205,6 +2378,8 @@ export function buildTestStatusDiagnoseContract(args: {
       ? "you still need exact traceback lines after focused or verbose detail"
       : null,
     dominant_blocker_bucket_index: dominantBlockerBucketIndex,
+    primary_suspect_kind: primarySuspectKind,
+    confidence_reason: "Unknown or low-confidence buckets remain; one deeper sift pass is justified.",
     provider_used: false,
     provider_confidence: null,
     provider_failed: false,
@@ -2240,9 +2415,17 @@ export function buildTestStatusDiagnoseContract(args: {
       })
     }
   };
+  const resolvedDecision =
+    effectiveDecision ?? deriveDecision(mergedContractWithoutDecision);
+  const resolvedConfidenceReason = buildConfidenceReason({
+    decision: resolvedDecision,
+    mainBuckets,
+    primarySuspectKind: mergedContractWithoutDecision.primary_suspect_kind
+  });
   const contract = testStatusDiagnoseContractSchema.parse({
     ...mergedContractWithoutDecision,
-    decision: effectiveDecision ?? deriveDecision(mergedContractWithoutDecision)
+    confidence_reason: resolvedConfidenceReason,
+    decision: resolvedDecision
   }) as TestStatusDiagnoseContract;
 
   return {

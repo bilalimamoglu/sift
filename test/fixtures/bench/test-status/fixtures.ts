@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { FailureBucketType } from "../../../../src/core/heuristics.js";
 import type { DetailLevel } from "../../../../src/types.js";
 
@@ -19,6 +21,12 @@ export interface BenchFixture {
   rawRecipe: BenchRecipeStep[];
   rawRecipeStopAfter: number;
   completion: BenchCompletionExpectation;
+}
+
+const SYNTHETIC_DIR = join(import.meta.dirname, "synthetic");
+
+function loadSyntheticFixture(name: string): string {
+  return readFileSync(join(SYNTHETIC_DIR, name), "utf-8");
 }
 
 function buildRepeatedErrors(args: {
@@ -208,33 +216,7 @@ function buildVitestSnapshotMismatchRaw(): string {
 }
 
 function buildVitestMixedJsRaw(): string {
-  return [
-    " RUN  v2.1.0 /repo",
-    "",
-    " ❯ src/components/button.test.ts > Button > renders primary FAILED [ 25%]",
-    " ❯ src/hooks/timeout.test.ts > useSlowHook > resolves FAILED [ 50%]",
-    " ❯ src/setup/auth.test.ts ERROR [ 75%]",
-    "",
-    "⎯⎯⎯ Failed Tests 2 ⎯⎯⎯",
-    "",
-    " FAIL  src/components/button.test.ts > Button > renders primary",
-    "Error: Snapshot `Button > renders primary` mismatched",
-    "❯ src/components/button.test.ts:42:19",
-    "",
-    " FAIL  src/hooks/timeout.test.ts > useSlowHook > resolves",
-    "Error: Test timed out in 5000ms.",
-    "❯ src/hooks/timeout.test.ts:21:9",
-    "",
-    "⎯⎯⎯ Failed Suites 1 ⎯⎯⎯",
-    "",
-    " FAIL  src/setup/auth.test.ts [ src/setup/auth.test.ts ]",
-    "Error: Failed to resolve import \"@/missing-client\" from \"src/setup/auth.test.ts\". Does the file exist?",
-    "❯ src/setup/auth.test.ts:1:1",
-    "",
-    " Test Files  2 failed | 1 passed (3)",
-    "      Tests  2 failed | 1 passed (3)",
-    "  Snapshots  1 failed (1)"
-  ].join("\n");
+  return loadSyntheticFixture("vitest-mixed-js.txt");
 }
 
 function buildJestMixedJsRaw(): string {

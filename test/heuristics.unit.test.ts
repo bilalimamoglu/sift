@@ -1500,11 +1500,20 @@ describe("heuristic policies", () => {
     expect(decision.contract.main_buckets[0]).toMatchObject({
       bucket_index: 1,
       label: "missing test env",
-      dominant: true
+      dominant: true,
+      suspect_kind: "environment",
+      fix_hint: "Set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-isolated tests."
     });
     expect(decision.contract.main_buckets[1]?.mini_diff).toEqual({
       removed_models: 1
     });
+    expect(decision.contract.main_buckets[1]).toMatchObject({
+      suspect_kind: "test"
+    });
+    expect(decision.contract.primary_suspect_kind).toBe("environment");
+    expect(decision.contract.confidence_reason).toBe(
+      "Dominant blocker (missing test env) is anchored and actionable."
+    );
     expect(decision.contract.next_best_action.code).toBe("fix_dominant_blocker");
     expect(decision.contract.read_targets).toMatchObject([
       {
@@ -1528,6 +1537,33 @@ describe("heuristic policies", () => {
       end_line: null,
       search_hint: "PGTEST_POSTGRES_DSN"
     });
+  });
+
+  it("derives conservative suspect kinds for ambiguous runtime-style buckets", () => {
+    const appCodeInput = buildSingleFailureOutput({
+      status: "FAILED",
+      label: "src/app/payloads.ts::normalize_payload",
+      detail: "RuntimeError: payload subject missing"
+    });
+    const opaqueInput = buildSingleFailureOutput({
+      status: "FAILED",
+      label: "opaque-id",
+      detail: "RuntimeError: payload subject missing"
+    });
+
+    const appCodeDecision = buildTestStatusDiagnoseContract({
+      input: appCodeInput,
+      analysis: analyzeTestStatus(appCodeInput)
+    });
+    const opaqueDecision = buildTestStatusDiagnoseContract({
+      input: opaqueInput,
+      analysis: analyzeTestStatus(opaqueInput)
+    });
+
+    expect(appCodeDecision.contract.main_buckets[0]?.suspect_kind).toBe("app_code");
+    expect(appCodeDecision.contract.primary_suspect_kind).toBe("app_code");
+    expect(opaqueDecision.contract.main_buckets[0]?.suspect_kind).toBe("unknown");
+    expect(opaqueDecision.contract.primary_suspect_kind).toBe("unknown");
   });
 
   it("builds a summary-first public diagnose contract and keeps full ids opt-in", () => {
@@ -1564,6 +1600,14 @@ describe("heuristic policies", () => {
     expect(summaryFirst.remaining_subset_available).toBe(true);
     expect(summaryFirst).not.toHaveProperty("resolved_tests");
     expect(summaryFirst).not.toHaveProperty("remaining_tests");
+    expect(summaryFirst.primary_suspect_kind).toBe("environment");
+    expect(summaryFirst.confidence_reason).toBe(
+      "Dominant blocker (missing test env) is anchored and actionable."
+    );
+    expect(summaryFirst.main_buckets[0]?.fix_hint).toBe(
+      "Set PGTEST_POSTGRES_DSN (or pass --pgtest-dsn) before rerunning DB-isolated tests."
+    );
+    expect(summaryFirst.main_buckets[1]?.suspect_kind).toBe("test");
 
     const withIds = buildTestStatusPublicDiagnoseContract({
       contract: decision.contract,

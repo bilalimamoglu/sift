@@ -320,6 +320,7 @@ describe("exec mode", () => {
         "- Tests passed.",
         "- 12 tests, 1 skip.",
         "- Decision: stop and act. Do not escalate unless you need exact traceback lines.",
+        "- Likely owner: unknown",
         "- Next: No failing buckets remain.",
         "- Stop signal: diagnosis complete; raw not needed."
       ].join("\n")
@@ -344,6 +345,7 @@ describe("exec mode", () => {
         "- Tests did not complete.",
         "- 134 errors occurred during collection.",
         "- Decision: read source next. Do not escalate unless exact traceback lines are still needed.",
+        "- Likely owner: unknown",
         "- Next: Inspect the collection traceback or setup code next; the run failed before tests executed.",
         "- Stop signal: diagnosis complete; raw not needed."
       ].join("\n")
@@ -390,6 +392,7 @@ describe("exec mode", () => {
         "- Anchor: /tmp/tests/unit/test_api.py",
         "- Fix: Install the missing dependencies and rerun the affected tests.",
         "- Decision: stop and act. Do not escalate unless you need exact traceback lines.",
+        "- Likely owner: test or project configuration",
         "- Next: Fix bucket 1 first, then rerun the full suite at standard.",
         "- Stop signal: diagnosis complete; raw not needed."
       ].join("\n")

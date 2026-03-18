@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { repoRoot } from "./helpers/cli.js";
+import { testStatusPublicDiagnoseContractSchema } from "../src/core/testStatusDecision.js";
 
 type Budget = { chars: number; tokens: number };
 type PrimaryBudgets = {
@@ -10,6 +11,7 @@ type PrimaryBudgets = {
   focused: Budget;
   verbose: Budget;
   verboseShowRaw: Budget;
+  diagnoseJson: Budget;
 };
 type Completion = {
   complete: boolean;
@@ -23,6 +25,10 @@ type Completion = {
 };
 type FixtureReport = {
   name: string;
+  decision: "stop" | "zoom" | "read_source" | "read_raw";
+  primarySuspectKind: "test" | "app_code" | "config" | "environment" | "tooling" | "unknown";
+  readTargetsCount: number;
+  unknownBucketCount: number;
   primary: PrimaryBudgets;
   completion: Completion;
   recipe: {
@@ -35,6 +41,12 @@ type FixtureReport = {
       stepCount: number;
       complete: boolean;
     };
+  };
+  rendered?: {
+    standardText: string;
+    focusedText: string;
+    verboseText: string;
+    diagnoseJson: string;
   };
 };
 type BenchmarkReport = {
@@ -192,6 +204,36 @@ describe("benchmark harness", () => {
     assertBudgetInvariants(report);
     assertMixedFixtureHasBothBuckets(report, "mixed-full-suite");
     assertMixedFixtureHasBothBuckets(report, "mixed-full-suite-real");
+  });
+
+  it("can include rendered outputs and public diagnose metadata", () => {
+    const report = runBenchmark(["--real", "--include-rendered"]);
+
+    const mixedSuite = report.fixtures.find((fixture) => fixture.name === "mixed-full-suite-real");
+    const vitestMixed = report.fixtures.find((fixture) => fixture.name === "vitest-mixed-js");
+
+    expect(mixedSuite).toMatchObject({
+      decision: "stop",
+      primarySuspectKind: "environment",
+      readTargetsCount: 2,
+      unknownBucketCount: 0
+    });
+    expect(mixedSuite?.rendered?.standardText).toContain("Likely owner: environment setup");
+    expect(mixedSuite?.rendered?.diagnoseJson).toContain('"primary_suspect_kind": "environment"');
+    expect(mixedSuite?.rendered?.diagnoseJson).toContain('"confidence_reason":');
+    expect(testStatusPublicDiagnoseContractSchema.parse(JSON.parse(mixedSuite?.rendered?.diagnoseJson ?? "{}")))
+      .not.toHaveProperty("resolved_tests");
+    expect(testStatusPublicDiagnoseContractSchema.parse(JSON.parse(mixedSuite?.rendered?.diagnoseJson ?? "{}")))
+      .not.toHaveProperty("remaining_tests");
+
+    expect(vitestMixed).toMatchObject({
+      decision: "read_source",
+      primarySuspectKind: "config",
+      readTargetsCount: 3,
+      unknownBucketCount: 0
+    });
+    expect(vitestMixed?.rendered?.standardText).toContain("Likely owner: test or project configuration");
+    expect(vitestMixed?.primary.diagnoseJson.tokens).toBeGreaterThan(0);
   });
 
   it("reports live-session scorecards for captured agent transcripts", () => {
