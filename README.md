@@ -8,9 +8,9 @@
 
 Your AI agent should not be reading 13,000 lines of test output.
 
-If 125 tests fail for one reason, your agent should pay for that reason once.
+If 125 tests fail for one reason, it should pay for that reason once.
 
-`sift` turns noisy command output into a short, structured diagnosis for coding agents.
+`sift` turns noisy command output into a short, structured diagnosis for coding agents, so they spend fewer tokens, cost less to run, and move through debug loops faster.
 
 Instead of feeding an agent thousands of lines of logs, you give it:
 - the root cause

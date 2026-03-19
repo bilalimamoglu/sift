@@ -23,9 +23,16 @@ vi.mock("node:child_process", () => ({
   spawn: spawnMock
 }));
 
-vi.mock("../src/core/run.js", () => ({
-  runSiftWithStats: runSiftWithStatsMock
-}));
+vi.mock("../src/core/run.js", async () => {
+  const actual = await vi.importActual<typeof import("../src/core/run.js")>(
+    "../src/core/run.js"
+  );
+
+  return {
+    ...actual,
+    runSiftWithStats: runSiftWithStatsMock
+  };
+});
 
 class FakeStream extends EventEmitter {}
 
@@ -55,6 +62,21 @@ function readRealFixture(name: string): string {
     path.resolve(import.meta.dirname, "fixtures", "bench", "test-status", "real", name),
     "utf8"
   );
+}
+
+function withPatchedStderrTTY(value: boolean): () => void {
+  const original = process.stderr.isTTY;
+  Object.defineProperty(process.stderr, "isTTY", {
+    configurable: true,
+    value
+  });
+
+  return () => {
+    Object.defineProperty(process.stderr, "isTTY", {
+      configurable: true,
+      value: original
+    });
+  };
 }
 
 describe("runExec unit", () => {
@@ -514,6 +536,77 @@ describe("runExec unit", () => {
         configurable: true,
         value: originalStderrIsTTY
       });
+    }
+  });
+
+  it("shows a tiny pending notice on tty stderr while waiting for the child command", async () => {
+    const child = new FakeChild();
+    const restoreStderrTTY = withPatchedStderrTTY(true);
+    spawnMock.mockReturnValue(child);
+    runSiftWithStatsMock.mockResolvedValue({ output: "Reduced answer", stats: null });
+    vi.useFakeTimers();
+
+    try {
+      const { runExec } = await import("../src/core/exec.js");
+      const pending = runExec(makeRequest({ presetName: "build-failure" }));
+
+      child.stdout.emit("data", "raw output");
+      await vi.advanceTimersByTimeAsync(160);
+
+      expect(stderr).toContain("sift waiting for child command...");
+
+      child.emit("close", 0, null);
+
+      await expect(pending).resolves.toBe(0);
+      expect(stdout).toContain("Reduced answer");
+    } finally {
+      vi.useRealTimers();
+      restoreStderrTTY();
+    }
+  });
+
+  it("suppresses the child waiting notice when stderr is not a tty or quiet is enabled", async () => {
+    const { runExec } = await import("../src/core/exec.js");
+    vi.useFakeTimers();
+
+    try {
+      const restoreNonTTY = withPatchedStderrTTY(false);
+      try {
+        const nonTTYChild = new FakeChild();
+        spawnMock.mockReturnValueOnce(nonTTYChild);
+        runSiftWithStatsMock.mockResolvedValueOnce({ output: "Reduced answer", stats: null });
+
+        const nonTTYPending = runExec(makeRequest({ presetName: "build-failure" }));
+        nonTTYChild.stdout.emit("data", "raw output");
+        await vi.advanceTimersByTimeAsync(200);
+        nonTTYChild.emit("close", 0, null);
+
+        await expect(nonTTYPending).resolves.toBe(0);
+        expect(stderr).not.toContain("sift waiting for child command...");
+      } finally {
+        restoreNonTTY();
+      }
+
+      stderr = "";
+
+      const restoreTTY = withPatchedStderrTTY(true);
+      try {
+        const quietChild = new FakeChild();
+        spawnMock.mockReturnValueOnce(quietChild);
+        runSiftWithStatsMock.mockResolvedValueOnce({ output: "Reduced answer", stats: null });
+
+        const quietPending = runExec(makeRequest({ presetName: "build-failure", quiet: true }));
+        quietChild.stdout.emit("data", "raw output");
+        await vi.advanceTimersByTimeAsync(200);
+        quietChild.emit("close", 0, null);
+
+        await expect(quietPending).resolves.toBe(0);
+        expect(stderr).not.toContain("sift waiting for child command...");
+      } finally {
+        restoreTTY();
+      }
+    } finally {
+      vi.useRealTimers();
     }
   });
 

@@ -1,6 +1,6 @@
 {
-  "version": "0.4.0",
-  "generatedAt": "2026-03-18T18:15:54.670Z",
+  "version": "0.4.1",
+  "generatedAt": "2026-03-19T00:50:41.004Z",
   "presetBenchmarks": {
     "tokenizer": "o200k_base",
     "cases": [

@@ -23,7 +23,7 @@ import { buildGenericRawSlice, buildTestStatusRawSlice } from "./rawSlice.js";
 import type { RunResult, RunStats } from "./stats.js";
 
 const RETRY_DELAY_MS = 300;
-const PROVIDER_PENDING_NOTICE_DELAY_MS = 150;
+const PENDING_NOTICE_DELAY_MS = 150;
 
 interface RunStatsRecorder {
   heuristic(): void;
@@ -144,17 +144,16 @@ async function delay(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function startProviderPendingNotice(): () => void {
-  if (!process.stderr.isTTY) {
+export function startPendingNotice(message: string, enabled: boolean): () => void {
+  if (!enabled) {
     return () => {};
   }
 
-  const message = "sift waiting for provider...";
   let shown = false;
   const timer = setTimeout(() => {
     shown = true;
     process.stderr.write(`${message}\r`);
-  }, PROVIDER_PENDING_NOTICE_DELAY_MS);
+  }, PENDING_NOTICE_DELAY_MS);
 
   return () => {
     clearTimeout(timer);
@@ -200,7 +199,10 @@ async function generateWithRetry(args: {
       jsonResponseFormat: args.request.config.provider.jsonResponseFormat
     });
 
-  const stopPendingNotice = startProviderPendingNotice();
+  const stopPendingNotice = startPendingNotice(
+    "sift waiting for provider...",
+    Boolean(process.stderr.isTTY)
+  );
 
   try {
     try {

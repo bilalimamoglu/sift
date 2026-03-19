@@ -9,7 +9,7 @@ import {
   buildInsufficientSignalOutput,
   isInsufficientSignalOutput
 } from "./insufficient.js";
-import { runSiftWithStats } from "./run.js";
+import { runSiftWithStats, startPendingNotice } from "./run.js";
 import { emitStatsFooter, type RunStats } from "./stats.js";
 import { looksLikeWatchStream, runWatch } from "./watch.js";
 import {
@@ -191,6 +191,10 @@ export async function runExec(request: ExecRequest): Promise<number> {
         cwd: commandCwd,
         stdio: ["inherit", "pipe", "pipe"] as const
       });
+  const stopChildPendingNotice = startPendingNotice(
+    "sift waiting for child command...",
+    Boolean(process.stderr.isTTY) && !request.quiet
+  );
 
   const handleChunk = (chunk: Buffer | string) => {
     const text = Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
@@ -221,22 +225,26 @@ export async function runExec(request: ExecRequest): Promise<number> {
   child.stdout.on("data", handleChunk);
   child.stderr.on("data", handleChunk);
 
-  await new Promise<void>((resolve, reject) => {
-    child.on("error", (error: Error) => {
-      reject(error);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      child.on("error", (error: Error) => {
+        reject(error);
+      });
+      child.on("close", (status: number | null, signal: NodeJS.Signals | null) => {
+        childStatus = status;
+        childSignal = signal;
+        resolve();
+      });
     });
-    child.on("close", (status: number | null, signal: NodeJS.Signals | null) => {
-      childStatus = status;
-      childSignal = signal;
-      resolve();
-    });
-  }).catch((error) => {
+  } catch (error) {
     if (error instanceof Error) {
       throw error;
     }
 
     throw new Error("Failed to start child process.");
-  });
+  } finally {
+    stopChildPendingNotice();
+  }
 
   const exitCode = normalizeChildExitCode(childStatus, childSignal);
   const capturedOutput = capture.render();

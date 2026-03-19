@@ -31,7 +31,7 @@ describe("benchmark history report", () => {
     expect(markdown).toContain("# Current Benchmark Report");
     expect(markdown).toContain("## Preset Aggregate");
     expect(markdown).toContain("## Test-Status Aggregate");
-    expect(parsed.version).toBe("0.4.0");
+    expect(parsed.version).toBe("0.4.1");
     expect(parsed.presetBenchmarks.aggregate.totalCases).toBe(16);
     expect(parsed.presetBenchmarks.aggregate.passed).toBe(16);
     expect(parsed.testStatusBenchmarks.fixtures.length).toBeGreaterThan(0);
