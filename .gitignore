@@ -14,4 +14,8 @@ assets/*
 !assets/brand/
 assets/brand/*
 !assets/brand/*.svg
+!assets/readme/
+assets/readme/*
+!assets/readme/test-status-demo.gif
+scripts/docs/
 sift-benchmark-blog.md
