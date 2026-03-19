@@ -10,13 +10,17 @@ Your AI agent should not be reading 13,000 lines of test output.
 
 If 125 tests fail for one reason, it should pay for that reason once.
 
-`sift` turns noisy command output into a short, structured diagnosis for coding agents, so they spend fewer tokens, cost less to run, and move through debug loops faster.
+`sift` turns noisy command output into a short, structured diagnosis for coding agents.
+
+It uses local heuristics first and only escalates to a cheaper provider when needed.
+
+That means fewer tokens, lower cost, and faster debug loops.
 
 Instead of feeding an agent thousands of lines of logs, you give it:
 - the root cause
 - where it happens
-- what to fix
-- what to do next
+- a likely fix
+- a decision signal
 
 ```bash
 sift exec --preset test-status -- pytest -q
@@ -34,8 +38,9 @@ sift exec --preset test-status -- pytest -q
 - Decision: stop and act.
 ```
 
-On the largest real fixture in the benchmark:
-`198K` raw-output tokens -> `129` `standard` tokens.
+It is strongest on test failures today, but also supports typecheck, lint, build, audit, diff, and infra-risk workflows.
+
+On the largest real fixture in the benchmark, `sift` reduced `198K` raw-output tokens to `129` `standard` tokens.
 
 Same diagnosis. Far less work.
 
