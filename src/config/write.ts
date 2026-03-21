@@ -26,7 +26,17 @@ export function writeExampleConfig(options: {
 
   const yaml = YAML.stringify(defaultConfig);
   fs.mkdirSync(path.dirname(resolved), { recursive: true });
-  fs.writeFileSync(resolved, yaml, "utf8");
+  fs.writeFileSync(resolved, yaml, {
+    encoding: "utf8",
+    mode: 0o600
+  });
+
+  try {
+    fs.chmodSync(resolved, 0o600);
+  } catch {
+    // Ignore permission enforcement failures on platforms that do not support chmod.
+  }
+
   return resolved;
 }
 

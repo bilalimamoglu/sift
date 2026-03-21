@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest a focused improvement to sift docs, heuristics, workflows, or CLI behavior.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion.
+        Please keep the request concrete and user-facing.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      placeholder: It is not obvious where test-status cache is stored or how to reset it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to see?
+      placeholder: Add a short docs section covering cache location, reset steps, and pipe-vs-exec behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What alternatives have you considered?
+      placeholder: I checked the README and CLI reference, but could not find this workflow documented.
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Extra context
+      description: Include affected commands, presets, docs pages, or examples if relevant.
+

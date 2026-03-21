@@ -73,9 +73,27 @@ describe("config filesystem helpers", () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sift-write-example-ok-"));
     const targetPath = path.join(tmpDir, "example.yaml");
     const writtenPath = writeExampleConfig({ targetPath });
+    const mode = fs.statSync(targetPath).mode & 0o777;
 
     expect(writtenPath).toBe(targetPath);
     expect(fs.readFileSync(targetPath, "utf8")).toContain("provider:");
+    if (process.platform !== "win32") {
+      expect(mode).toBe(0o600);
+    }
+  });
+
+  it("writeExampleConfig tolerates chmod failures after writing securely", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sift-write-example-chmod-"));
+    const targetPath = path.join(tmpDir, "example.yaml");
+    const chmodSpy = vi.spyOn(fs, "chmodSync").mockImplementation(() => {
+      throw new Error("chmod unsupported");
+    });
+
+    const writtenPath = writeExampleConfig({ targetPath });
+
+    expect(writtenPath).toBe(targetPath);
+    expect(fs.readFileSync(targetPath, "utf8")).toContain("provider:");
+    expect(chmodSpy).toHaveBeenCalled();
   });
 
   it("writeExampleConfig supports default and global destinations", () => {

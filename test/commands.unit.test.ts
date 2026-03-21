@@ -330,6 +330,22 @@ describe("command modules", () => {
     expect(stderr).toBe("");
   });
 
+  it("runDoctor treats placeholder API keys as incomplete setup", () => {
+    const config = buildConfig({ apiKey: "YOUR_API_KEY" });
+
+    const { stdout, stderr } = captureOutput(() => {
+      withPatchedStream(process.stderr, { isTTY: false }, () => {
+        const code = runDoctor(config, "/tmp/example.yaml");
+        expect(code).toBe(1);
+      });
+    });
+
+    expect(stdout).toContain("configPath: /tmp/example.yaml");
+    expect(stdout).toContain("apiKey: placeholder (not a real key)");
+    expect(stderr).toContain('provider.apiKey looks like a placeholder: "YOUR_API_KEY"');
+    expect(stderr).toContain("OPENAI_API_KEY");
+  });
+
   it("runDoctor reports missing provider fields to stderr", () => {
     const config = buildConfig({ apiKey: "" });
 

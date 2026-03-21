@@ -2,8 +2,38 @@ import { getProviderApiKeyEnvNames } from "../config/provider-api-key.js";
 import type { SiftConfig } from "../types.js";
 import { createPresentation } from "../ui/presentation.js";
 
+const PLACEHOLDER_API_KEYS = [
+  "YOUR_API_KEY",
+  "your_api_key",
+  "your-api-key",
+  "sk-xxx",
+  "sk-placeholder",
+  "CHANGE_ME",
+  "change_me",
+  "TODO",
+  "todo",
+  "xxx",
+  "XXX"
+];
+
+function isPlaceholderApiKey(key: string | undefined): boolean {
+  if (!key) return false;
+  return PLACEHOLDER_API_KEYS.includes(key.trim());
+}
+
+function isRealApiKey(key: string | undefined): boolean {
+  return Boolean(key) && !isPlaceholderApiKey(key);
+}
+
 export function runDoctor(config: SiftConfig, configPath?: string | null): number {
   const ui = createPresentation(Boolean(process.stdout.isTTY));
+
+  const apiKeyStatus = isRealApiKey(config.provider.apiKey)
+    ? "set"
+    : isPlaceholderApiKey(config.provider.apiKey)
+      ? "placeholder (not a real key)"
+      : "not set";
+
   const lines = [
     "sift doctor",
     "A quick check for your local setup.",
@@ -12,7 +42,7 @@ export function runDoctor(config: SiftConfig, configPath?: string | null): numbe
     ui.labelValue("provider", config.provider.provider),
     ui.labelValue("model", config.provider.model),
     ui.labelValue("baseUrl", config.provider.baseUrl),
-    ui.labelValue("apiKey", config.provider.apiKey ? "set" : "not set"),
+    ui.labelValue("apiKey", apiKeyStatus),
     ui.labelValue("maxCaptureChars", String(config.input.maxCaptureChars)),
     ui.labelValue("maxInputChars", String(config.input.maxInputChars)),
     ui.labelValue("rawFallback", String(config.runtime.rawFallback))
@@ -34,9 +64,13 @@ export function runDoctor(config: SiftConfig, configPath?: string | null): numbe
     (config.provider.provider === "openai" ||
       config.provider.provider === "openai-compatible" ||
       config.provider.provider === "openrouter") &&
-    !config.provider.apiKey
+    !isRealApiKey(config.provider.apiKey)
   ) {
-    problems.push("Missing provider.apiKey");
+    if (isPlaceholderApiKey(config.provider.apiKey)) {
+      problems.push(`provider.apiKey looks like a placeholder: "${config.provider.apiKey}"`);
+    } else {
+      problems.push("Missing provider.apiKey");
+    }
     problems.push(
       `Set one of: ${getProviderApiKeyEnvNames(
         config.provider.provider,
