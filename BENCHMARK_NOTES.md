@@ -1,13 +1,77 @@
 # Benchmark Notes
 
-This file explains the current `test-status` benchmark in simple terms:
+This file covers two benchmarks:
 
-- what we are measuring
-- what changed over time
-- what the current results mean
-- how to rerun the benchmark later
+1. **End-to-end agent benchmark** — two real Claude agents debugging the same codebase, one with sift and one without.
+2. **Fixture benchmark** — deterministic token-reduction measurements on saved test output.
 
-It is intentionally plain-language and focused on the `test-status` benchmark, not on every `sift` feature.
+---
+
+## End-to-end agent benchmark
+
+This is the benchmark behind the README table. It measures what happens when a real coding agent debugs a real failing test suite, with and without sift.
+
+### Setup
+
+- **Model**: Claude Opus 4.6 for both agents.
+- **Codebase**: A real Python backend built with FastAPI and SQLAlchemy. Not a toy repo.
+- **Test suite**: 640 tests. 124 setup errors from a missing test database env var, 3 contract failures from stale frozen snapshots, 511 passing, 2 skipped.
+- **Isolation**: Both agents started with zero prior context. No project docs, no hints, no CLAUDE.md. Same goal: "Run the full test suite, identify ALL distinct failure categories, determine root cause for each, and document what you find."
+- **sift version**: v0.3.1.
+
+### How many runs
+
+- The raw agent (no sift) was run 7 independent times to control for model variability. README numbers are averages across those 7 runs.
+- The sift agent was run once. Variance is lower because sift's heuristic output is deterministic for the same input, so the agent's investigation path is more constrained.
+
+### What each agent did
+
+**Raw agent** (average 15.5 commands per run):
+1. Run the full suite, get thousands of lines of output.
+2. Rerun with `--tb=short -q` for shorter tracebacks.
+3. Rerun with `-x` to stop at first error.
+4. Read conftest to understand fixtures.
+5. Rerun just contract tests to isolate failures.
+6. Run individual contract test files with `-vv`.
+7. Read source files.
+8+. More targeted runs, greps, source reads.
+
+**sift agent** (6 commands):
+1. Run `sift exec --preset test-status -- python -m pytest tests/`.
+2-6. A few targeted contract test commands and greps for specifics about which snapshots drifted, not to verify the diagnosis.
+
+### Results
+
+| Metric | Without sift | With sift | Reduction |
+|--------|-------------:|----------:|----------:|
+| Tokens | 52,944 | 20,049 | 62% fewer |
+| Tool calls | 40.8 | 12 | 71% fewer |
+| Wall-clock time | 244s | 85s | 65% faster |
+| Commands | 15.5 | 6 | 61% fewer |
+| Diagnosis | Same | Same | Same outcome |
+
+Both agents reached the same diagnosis: one shared DB env var blocker across 124 tests, and 3 stale contract snapshots.
+
+### What this does and does not show
+
+**It does show:**
+- sift gets the agent to the same diagnosis with far fewer investigation steps.
+- The difference comes from skipping the narrowing loop. The raw agent spends most of its budget re-running tests with different flags to figure out the failure shape. sift surfaces that shape in one pass.
+
+**It does not show:**
+- That every debugging session will see 62% token savings. The codebase had a high-repetition failure profile, which is where sift helps most.
+- That the sift agent never needs to read source code. It does. sift handles triage, not the fix.
+
+### Sift processing during the benchmark
+
+- The heuristic layer handled everything locally. The provider was never called.
+- Redaction stripped secrets, API keys, tokens, and connection strings before analysis.
+
+---
+
+## Fixture benchmark
+
+The rest of this file covers the deterministic fixture benchmark. This measures token reduction on saved test outputs, not agent behavior.
 
 ## What problem are we measuring?
 
