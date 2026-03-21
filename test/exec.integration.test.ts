@@ -24,11 +24,33 @@ vi.mock("../src/core/run.js", async () => {
   };
 });
 
-function readRealFixture(name: string): string {
-  return fs.readFileSync(
-    path.resolve(import.meta.dirname, "fixtures", "bench", "test-status", "real", name),
+function writeFixtureScript(args: {
+  cwd: string;
+  filename: string;
+  fixtureName: string;
+}): string {
+  // Keep large fixture payloads out of `node -e "...huge string..."` argv blobs.
+  // That can pass locally on macOS but trip Linux CI spawn limits with E2BIG.
+  const fixturePath = path.resolve(
+    import.meta.dirname,
+    "fixtures",
+    "bench",
+    "test-status",
+    "real",
+    args.fixtureName
+  );
+  const scriptPath = path.join(args.cwd, args.filename);
+  fs.writeFileSync(
+    scriptPath,
+    [
+      'import fs from "node:fs";',
+      `const fixturePath = ${JSON.stringify(fixturePath)};`,
+      "process.stdout.write(fs.readFileSync(fixturePath, 'utf8'));",
+      "process.exit(1);"
+    ].join("\n"),
     "utf8"
   );
+  return scriptPath;
 }
 
 function makeRequest(overrides: Partial<ExecRequest> = {}): ExecRequest {
@@ -119,8 +141,16 @@ describe("runExec integration", () => {
   it("prepends diff lines for same-cwd test-status reruns", async () => {
     const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "sift-exec-int-cwd-"));
     const statePath = getScopedTestStatusStatePath(cwd, homeDir);
-    const firstRaw = readRealFixture("snapshot-drift-only.txt");
-    const secondRaw = readRealFixture("single-blocker-short.txt");
+    const firstScriptPath = writeFixtureScript({
+      cwd,
+      filename: "first-fixture.mjs",
+      fixtureName: "snapshot-drift-only.txt"
+    });
+    const secondScriptPath = writeFixtureScript({
+      cwd,
+      filename: "second-fixture.mjs",
+      fixtureName: "single-blocker-short.txt"
+    });
     runSiftWithStatsMock.mockResolvedValue({
       output: "Tests did not pass",
       stats: null
@@ -134,11 +164,7 @@ describe("runExec integration", () => {
           presetName: "test-status",
           format: "bullets",
           detail: "standard",
-          command: [
-            process.execPath,
-            "-e",
-            `process.stdout.write(${JSON.stringify(firstRaw)}); process.exit(1);`
-          ]
+          command: [process.execPath, firstScriptPath]
         })
       )
     ).resolves.toBe(1);
@@ -155,11 +181,7 @@ describe("runExec integration", () => {
           format: "bullets",
           detail: "standard",
           diff: true,
-          command: [
-            process.execPath,
-            "-e",
-            `process.stdout.write(${JSON.stringify(secondRaw)}); process.exit(1);`
-          ]
+          command: [process.execPath, secondScriptPath]
         })
       )
     ).resolves.toBe(1);
