@@ -259,7 +259,7 @@ Main files:
 - `test/fixtures/bench/test-status/fixtures.ts`
 - `test/fixtures/bench/test-status/real-fixtures.ts`
 - `test/fixtures/bench/test-status/real/`
-- `test/bench.script.test.ts`
+- `test/bench.script.integration.test.ts`
 
 ## How to rerun it
 

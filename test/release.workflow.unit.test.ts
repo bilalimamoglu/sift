@@ -24,27 +24,43 @@ describe("release workflow", () => {
     expect(pkg.bugs).toEqual({
       url: "https://github.com/bilalimamoglu/sift/issues"
     });
-    expect(pkg.scripts?.["test:coverage"]).toBe("vitest run --coverage");
+    expect(pkg.scripts?.test).toBe("vitest run --config vitest.config.ts");
+    expect(pkg.scripts?.["test:smoke"]).toBe(
+      "vitest run --config vitest.config.ts test/*.smoke.test.ts"
+    );
+    expect(pkg.scripts?.["test:e2e"]).toBe(
+      "vitest run --config vitest.e2e.config.ts test/*.e2e.test.ts"
+    );
+    expect(pkg.scripts?.["test:coverage"]).toBe(
+      "vitest run --config vitest.config.ts --coverage --exclude=\"test/**/*.smoke.test.ts\" --exclude=\"test/**/*.e2e.test.ts\""
+    );
     expect(pkg.scripts?.prepublishOnly).toContain("npm run test:coverage");
   });
 
   it("enforces measured coverage in vitest and CI", () => {
     const vitestConfig = fs.readFileSync(path.join(root, "vitest.config.ts"), "utf8");
+    const vitestE2EConfig = fs.readFileSync(path.join(root, "vitest.e2e.config.ts"), "utf8");
     const ciWorkflow = fs.readFileSync(
       path.join(root, ".github", "workflows", "ci.yml"),
       "utf8"
     );
 
     expect(vitestConfig).toContain("provider: \"v8\"");
+    expect(vitestConfig).toContain("exclude: [\"test/**/*.e2e.test.ts\"]");
     expect(vitestConfig).toContain("thresholds:");
     expect(vitestConfig).toContain("lines: 80");
     expect(vitestConfig).toContain("functions: 80");
     expect(vitestConfig).toContain("branches: 75");
     expect(vitestConfig).toContain("statements: 80");
+    expect(vitestE2EConfig).toContain("test/global-setup.e2e.ts");
+    expect(vitestE2EConfig).toContain("test/**/*.e2e.test.ts");
     expect(ciWorkflow).toContain("npm run test:coverage");
+    expect(ciWorkflow).toContain("npm run test:smoke");
+    expect(ciWorkflow).toContain("npm run test:e2e");
     expect(ciWorkflow).toContain("matrix:");
     expect(ciWorkflow).toContain("node-version: [20, 24]");
     expect(ciWorkflow).toContain("node-version: ${{ matrix.node-version }}");
+    expect(ciWorkflow).toContain("node-version: 20");
   });
 
   it("ignores local secrets and machine-local artifacts", () => {
@@ -73,6 +89,9 @@ describe("release workflow", () => {
     expect(workflow).toContain("Validate requested release version");
     expect(workflow).toContain("workflow_dispatch input version");
     expect(workflow).toContain("must match package.json version");
+    expect(workflow).toContain("npm run test:coverage");
+    expect(workflow).toContain("npm run test:smoke");
+    expect(workflow).toContain("npm run test:e2e");
     expect(workflow).toContain("npm publish --access public");
     expect(workflow).toContain("git tag -a");
     expect(workflow).toContain("gh release create");
@@ -85,7 +104,8 @@ describe("release workflow", () => {
     expect(workflow).toContain("id-token: write");
     expect(workflow).toContain("actions/workflows/ci.yml/runs");
     expect(workflow).toContain("CI must pass on this exact commit before release");
-    expect(workflow).toContain('sift exec "did tests pass?" --dry-run -- node -e "console.log(\'12 passed\')"');
+    expect(workflow).not.toContain("\n      - name: Test\n");
+    expect(workflow).not.toContain("Smoke install tarball");
     expect(workflow).not.toContain("NODE_AUTH_TOKEN");
     expect(workflow).not.toContain("NPM_TOKEN");
   });

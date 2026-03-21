@@ -2,11 +2,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { spawn } from "node:child_process";
-import { repoRoot } from "./helpers/cli.js";
+import { runDistCliAsync } from "./helpers/cli.js";
 import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
 
-describe("README quick start acceptance", () => {
+describe("README quick start e2e", () => {
   it("supports the documented quick-start commands", async () => {
     const server = await createFakeOpenAIServer((body, _index, request) => {
       const serializedBody = JSON.stringify(body);
@@ -56,7 +55,6 @@ describe("README quick start acceptance", () => {
     });
 
     try {
-      const cli = [process.execPath, "dist/cli.js"];
       const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-docs-home-"));
       const env = {
         PATH: process.env.PATH,
@@ -68,56 +66,133 @@ describe("README quick start acceptance", () => {
       };
 
       const commands = [
-        `${cli.join(" ")} exec "what changed?" -- node -e "console.log('diff --git a/file b/file\\n+change')"`,
-        `${cli.join(" ")} exec --preset test-status -- node -e "console.log('12 passed')"`,
-        `${cli.join(" ")} exec --preset test-status -- node -e "console.error('FAILED tests/unit/test_auth.py::test_refresh - AssertionError: expected token'); process.exit(1)"`,
-        `${cli.join(" ")} rerun`,
-        `${cli.join(" ")} escalate`,
-        `${cli.join(" ")} exec --preset typecheck-summary -- node -e "console.error('src/app.ts:1:1 - error TS2322: Type string is not assignable to type number')"`,
-        `${cli.join(" ")} exec --preset lint-failures -- node -e "console.error('src/app.ts\\n  1:1  error  Unexpected any  @typescript-eslint/no-explicit-any')"`,
-        `${cli.join(" ")} exec --preset audit-critical -- node -e "console.log('critical vuln')"`,
-        `${cli.join(" ")} exec --preset infra-risk -- node -e "console.log('Plan: 2 to destroy')"`,
-        `${cli.join(" ")} exec --preset audit-critical --fail-on -- node -e "console.log('lodash: critical vulnerability')"`,
-        `${cli.join(" ")} exec --preset infra-risk --fail-on -- node -e "console.log('Plan: 2 to destroy')"`,
-        `${cli.join(" ")} agent show codex`,
-        `${cli.join(" ")} agent show codex --raw`,
-        `${cli.join(" ")} agent install codex --dry-run`,
-        `${cli.join(" ")} agent install codex --dry-run --raw`
+        {
+          args: [
+            "exec",
+            "what changed?",
+            "--",
+            "node",
+            "-e",
+            "console.log('diff --git a/file b/file\\n+change')"
+          ]
+        },
+        {
+          args: [
+            "exec",
+            "--preset",
+            "test-status",
+            "--",
+            "node",
+            "-e",
+            "console.log('12 passed')"
+          ]
+        },
+        {
+          args: [
+            "exec",
+            "--preset",
+            "test-status",
+            "--",
+            "node",
+            "-e",
+            "console.error('FAILED tests/unit/test_auth.py::test_refresh - AssertionError: expected token'); process.exit(1)"
+          ]
+        },
+        {
+          args: ["rerun"]
+        },
+        {
+          args: ["escalate"]
+        },
+        {
+          args: [
+            "exec",
+            "--preset",
+            "typecheck-summary",
+            "--",
+            "node",
+            "-e",
+            "console.error('src/app.ts:1:1 - error TS2322: Type string is not assignable to type number')"
+          ]
+        },
+        {
+          args: [
+            "exec",
+            "--preset",
+            "lint-failures",
+            "--",
+            "node",
+            "-e",
+            "console.error('src/app.ts\\n  1:1  error  Unexpected any  @typescript-eslint/no-explicit-any')"
+          ]
+        },
+        {
+          args: [
+            "exec",
+            "--preset",
+            "audit-critical",
+            "--",
+            "node",
+            "-e",
+            "console.log('critical vuln')"
+          ]
+        },
+        {
+          args: [
+            "exec",
+            "--preset",
+            "infra-risk",
+            "--",
+            "node",
+            "-e",
+            "console.log('Plan: 2 to destroy')"
+          ]
+        },
+        {
+          args: [
+            "exec",
+            "--preset",
+            "audit-critical",
+            "--fail-on",
+            "--",
+            "node",
+            "-e",
+            "console.log('lodash: critical vulnerability')"
+          ]
+        },
+        {
+          args: [
+            "exec",
+            "--preset",
+            "infra-risk",
+            "--fail-on",
+            "--",
+            "node",
+            "-e",
+            "console.log('Plan: 2 to destroy')"
+          ]
+        },
+        {
+          args: ["agent", "show", "codex"]
+        },
+        {
+          args: ["agent", "show", "codex", "--raw"]
+        },
+        {
+          args: ["agent", "install", "codex", "--dry-run"]
+        },
+        {
+          args: ["agent", "install", "codex", "--dry-run", "--raw"]
+        }
       ];
 
       const expectedStatuses = [0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0];
-
       const outputs: string[] = [];
 
       for (const [index, command] of commands.entries()) {
-        const result = await new Promise<{
-          status: number | null;
-          stdout: string;
-          stderr: string;
-        }>((resolve, reject) => {
-          const child = spawn("bash", ["-lc", command], {
-            cwd: repoRoot(),
-            env,
-            stdio: ["ignore", "pipe", "pipe"]
-          });
-
-          let stdout = "";
-          let stderr = "";
-
-          child.stdout.on("data", (chunk) => {
-            stdout += chunk.toString();
-          });
-          child.stderr.on("data", (chunk) => {
-            stderr += chunk.toString();
-          });
-          child.on("error", reject);
-          child.on("close", (status) => {
-            resolve({
-              status,
-              stdout,
-              stderr
-            });
-          });
+        const result = await runDistCliAsync({
+          args: command.args,
+          env
         });
 
         outputs.push(result.stdout.trim());

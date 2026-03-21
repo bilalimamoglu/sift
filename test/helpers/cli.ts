@@ -26,7 +26,6 @@ export interface RunCliOptions {
   args?: string[];
   env?: NodeJS.ProcessEnv;
   input?: string;
-  useDist?: boolean;
   cwd?: string;
 }
 
@@ -49,11 +48,7 @@ function createBaseChildEnv(overrides?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   };
 }
 
-export function runCli(options: RunCliOptions = {}) {
-  const args = options.useDist
-    ? [distCli, ...(options.args ?? [])]
-    : ["--import", tsxLoader, srcCli, ...(options.args ?? [])];
-
+function runCliSync(args: string[], options: RunCliOptions = {}) {
   return spawnSync(process.execPath, args, {
     cwd: options.cwd ?? root,
     env: createBaseChildEnv(options.env),
@@ -62,11 +57,7 @@ export function runCli(options: RunCliOptions = {}) {
   });
 }
 
-export async function runCliAsync(options: RunCliOptions = {}) {
-  const args = options.useDist
-    ? [distCli, ...(options.args ?? [])]
-    : ["--import", tsxLoader, srcCli, ...(options.args ?? [])];
-
+async function runCliProcess(args: string[], options: RunCliOptions = {}) {
   const child = spawn(process.execPath, args, {
     cwd: options.cwd ?? root,
     env: createBaseChildEnv(options.env),
@@ -108,6 +99,28 @@ export async function runCliAsync(options: RunCliOptions = {}) {
   });
 
   return result;
+}
+
+export function runSourceCli(options: RunCliOptions = {}) {
+  return runCliSync(
+    ["--import", tsxLoader, srcCli, ...(options.args ?? [])],
+    options
+  );
+}
+
+export async function runSourceCliAsync(options: RunCliOptions = {}) {
+  return runCliProcess(
+    ["--import", tsxLoader, srcCli, ...(options.args ?? [])],
+    options
+  );
+}
+
+export function runDistCli(options: RunCliOptions = {}) {
+  return runCliSync([distCli, ...(options.args ?? [])], options);
+}
+
+export async function runDistCliAsync(options: RunCliOptions = {}) {
+  return runCliProcess([distCli, ...(options.args ?? [])], options);
 }
 
 export function repoRoot(): string {

@@ -3,12 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import YAML from "yaml";
 import { describe, expect, it } from "vitest";
-import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
-import { runCli, runCliAsync } from "./helpers/cli.js";
+import { runDistCli, runSourceCli, runSourceCliAsync } from "./helpers/cli.js";
 
 describe("CLI smoke", () => {
   it("prints help", () => {
-    const result = runCli({
+    const result = runSourceCli({
       args: ["--help"]
     });
 
@@ -29,7 +28,7 @@ describe("CLI smoke", () => {
   });
 
   it("prints config help with the provider switch example", () => {
-    const result = runCli({
+    const result = runSourceCli({
       args: ["config", "--help"]
     });
 
@@ -39,7 +38,7 @@ describe("CLI smoke", () => {
   });
 
   it("prints exec help with passthrough usage", () => {
-    const result = runCli({
+    const result = runSourceCli({
       args: ["exec", "--help"]
     });
 
@@ -52,7 +51,7 @@ describe("CLI smoke", () => {
   });
 
   it("prints escalate help", () => {
-    const result = runCli({
+    const result = runSourceCli({
       args: ["escalate", "--help"]
     });
 
@@ -63,7 +62,7 @@ describe("CLI smoke", () => {
   });
 
   it("prints rerun help", () => {
-    const result = runCli({
+    const result = runSourceCli({
       args: ["rerun", "--help"]
     });
 
@@ -76,7 +75,7 @@ describe("CLI smoke", () => {
   });
 
   it("prints watch help", () => {
-    const result = runCli({
+    const result = runSourceCli({
       args: ["watch", "--help"]
     });
 
@@ -88,7 +87,7 @@ describe("CLI smoke", () => {
   });
 
   it("prints agent help with scope and dry-run examples", () => {
-    const result = runCli({
+    const result = runSourceCli({
       args: ["agent", "--help"]
     });
 
@@ -105,13 +104,13 @@ describe("CLI smoke", () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-config-"));
     const configPath = path.join(dir, "sift.config.yaml");
 
-    const init = runCli({
+    const init = runSourceCli({
       args: ["config", "init", "--path", configPath]
     });
-    const show = runCli({
+    const show = runSourceCli({
       args: ["config", "show", "--config", configPath]
     });
-    const validate = runCli({
+    const validate = runSourceCli({
       args: ["config", "validate", "--config", configPath]
     });
 
@@ -127,7 +126,7 @@ describe("CLI smoke", () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-setup-"));
     const configPath = path.join(dir, "sift.config.yaml");
 
-    const result = runCli({
+    const result = runSourceCli({
       args: ["config", "setup", "--path", configPath]
     });
 
@@ -140,17 +139,15 @@ describe("CLI smoke", () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-home-"));
     const expectedPath = path.join(home, ".config", "sift", "config.yaml");
 
-    const init = runCli({
+    const init = runDistCli({
       args: ["config", "init", "--global"],
-      useDist: true,
       env: {
         HOME: home
       }
     });
 
-    const validate = runCli({
+    const validate = runDistCli({
       args: ["config", "validate"],
-      useDist: true,
       cwd: home,
       env: {
         HOME: home
@@ -164,13 +161,13 @@ describe("CLI smoke", () => {
   });
 
   it("masks secrets in config show by default and reveals them with --show-secrets", async () => {
-    const masked = runCli({
+    const masked = runSourceCli({
       args: ["config", "show"],
       env: {
         SIFT_PROVIDER_API_KEY: "env-secret-key"
       }
     });
-    const revealed = runCli({
+    const revealed = runSourceCli({
       args: ["config", "show", "--show-secrets"],
       env: {
         SIFT_PROVIDER_API_KEY: "env-secret-key"
@@ -187,9 +184,8 @@ describe("CLI smoke", () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-use-home-"));
     const expectedPath = path.join(home, ".config", "sift", "config.yaml");
 
-    const use = runCli({
+    const use = runDistCli({
       args: ["config", "use", "openrouter"],
-      useDist: true,
       cwd: home,
       env: {
         HOME: home,
@@ -215,9 +211,8 @@ describe("CLI smoke", () => {
   it("fails config use when no saved key or provider env key exists", async () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-use-fail-home-"));
 
-    const result = runCli({
+    const result = runDistCli({
       args: ["config", "use", "openrouter"],
-      useDist: true,
       cwd: home,
       env: {
         HOME: home
@@ -229,10 +224,10 @@ describe("CLI smoke", () => {
   });
 
   it("fails when an explicit config path does not exist", () => {
-    const show = runCli({
+    const show = runSourceCli({
       args: ["config", "show", "--config", "/tmp/definitely-missing-sift-config.yaml"]
     });
-    const validate = runCli({
+    const validate = runSourceCli({
       args: ["config", "validate", "--config", "/tmp/definitely-missing-sift-config.yaml"]
     });
 
@@ -243,19 +238,19 @@ describe("CLI smoke", () => {
   });
 
   it("lists and shows presets", () => {
-    const list = runCli({
+    const list = runSourceCli({
       args: ["presets", "list"]
     });
-    const show = runCli({
+    const show = runSourceCli({
       args: ["presets", "show", "test-status"]
     });
-    const internal = runCli({
+    const internal = runSourceCli({
       args: ["presets", "show", "test-status", "--internal"]
     });
-    const typecheck = runCli({
+    const typecheck = runSourceCli({
       args: ["presets", "show", "typecheck-summary"]
     });
-    const lint = runCli({
+    const lint = runSourceCli({
       args: ["presets", "show", "lint-failures"]
     });
 
@@ -287,105 +282,8 @@ describe("CLI smoke", () => {
     });
   });
 
-  it("runs freeform and preset modes", async () => {
-    const server = await createFakeOpenAIServer((_body, index) => ({
-      body: {
-        choices: [
-          {
-            message: {
-              content:
-                index === 0
-                  ? "Short answer."
-                  : JSON.stringify({
-                      status: "ok",
-                      vulnerabilities: [],
-                      summary: "No high or critical vulnerabilities found in the provided input."
-                    })
-            }
-          }
-        ]
-      }
-    }));
-
-    try {
-      const freeform = await runCliAsync({
-        args: [
-          "what changed?",
-          "--provider",
-          "openai-compatible",
-          "--base-url",
-          server.baseUrl,
-          "--api-key",
-          "test-key",
-          "--model",
-          "test-model"
-        ],
-        input: "diff --git a/file b/file\n+change\n"
-      });
-      const preset = await runCliAsync({
-        args: [
-          "preset",
-          "audit-critical",
-          "--provider",
-          "openai-compatible",
-          "--base-url",
-          server.baseUrl,
-          "--api-key",
-          "test-key",
-          "--model",
-          "test-model"
-        ],
-        input: "lodash critical vulnerability"
-      });
-
-      expect(freeform.status).toBe(0);
-      expect(freeform.stdout).toContain("Short answer.");
-      expect(preset.status).toBe(0);
-      expect(JSON.parse(preset.stdout)).toEqual({
-        status: "ok",
-        vulnerabilities: [],
-        summary: "No high or critical vulnerabilities found in the provided input."
-      });
-    } finally {
-      await server.close();
-    }
-  });
-
-  it("prints raw stdin to stderr in pipe mode when --show-raw is set", async () => {
-    const server = await createFakeOpenAIServer(() => ({
-      body: {
-        choices: [{ message: { content: "Short answer." } }]
-      }
-    }));
-
-    try {
-      const result = await runCliAsync({
-        args: [
-          "what changed?",
-          "--show-raw",
-          "--provider",
-          "openai-compatible",
-          "--base-url",
-          server.baseUrl,
-          "--api-key",
-          "test-key",
-          "--model",
-          "test-model"
-        ],
-        input: "diff --git a/file b/file\n+change\n"
-      });
-
-      expect(result.status).toBe(0);
-      expect(result.stdout.trim()).toBe("Short answer.");
-      expect(result.stderr).toContain("diff --git a/file b/file");
-      expect(result.stderr).toContain("+change");
-    } finally {
-      await server.close();
-    }
-  });
-
   it("supports --fail-on in preset pipe mode for infra-risk", async () => {
-    const result = await runCliAsync({
+    const result = await runSourceCliAsync({
       args: ["preset", "infra-risk", "--fail-on"],
       input: "Plan: 2 to add, 1 to destroy\n"
     });
@@ -395,7 +293,7 @@ describe("CLI smoke", () => {
   });
 
   it("supports --detail focused in preset pipe mode for test-status", async () => {
-    const result = await runCliAsync({
+    const result = await runSourceCliAsync({
       args: ["preset", "test-status", "--detail", "focused"],
       input: [
         "4 errors during collection",
@@ -417,7 +315,7 @@ describe("CLI smoke", () => {
   });
 
   it("supports --detail verbose in preset pipe mode for test-status", async () => {
-    const result = await runCliAsync({
+    const result = await runSourceCliAsync({
       args: ["preset", "test-status", "--detail", "verbose"],
       input: [
         "2 errors during collection",
@@ -437,7 +335,7 @@ describe("CLI smoke", () => {
   });
 
   it("rejects --fail-on for unsupported preset pipe mode", async () => {
-    const result = await runCliAsync({
+    const result = await runSourceCliAsync({
       args: ["preset", "test-status", "--fail-on"],
       input: "Ran 12 tests\n12 passed\n"
     });
@@ -447,7 +345,7 @@ describe("CLI smoke", () => {
   });
 
   it("rejects --detail for unsupported preset pipe mode", async () => {
-    const result = await runCliAsync({
+    const result = await runSourceCliAsync({
       args: ["preset", "infra-risk", "--detail", "focused"],
       input: "Plan: 2 to add, 1 to destroy\n"
     });
@@ -457,7 +355,7 @@ describe("CLI smoke", () => {
   });
 
   it("rejects --fail-on for freeform pipe mode", async () => {
-    const result = await runCliAsync({
+    const result = await runSourceCliAsync({
       args: ["did the tests pass?", "--fail-on"],
       input: "Ran 12 tests\n12 passed\n"
     });
@@ -467,7 +365,7 @@ describe("CLI smoke", () => {
   });
 
   it("rejects --detail for freeform pipe mode", async () => {
-    const result = await runCliAsync({
+    const result = await runSourceCliAsync({
       args: ["did the tests pass?", "--detail", "focused"],
       input: "Ran 12 tests\n12 passed\n"
     });
@@ -478,9 +376,8 @@ describe("CLI smoke", () => {
 
   it("reports api key presence from environment in doctor output", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
-    const result = runCli({
+    const result = runDistCli({
       args: ["doctor"],
-      useDist: true,
       cwd,
       env: {
         SIFT_BASE_URL: "https://example.test/v1",
@@ -505,9 +402,8 @@ describe("CLI smoke", () => {
 
     try {
       const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
-      const result = runCli({
+      const result = runDistCli({
         args: ["doctor"],
-        useDist: true,
         cwd,
         env: {
           SIFT_BASE_URL: "https://example.test/v1",
@@ -560,9 +456,8 @@ describe("CLI smoke", () => {
 
     try {
       const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
-      const result = runCli({
+      const result = runDistCli({
         args: ["doctor"],
-        useDist: true,
         cwd
       });
 
@@ -584,9 +479,8 @@ describe("CLI smoke", () => {
 
   it("accepts OPENAI_API_KEY for the openai provider", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
-    const result = runCli({
+    const result = runDistCli({
       args: ["doctor"],
-      useDist: true,
       cwd,
       env: {
         SIFT_PROVIDER: "openai",
@@ -603,9 +497,8 @@ describe("CLI smoke", () => {
 
   it("still accepts OPENAI_API_KEY for the default OpenAI-compatible endpoint", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
-    const result = runCli({
+    const result = runDistCli({
       args: ["doctor"],
-      useDist: true,
       cwd,
       env: {
         SIFT_PROVIDER: "openai-compatible",
@@ -621,9 +514,8 @@ describe("CLI smoke", () => {
 
   it("accepts OPENROUTER_API_KEY for the openrouter provider defaults", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
-    const result = runCli({
+    const result = runDistCli({
       args: ["doctor"],
-      useDist: true,
       cwd,
       env: {
         SIFT_PROVIDER: "openrouter",
@@ -641,9 +533,8 @@ describe("CLI smoke", () => {
   it("fails doctor when api key is missing for openai-compatible", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-home-"));
-    const result = runCli({
+    const result = runDistCli({
       args: ["doctor"],
-      useDist: true,
       cwd,
       env: {
         HOME: home,
@@ -662,9 +553,8 @@ describe("CLI smoke", () => {
   it("fails doctor when api key is missing for openrouter", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-home-"));
-    const result = runCli({
+    const result = runDistCli({
       args: ["doctor"],
-      useDist: true,
       cwd,
       env: {
         HOME: home,

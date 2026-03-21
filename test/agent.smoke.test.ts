@@ -2,17 +2,17 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { repoRoot, runCli, runCliAsync } from "./helpers/cli.js";
+import { repoRoot, runSourceCli, runSourceCliAsync } from "./helpers/cli.js";
 
 describe("agent installer smoke", () => {
   it("shows short previews by default and raw managed blocks on demand", () => {
-    const codex = runCli({
+    const codex = runSourceCli({
       args: ["agent", "show", "codex"]
     });
-    const claude = runCli({
+    const claude = runSourceCli({
       args: ["agent", "show", "claude"]
     });
-    const rawCodex = runCli({
+    const rawCodex = runSourceCli({
       args: ["agent", "show", "codex", "--raw"]
     });
 
@@ -46,7 +46,7 @@ describe("agent installer smoke", () => {
     const agentsPath = path.join(cwd, "AGENTS.md");
     const claudePath = path.join(cwd, "CLAUDE.md");
 
-    const create = runCli({
+    const create = runSourceCli({
       args: ["agent", "install", "codex", "--yes"],
       cwd
     });
@@ -59,7 +59,7 @@ describe("agent installer smoke", () => {
       "utf8"
     );
 
-    const append = runCli({
+    const append = runSourceCli({
       args: ["agent", "install", "claude", "--yes"],
       cwd
     });
@@ -69,7 +69,7 @@ describe("agent installer smoke", () => {
     expect(appended).toContain("Keep this.");
     expect(appended).toContain("<!-- sift:begin claude -->");
 
-    const update = runCli({
+    const update = runSourceCli({
       args: ["agent", "install", "claude", "--yes"],
       cwd
     });
@@ -77,7 +77,7 @@ describe("agent installer smoke", () => {
     const updated = await fs.readFile(claudePath, "utf8");
     expect(updated.match(/<!-- sift:begin claude -->/g)?.length ?? 0).toBe(1);
 
-    const status = runCli({
+    const status = runSourceCli({
       args: ["agent", "status"],
       cwd
     });
@@ -85,7 +85,7 @@ describe("agent installer smoke", () => {
     expect(status.stdout).toContain("Codex managed block: installed");
     expect(status.stdout).toContain("Claude managed block: installed");
 
-    const remove = runCli({
+    const remove = runSourceCli({
       args: ["agent", "remove", "claude", "--yes"],
       cwd
     });
@@ -99,14 +99,14 @@ describe("agent installer smoke", () => {
     const codexGlobalPath = path.join(home, ".codex", "AGENTS.md");
     const claudeGlobalPath = path.join(home, ".claude", "CLAUDE.md");
 
-    const dryRun = runCli({
+    const dryRun = runSourceCli({
       args: ["agent", "install", "codex", "--scope", "global", "--dry-run"],
       cwd,
       env: {
         HOME: home
       }
     });
-    const dryRunRaw = runCli({
+    const dryRunRaw = runSourceCli({
       args: ["agent", "install", "codex", "--scope", "global", "--dry-run", "--raw"],
       cwd,
       env: {
@@ -121,7 +121,7 @@ describe("agent installer smoke", () => {
     expect(dryRunRaw.stdout).toContain("<!-- sift:begin codex -->");
     await expect(fs.stat(codexGlobalPath)).rejects.toThrow();
 
-    const install = runCli({
+    const install = runSourceCli({
       args: ["agent", "install", "claude", "--scope", "global", "--yes"],
       cwd,
       env: {
@@ -131,7 +131,7 @@ describe("agent installer smoke", () => {
     expect(install.status).toBe(0);
     expect(await fs.readFile(claudeGlobalPath, "utf8")).toContain("<!-- sift:begin claude -->");
 
-    const status = runCli({
+    const status = runSourceCli({
       args: ["agent", "status"],
       cwd,
       env: {
@@ -162,21 +162,21 @@ describe("agent installer smoke", () => {
       "utf8"
     );
 
-    const nonInteractive = runCli({
+    const nonInteractive = runSourceCli({
       args: ["agent", "install", "claude"],
       cwd
     });
     expect(nonInteractive.status).toBe(1);
     expect(nonInteractive.stderr).toContain("sift agent install requires --yes in non-interactive mode.");
 
-    const malformed = runCli({
+    const malformed = runSourceCli({
       args: ["agent", "install", "codex", "--yes"],
       cwd
     });
     expect(malformed.status).toBe(1);
     expect(malformed.stderr).toContain("Found malformed or duplicate managed blocks for codex");
 
-    const removeMalformed = runCli({
+    const removeMalformed = runSourceCli({
       args: ["agent", "remove", "codex", "--yes"],
       cwd
     });
@@ -188,14 +188,14 @@ describe("agent installer smoke", () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-agent-path-"));
     const targetPath = path.join(cwd, "nested", "custom.md");
 
-    const install = runCli({
+    const install = runSourceCli({
       args: ["agent", "install", "codex", "--path", targetPath, "--yes"],
       cwd
     });
     expect(install.status).toBe(0);
     expect(await fs.readFile(targetPath, "utf8")).toContain("<!-- sift:begin codex -->");
 
-    const remove = runCli({
+    const remove = runSourceCli({
       args: ["agent", "remove", "codex", "--path", targetPath, "--yes"],
       cwd
     });
@@ -212,7 +212,7 @@ describe("agent installer smoke", () => {
       .then((content) => ({ exists: true as const, content }))
       .catch(() => ({ exists: false as const, content: "" }));
 
-    const result = await runCliAsync({
+    const result = await runSourceCliAsync({
       args: ["agent", "install", "codex", "--scope", "global", "--yes"],
       cwd,
       env: {

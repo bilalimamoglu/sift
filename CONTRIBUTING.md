@@ -23,10 +23,28 @@ Useful commands while working:
 
 ```bash
 npm test
+npm run test:smoke
+npm run test:e2e
 npm run test:coverage
 npm run typecheck
 npm run build
 ```
+
+## Test layers
+
+The default test loop is intentionally source-backed:
+
+- `npm test` runs unit, integration, and source smoke tests
+- `npm run test:smoke` runs the small CLI wiring layer only
+- `npm run test:e2e` builds once, then verifies `dist`, packaging, and docs quick starts
+- `npm run test:coverage` measures unit and integration coverage without smoke/E2E noise
+
+When adding tests:
+
+- put pure logic, parsing, and helper behavior in unit tests
+- put real module orchestration without the outer CLI process in integration tests
+- keep smoke tests small and focused on CLI wiring, argv parsing, stdout/stderr, and exit codes
+- use E2E tests only for built artifacts, package install, and documented quick-start flows
 
 ## What makes a good contribution
 

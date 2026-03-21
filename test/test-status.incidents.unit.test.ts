@@ -22,7 +22,7 @@ describe("test-status incident archive", () => {
       "before-vs-after-summary.md"
     );
     const examplesReadmePath = path.join(root, "examples", "README.md");
-    const syncTestPath = path.join(root, "test", "examples.sync.test.ts");
+    const syncTestPath = path.join(root, "test", "examples.sync.unit.test.ts");
 
     expect(testStatusIncidentArtifacts).toHaveLength(6);
 

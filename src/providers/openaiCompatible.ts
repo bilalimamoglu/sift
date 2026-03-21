@@ -75,6 +75,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
         signal: controller.signal,
         headers: {
           "content-type": "application/json",
+          connection: "close",
           ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {})
         },
         body: JSON.stringify({

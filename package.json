@@ -1,6 +1,6 @@
 {
   "name": "@bilalimamoglu/sift",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "Agent-first command-output reduction layer for agents, CI, and automation.",
   "type": "module",
   "bin": {
@@ -25,8 +25,10 @@
     "bench:report": "node --import tsx scripts/bench/generate-progress-report.ts",
     "dev": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test": "vitest run --config vitest.config.ts",
+    "test:smoke": "vitest run --config vitest.config.ts test/*.smoke.test.ts",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts test/*.e2e.test.ts",
+    "test:coverage": "vitest run --config vitest.config.ts --coverage --exclude=\"test/**/*.smoke.test.ts\" --exclude=\"test/**/*.e2e.test.ts\"",
     "test:watch": "vitest",
     "prepublishOnly": "npm run typecheck && npm run test:coverage && npm run build"
   },

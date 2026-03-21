@@ -1,9 +1,3 @@
-import { execSync } from "node:child_process";
-import path from "node:path";
-
 export default function globalSetup(): void {
-  execSync("npm run build", {
-    cwd: path.resolve(import.meta.dirname, ".."),
-    stdio: "pipe"
-  });
+  // Default test runs are source-backed and do not require a pre-suite build.
 }

@@ -75,26 +75,14 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm test
+      - name: Test coverage
+        run: npm run test:coverage
 
-      - name: Build
-        run: npm run build
+      - name: Smoke tests
+        run: npm run test:smoke
 
-      - name: Pack
-        id: pack
-        run: |
-          echo "tarball=$(npm pack | tail -n 1)" >> "$GITHUB_OUTPUT"
-
-      - name: Smoke install tarball
-        run: |
-          TMP_DIR="$(mktemp -d)"
-          cp "${{ steps.pack.outputs.tarball }}" "$TMP_DIR/"
-          cd "$TMP_DIR"
-          npm init -y >/dev/null 2>&1
-          npm install "./${{ steps.pack.outputs.tarball }}" >/dev/null 2>&1
-          npx --no-install sift --help >/dev/null
-          npx --no-install sift exec "did tests pass?" --dry-run -- node -e "console.log('12 passed')" >/dev/null
+      - name: Dist and packaging E2E
+        run: npm run test:e2e
 
       - name: Publish to npm
         run: npm publish --access public --provenance

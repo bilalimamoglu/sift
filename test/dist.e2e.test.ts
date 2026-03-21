@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
-import { repoRoot, runCliAsync } from "./helpers/cli.js";
+import { runDistCliAsync } from "./helpers/cli.js";
 
 describe("dist e2e", () => {
   it("runs the built cli against a fake provider", async () => {
@@ -11,8 +11,7 @@ describe("dist e2e", () => {
     }));
 
     try {
-      const result = await runCliAsync({
-        useDist: true,
+      const result = await runDistCliAsync({
         args: [
           "did tests pass?",
           "--provider",

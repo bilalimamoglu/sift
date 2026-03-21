@@ -266,6 +266,7 @@ sift rerun --goal diagnose --format json
 - CLI reference: [docs/cli-reference.md](docs/cli-reference.md)
 - Worked examples: [docs/examples](docs/examples)
 - Benchmark methodology: [BENCHMARK_NOTES.md](BENCHMARK_NOTES.md)
+- Contributing and development notes: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Release notes: [release-notes](release-notes)
 
 ---

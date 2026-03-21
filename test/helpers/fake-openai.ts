@@ -24,6 +24,7 @@ export async function createFakeOpenAIServer(
   ) => FakeOpenAIResponse | Promise<FakeOpenAIResponse>
 ): Promise<FakeOpenAIServer> {
   const requests: any[] = [];
+  const sockets = new Set<import("node:net").Socket>();
 
   const server = http.createServer(async (request, response) => {
     const requestPath = request.url?.split("?")[0];
@@ -57,11 +58,23 @@ export async function createFakeOpenAIServer(
 
     response.statusCode = result.status ?? 200;
     response.setHeader("content-type", "application/json");
+    response.setHeader("connection", "close");
     response.end(JSON.stringify(result.body ?? {}));
   });
 
-  await new Promise<void>((resolve) => {
-    server.listen(0, "127.0.0.1", () => resolve());
+  server.on("connection", (socket) => {
+    sockets.add(socket);
+    socket.on("close", () => {
+      sockets.delete(socket);
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
   });
 
   const address = server.address();
@@ -74,6 +87,10 @@ export async function createFakeOpenAIServer(
     requests,
     close() {
       return new Promise((resolve, reject) => {
+        for (const socket of sockets) {
+          socket.destroy();
+        }
+
         server.close((error) => {
           if (error) {
             reject(error);
