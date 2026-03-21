@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { getDefaultTestStatusStatePath } from "../src/constants.js";
+import { getScopedTestStatusStatePath } from "../src/constants.js";
 import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
 import { runCliAsync } from "./helpers/cli.js";
 
@@ -483,7 +483,7 @@ describe("exec mode", () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-escalate-home-"));
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-escalate-cwd-"));
     const counterPath = path.join(cwd, "counter.txt");
-    const statePath = path.join(home, ".config", "sift", "state", "last-test-status.json");
+    const statePath = getScopedTestStatusStatePath(cwd, home);
     const script = [
       "const fs = require('node:fs');",
       "fs.appendFileSync(process.argv[1], 'x');",
@@ -541,6 +541,52 @@ describe("exec mode", () => {
     expect(secondEscalate.status).toBe(1);
     expect(await fs.readFile(counterPath, "utf8")).toBe("x");
     expect(JSON.parse(await fs.readFile(statePath, "utf8")).detail).toBe("verbose");
+  });
+
+  it("does not reuse another project's cached test-status run during escalate", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-escalate-scope-home-"));
+    const cwdA = await fs.mkdtemp(path.join(os.tmpdir(), "sift-escalate-scope-a-"));
+    const cwdB = await fs.mkdtemp(path.join(os.tmpdir(), "sift-escalate-scope-b-"));
+    const counterPath = path.join(cwdA, "counter.txt");
+    const script = [
+      "const fs = require('node:fs');",
+      "fs.appendFileSync(process.argv[1], 'x');",
+      "console.error('FAILED tests/unit/test_auth.py::test_refresh - AssertionError: expected token');",
+      "process.exit(1);"
+    ].join(" ");
+
+    const execResult = await runCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "test-status",
+        "--",
+        "node",
+        "-e",
+        script,
+        counterPath
+      ],
+      cwd: cwdA,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(execResult.status).toBe(1);
+    expect(await fs.readFile(counterPath, "utf8")).toBe("x");
+
+    const escalateResult = await runCliAsync({
+      args: ["escalate"],
+      cwd: cwdB,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(escalateResult.status).toBe(1);
+    expect(escalateResult.stderr).toContain(
+      "No cached test-status run found. Start with `sift exec --preset test-status -- <test command>`."
+    );
   });
 
   it("prepends matching diff output for cached test-status reruns", async () => {
@@ -770,7 +816,7 @@ describe("exec mode", () => {
     expect(remainingRerun.stdout).not.toContain("tests/ui/auth.test.ts > refresh token");
 
     const cachedState = JSON.parse(
-      await fs.readFile(getDefaultTestStatusStatePath(home), "utf8")
+      await fs.readFile(getScopedTestStatusStatePath(cwd, home), "utf8")
     ) as { rawOutput: string };
     expect(cachedState.rawOutput).toContain("tests/ui/auth.test.ts > refresh token");
     expect(cachedState.rawOutput).toContain("tests/ui/users.test.ts > list users");
@@ -869,7 +915,7 @@ describe("exec mode", () => {
     });
 
     const cachedState = JSON.parse(
-      await fs.readFile(getDefaultTestStatusStatePath(home), "utf8")
+      await fs.readFile(getScopedTestStatusStatePath(cwd, home), "utf8")
     ) as { rawOutput: string };
     expect(cachedState.rawOutput).toContain("FAIL tests/ui/auth.test.ts");
     expect(cachedState.rawOutput).toContain("FAIL tests/ui/users.test.ts");

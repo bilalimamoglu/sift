@@ -1,5 +1,6 @@
 import pc from "picocolors";
 import type { Goal, OutputFormat, PromptPolicyName, SiftConfig } from "../types.js";
+import { getScopedTestStatusStatePath } from "../constants.js";
 import { buildInsufficientSignalOutput, isInsufficientSignalOutput } from "./insufficient.js";
 import { runSiftWithStats } from "./run.js";
 import { emitStatsFooter } from "./stats.js";
@@ -51,7 +52,8 @@ function resolveEscalationDetail(
 }
 
 export async function runEscalate(request: EscalateRequest): Promise<number> {
-  const state = readCachedTestStatusRun();
+  const scopedStatePath = getScopedTestStatusStatePath(process.cwd());
+  const state = readCachedTestStatusRun(scopedStatePath);
   const detail = resolveEscalationDetail(state, request.detail, request.showRaw);
 
   if (request.verbose) {
@@ -104,10 +106,13 @@ export async function runEscalate(request: EscalateRequest): Promise<number> {
   });
 
   try {
-    writeCachedTestStatusRun({
-      ...state,
-      detail
-    });
+    writeCachedTestStatusRun(
+      {
+        ...state,
+        detail
+      },
+      scopedStatePath
+    );
   } catch (error) {
     if (request.verbose) {
       const reason = error instanceof Error ? error.message : "unknown_error";

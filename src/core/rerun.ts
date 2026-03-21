@@ -5,6 +5,7 @@ import type {
   SiftConfig,
   TestStatusRemainingMode
 } from "../types.js";
+import { getScopedTestStatusStatePath } from "../constants.js";
 import { runExec } from "./exec.js";
 import {
   getCachedRerunCommand,
@@ -36,12 +37,12 @@ export interface RerunRequest {
 }
 
 export async function runRerun(request: RerunRequest): Promise<number> {
-  const state = readCachedTestStatusRun();
+  const state = readCachedTestStatusRun(getScopedTestStatusStatePath(process.cwd()));
 
   if (!request.remaining) {
-  return runExec({
-    ...request,
-    ...getCachedRerunCommand(state),
+    return runExec({
+      ...request,
+      ...getCachedRerunCommand(state),
       cwd: state.cwd,
       diff: true,
       presetName: "test-status",
@@ -53,7 +54,7 @@ export async function runRerun(request: RerunRequest): Promise<number> {
         ...request.testStatusContext,
         remainingMode: "none"
       }
-  });
+    });
   }
 
   if (state.runner.name === "pytest") {

@@ -37,9 +37,10 @@ Notes:
 - `sift rerun` reruns the cached full command at standard detail.
 - `sift rerun --remaining` narrows automatically for cached `pytest` runs.
 - For cached `vitest` and `jest` runs, `sift rerun --remaining` reruns the original full command and keeps the diagnosis focused on what still fails relative to the cached baseline.
-- The cached `test-status` baseline is stored at `~/.config/sift/state/last-test-status.json`.
-- That baseline is written by `sift exec --preset test-status -- <test command>` on normal non-watch runs.
-- If you want to start fresh, delete `~/.config/sift/state/last-test-status.json` and run a new `sift exec --preset test-status -- <test command>`.
+- The cached `test-status` baseline is project-scoped and stored under `~/.config/sift/state/test-status/by-cwd/`.
+- That baseline is written by `sift exec --preset test-status -- <test command>` on normal non-watch runs for the command's working directory.
+- `sift rerun` and `sift escalate` only read the cached baseline for the current working directory.
+- If you want to start fresh for the current project, delete that project's cache entry under `~/.config/sift/state/test-status/by-cwd/` and run a new `sift exec --preset test-status -- <test command>`.
 
 ### `sift escalate`
 

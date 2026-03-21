@@ -1,5 +1,7 @@
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import crypto from "node:crypto";
 
 export const DEFAULT_CONFIG_FILENAME = "sift.config.yaml";
 
@@ -21,6 +23,35 @@ export function getDefaultGlobalStateDir(homeDir = os.homedir()): string {
 
 export function getDefaultTestStatusStatePath(homeDir = os.homedir()): string {
   return path.join(getDefaultGlobalStateDir(homeDir), "last-test-status.json");
+}
+
+export function getDefaultScopedTestStatusStateDir(homeDir = os.homedir()): string {
+  return path.join(getDefaultGlobalStateDir(homeDir), "test-status", "by-cwd");
+}
+
+export function getScopedTestStatusStatePath(cwd: string, homeDir = os.homedir()): string {
+  const normalizedCwd = normalizeScopedCacheCwd(cwd);
+  const baseName = slugCachePathSegment(path.basename(normalizedCwd)) || "root";
+  const shortHash = crypto.createHash("sha256").update(normalizedCwd).digest("hex").slice(0, 10);
+  return path.join(getDefaultScopedTestStatusStateDir(homeDir), `${baseName}-${shortHash}.json`);
+}
+
+function slugCachePathSegment(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function normalizeScopedCacheCwd(cwd: string): string {
+  const absoluteCwd = path.resolve(cwd);
+
+  try {
+    return fs.realpathSync.native(absoluteCwd);
+  } catch {
+    return absoluteCwd;
+  }
 }
 
 export function getDefaultConfigSearchPaths(): string[] {

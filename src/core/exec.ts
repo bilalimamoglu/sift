@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { constants as osConstants } from "node:os";
 import pc from "picocolors";
-import { CAPTURE_OMITTED_MARKER } from "../constants.js";
+import { CAPTURE_OMITTED_MARKER, getScopedTestStatusStatePath } from "../constants.js";
 import type { OutputFormat, RunRequest, SiftConfig } from "../types.js";
 import { evaluateGate, supportsFailOnPreset } from "./gate.js";
 import { analyzeTestStatus, detectTestRunner } from "./heuristics.js";
@@ -164,12 +164,14 @@ export async function runExec(request: ExecRequest): Promise<number> {
   const shellPath = process.env.SHELL || "/bin/bash";
   const commandPreview = buildCommandPreview(request);
   const commandCwd = request.cwd ?? process.cwd();
+  const scopedStatePath = getScopedTestStatusStatePath(commandCwd);
   const isTestStatusPreset = request.presetName === "test-status";
   const readCachedBaseline = isTestStatusPreset && (request.readCachedBaseline ?? true);
   const writeCachedBaselineRequested =
     isTestStatusPreset &&
     (request.writeCachedBaseline ?? (request.skipCacheWrite ? false : true));
-  const previousCachedRun = readCachedBaseline ? tryReadCachedTestStatusRun() : null;
+  const previousCachedRun =
+    readCachedBaseline ? tryReadCachedTestStatusRun(scopedStatePath) : null;
   if (request.config.runtime.verbose) {
     process.stderr.write(
       `${pc.dim("sift")} exec mode=${hasShellCommand ? "shell" : "argv"} command=${commandPreview}\n`
@@ -433,7 +435,7 @@ export async function runExec(request: ExecRequest): Promise<number> {
 
       if (currentCachedRun && shouldWriteCachedBaseline) {
         try {
-          writeCachedTestStatusRun(currentCachedRun);
+          writeCachedTestStatusRun(currentCachedRun, scopedStatePath);
         } catch (error) {
           if (request.config.runtime.verbose) {
             const reason = error instanceof Error ? error.message : "unknown_error";

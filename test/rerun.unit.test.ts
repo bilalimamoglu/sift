@@ -2,7 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getDefaultTestStatusStatePath } from "../src/constants.js";
+import {
+  getDefaultTestStatusStatePath,
+  getScopedTestStatusStatePath
+} from "../src/constants.js";
 import { defaultConfig } from "../src/config/defaults.js";
 import { analyzeTestStatus } from "../src/core/heuristics.js";
 import {
@@ -39,7 +42,7 @@ function writeState(args: {
       truncatedApplied: false,
       analysis: analyzeTestStatus(args.rawOutput)
     }),
-    getDefaultTestStatusStatePath(args.homeDir)
+    getScopedTestStatusStatePath(args.cwd ?? "/tmp/repo", args.homeDir)
   );
 }
 
@@ -50,10 +53,37 @@ describe("runRerun", () => {
     homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "sift-rerun-home-"));
     runExecMock.mockReset();
     vi.spyOn(os, "homedir").mockReturnValue(homeDir);
+    vi.spyOn(process, "cwd").mockReturnValue("/tmp/repo");
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("fails clearly when the current working directory has no cached baseline", async () => {
+    writeState({
+      homeDir,
+      cwd: "/tmp/repo-a",
+      command: ["pytest", "-q"],
+      rawOutput: [
+        "FAILED tests/unit/test_auth.py::test_refresh - AssertionError: expected token",
+        "1 failed in 0.12s"
+      ].join("\n")
+    });
+    vi.spyOn(process, "cwd").mockReturnValue("/tmp/repo-b");
+
+    const { runRerun } = await import("../src/core/rerun.js");
+    await expect(
+      runRerun({
+        question: "Did the tests pass?",
+        format: "bullets",
+        config: defaultConfig
+      })
+    ).rejects.toThrow(
+      "No cached test-status run found. Start with `sift exec --preset test-status -- <test command>`."
+    );
+
+    expect(runExecMock).not.toHaveBeenCalled();
   });
 
   it("reruns the cached full command in standard diff mode", async () => {
@@ -232,7 +262,7 @@ describe("runRerun", () => {
     );
   });
 
-  it("fails clearly when a migrated cache lacks a trustworthy full-command baseline", async () => {
+  it("ignores the legacy global cache path after the scoped-cache cutover", async () => {
     const legacyStatePath = getDefaultTestStatusStatePath(homeDir);
     fs.mkdirSync(path.dirname(legacyStatePath), {
       recursive: true
@@ -302,7 +332,7 @@ describe("runRerun", () => {
         remaining: true
       })
     ).rejects.toThrow(
-      "Cached test-status run cannot use `sift rerun --remaining` yet because the original full command is unavailable from cache."
+      "No cached test-status run found. Start with `sift exec --preset test-status -- <test command>`."
     );
   });
 });

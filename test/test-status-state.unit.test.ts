@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { getScopedTestStatusStatePath } from "../src/constants.js";
 import { analyzeTestStatus } from "../src/core/heuristics.js";
 import {
   InvalidCachedTestStatusRunError,
@@ -24,6 +25,18 @@ function readRealFixture(name: string): string {
 }
 
 describe("test-status state helpers", () => {
+  it("derives deterministic scoped cache paths per cwd", () => {
+    const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "sift-state-home-"));
+    const repoA = getScopedTestStatusStatePath("/tmp/My Repo", homeDir);
+    const repoARepeat = getScopedTestStatusStatePath("/tmp/My Repo", homeDir);
+    const repoB = getScopedTestStatusStatePath("/tmp/other-repo", homeDir);
+
+    expect(repoA).toBe(repoARepeat);
+    expect(repoA).not.toBe(repoB);
+    expect(path.basename(repoA)).toMatch(/^my-repo-[a-f0-9]{10}\.json$/);
+    expect(repoA).toContain(`${path.sep}test-status${path.sep}by-cwd${path.sep}`);
+  });
+
   it("writes and reads cached test-status runs", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sift-state-"));
     const statePath = path.join(dir, "last-test-status.json");

@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getDefaultTestStatusStatePath } from "../src/constants.js";
+import { getScopedTestStatusStatePath } from "../src/constants.js";
 import { defaultConfig } from "../src/config/defaults.js";
 import {
   BoundedCapture,
@@ -202,7 +202,7 @@ describe("runExec unit", () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);
     runSiftWithStatsMock.mockResolvedValue({ output: "Reduced answer", stats: null });
-    const statePath = getDefaultTestStatusStatePath(homeDir);
+    const statePath = getScopedTestStatusStatePath(process.cwd(), homeDir);
     const rawOutput = [
       "=================== short test summary info ===================",
       "ERROR tests/db/test_users.py - RuntimeError: DB-isolated tests require PGTEST_POSTGRES_DSN",
@@ -704,7 +704,7 @@ describe("runExec unit", () => {
   it("bypasses reduction for interactive prompt-like output", async () => {
     const child = new FakeChild();
     spawnMock.mockReturnValue(child);
-    const statePath = getDefaultTestStatusStatePath(homeDir);
+    const statePath = getScopedTestStatusStatePath(process.cwd(), homeDir);
 
     const { runExec } = await import("../src/core/exec.js");
     const pending = runExec(
