@@ -1,12 +1,10 @@
 <!-- sift:begin codex -->
-Use `sift` as the default reduction layer for long, noisy, non-interactive command output.
-The goal is to shrink that output before it spends context-window and token budget in the model.
+Use `sift` as the default local-first output guidance layer for long, noisy, non-interactive command output.
+The goal is to turn failure walls into grouped issues, likely root causes, and the next useful step before reading raw logs.
 
 Start with:
 - `sift exec "question" -- <command> [args...]`
 - `sift exec --preset test-status -- <test command>`
-- `sift watch "what changed between cycles?" < watcher-output.txt`
-- `sift exec --watch "what changed between cycles?" -- <command> [args...]`
 - `sift exec --preset audit-critical -- npm audit`
 - `sift exec --preset infra-risk -- terraform plan`
 

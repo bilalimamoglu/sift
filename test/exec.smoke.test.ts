@@ -46,6 +46,22 @@ describe("exec mode smoke", () => {
     expect(result.stderr).toBe("");
   });
 
+  it("uses a local summary for wrapped silent typecheck success output", async () => {
+    const result = await runSourceCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "typecheck-summary",
+        "--shell",
+        "npm run typecheck"
+      ]
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("No type errors.");
+    expect(result.stderr).toBe("");
+  });
+
   it("reuses the cached test-status run during escalate without rerunning the child command", async () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-escalate-home-"));
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-escalate-cwd-"));

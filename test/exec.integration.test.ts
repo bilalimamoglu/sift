@@ -117,6 +117,80 @@ describe("runExec integration", () => {
     expect(stdout).toContain("Reduced answer");
   });
 
+  it("normalizes npm-style wrapper output before reduction and short-circuits silent typecheck success", async () => {
+    const { runExec } = await import("../src/core/exec.js");
+
+    await expect(
+      runExec(
+        makeRequest({
+          presetName: "typecheck-summary",
+          format: "bullets",
+          shellCommand: "npm run typecheck",
+          command: undefined
+        })
+      )
+    ).resolves.toBe(0);
+
+    expect(runSiftWithStatsMock).not.toHaveBeenCalled();
+    expect(stdout).toContain("No type errors.");
+  });
+
+  it("forwards only post-wrapper diagnostics into reduction", async () => {
+    runSiftWithStatsMock.mockResolvedValue({
+      output: "Reduced answer",
+      stats: null
+    });
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "sift-exec-int-typecheck-"));
+    fs.writeFileSync(
+      path.join(cwd, "package.json"),
+      JSON.stringify(
+        {
+          name: "exec-int-typecheck",
+          version: "1.0.0",
+          private: true,
+          scripts: {
+            typecheck: "node emit-typecheck.mjs"
+          }
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+    fs.writeFileSync(
+      path.join(cwd, "emit-typecheck.mjs"),
+      [
+        "process.stdout.write(",
+        JSON.stringify(
+          "src/app.ts:1:1 - error TS2322: Type 'string' is not assignable to type 'number'.\n"
+        ),
+        ");",
+        "process.exit(1);"
+      ].join(""),
+      "utf8"
+    );
+
+    const { runExec } = await import("../src/core/exec.js");
+
+    await expect(
+      runExec(
+        makeRequest({
+          cwd,
+          presetName: "typecheck-summary",
+          format: "bullets",
+          shellCommand: "npm run typecheck",
+          command: undefined
+        })
+      )
+    ).resolves.toBe(1);
+
+    expect(runSiftWithStatsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stdin: "src/app.ts:1:1 - error TS2322: Type 'string' is not assignable to type 'number'."
+      })
+    );
+  });
+
   it("mirrors captured raw output to stderr when showRaw is enabled", async () => {
     runSiftWithStatsMock.mockResolvedValue({
       output: "Reduced answer",

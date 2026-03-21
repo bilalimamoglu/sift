@@ -137,17 +137,101 @@ export function buildCommandPreview(request: ExecRequest): string {
   return (request.command ?? []).join(" ");
 }
 
+export type PackageManagerScriptKind = "npm" | "pnpm" | "yarn" | "bun";
+
+export function detectPackageManagerScriptKind(
+  commandPreview: string
+): PackageManagerScriptKind | null {
+  const trimmed = commandPreview.trim();
+
+  if (/^npm(?:\s+--?[^\s]+(?:[=\s][^\s]+)?)?\s+run\s+\S+/i.test(trimmed)) {
+    return "npm";
+  }
+
+  if (/^pnpm(?:\s+--?[^\s]+(?:[=\s][^\s]+)?)?\s+run\s+\S+/i.test(trimmed)) {
+    return "pnpm";
+  }
+
+  if (/^yarn(?:\s+--?[^\s]+(?:[=\s][^\s]+)?)?\s+run\s+\S+/i.test(trimmed)) {
+    return "yarn";
+  }
+
+  if (/^bun(?:\s+--?[^\s]+(?:[=\s][^\s]+)?)?\s+run\s+\S+/i.test(trimmed)) {
+    return "bun";
+  }
+
+  return null;
+}
+
+export function normalizeScriptWrapperOutput(args: {
+  commandPreview: string;
+  capturedOutput: string;
+}): string {
+  const kind = detectPackageManagerScriptKind(args.commandPreview);
+  if (!kind) {
+    return args.capturedOutput;
+  }
+
+  const lines = args.capturedOutput.split(/\r?\n/);
+
+  const trimBlankEdges = () => {
+    while (lines.length > 0 && lines[0]!.trim() === "") {
+      lines.shift();
+    }
+
+    while (lines.length > 0 && lines.at(-1)!.trim() === "") {
+      lines.pop();
+    }
+  };
+
+  trimBlankEdges();
+
+  if (kind === "npm" || kind === "pnpm") {
+    let removed = 0;
+    while (lines.length > 0 && removed < 2 && /^\s*>\s+/.test(lines[0]!)) {
+      lines.shift();
+      removed += 1;
+    }
+  }
+
+  if (kind === "yarn") {
+    if (lines[0] && /^\s*yarn run v/i.test(lines[0]!)) {
+      lines.shift();
+    }
+    if (lines[0] && /^\s*\$\s+/.test(lines[0]!)) {
+      lines.shift();
+    }
+    trimBlankEdges();
+    if (lines.at(-1) && /^\s*Done in\b/i.test(lines.at(-1)!)) {
+      lines.pop();
+    }
+  }
+
+  if (kind === "bun") {
+    if (lines[0] && /^\s*\$\s+/.test(lines[0]!)) {
+      lines.shift();
+    }
+  }
+
+  trimBlankEdges();
+  return lines.join("\n");
+}
+
 export function getExecSuccessShortcut(args: {
   presetName?: string;
   exitCode: number;
-  capturedOutput: string;
+  normalizedOutput: string;
 }): string | null {
   if (args.exitCode !== 0) {
     return null;
   }
 
-  if (args.presetName === "typecheck-summary" && args.capturedOutput.trim() === "") {
+  if (args.presetName === "typecheck-summary" && args.normalizedOutput.trim() === "") {
     return "No type errors.";
+  }
+
+  if (args.presetName === "lint-failures" && args.normalizedOutput.trim() === "") {
+    return "No lint failures.";
   }
 
   return null;
@@ -250,6 +334,10 @@ export async function runExec(request: ExecRequest): Promise<number> {
 
   const exitCode = normalizeChildExitCode(childStatus, childSignal);
   const capturedOutput = capture.render();
+  const normalizedOutput = normalizeScriptWrapperOutput({
+    commandPreview,
+    capturedOutput
+  });
   const autoWatchDetected = !request.watch && looksLikeWatchStream(capturedOutput);
   const useWatchFlow = Boolean(request.watch) || autoWatchDetected;
   const shouldBuildTestStatusState = isTestStatusPreset && !useWatchFlow;
@@ -280,7 +368,7 @@ export async function runExec(request: ExecRequest): Promise<number> {
       : getExecSuccessShortcut({
           presetName: request.presetName,
           exitCode,
-          capturedOutput
+          normalizedOutput
         });
 
     if (execSuccessShortcut && !request.dryRun) {
@@ -307,16 +395,17 @@ export async function runExec(request: ExecRequest): Promise<number> {
     if (useWatchFlow) {
       let output = await runWatch({
         ...request,
-        stdin: capturedOutput
+        stdin: normalizedOutput
       });
 
       if (isInsufficientSignalOutput(output)) {
         output = buildInsufficientSignalOutput({
           presetName: request.presetName,
-          originalLength: capture.getTotalChars(),
+          originalLength:
+            normalizedOutput.length > 0 ? normalizedOutput.length : capture.getTotalChars(),
           truncatedApplied: capture.wasTruncated(),
           exitCode,
-          recognizedRunner: detectTestRunner(capturedOutput)
+          recognizedRunner: detectTestRunner(normalizedOutput)
         });
       }
 
@@ -371,7 +460,7 @@ export async function runExec(request: ExecRequest): Promise<number> {
 
     const result = await runSiftWithStats({
       ...request,
-      stdin: capturedOutput,
+      stdin: normalizedOutput,
       analysisContext:
         request.testStatusContext?.remainingMode &&
         request.testStatusContext.remainingMode !== "none" &&
@@ -416,10 +505,11 @@ export async function runExec(request: ExecRequest): Promise<number> {
       if (isInsufficientSignalOutput(output)) {
         output = buildInsufficientSignalOutput({
           presetName: request.presetName,
-          originalLength: capture.getTotalChars(),
+          originalLength:
+            normalizedOutput.length > 0 ? normalizedOutput.length : capture.getTotalChars(),
           truncatedApplied: capture.wasTruncated(),
           exitCode,
-          recognizedRunner: detectTestRunner(capturedOutput)
+          recognizedRunner: detectTestRunner(normalizedOutput)
         });
       }
 
@@ -446,10 +536,11 @@ export async function runExec(request: ExecRequest): Promise<number> {
     } else if (isInsufficientSignalOutput(output)) {
       output = buildInsufficientSignalOutput({
         presetName: request.presetName,
-        originalLength: capture.getTotalChars(),
+        originalLength:
+          normalizedOutput.length > 0 ? normalizedOutput.length : capture.getTotalChars(),
         truncatedApplied: capture.wasTruncated(),
         exitCode,
-        recognizedRunner: detectTestRunner(capturedOutput)
+        recognizedRunner: detectTestRunner(normalizedOutput)
       });
     }
 

@@ -8,8 +8,10 @@ import { defaultConfig } from "../src/config/defaults.js";
 import {
   BoundedCapture,
   buildCommandPreview,
+  detectPackageManagerScriptKind,
   getExecSuccessShortcut,
   looksInteractivePrompt,
+  normalizeScriptWrapperOutput,
   normalizeChildExitCode,
   type ExecRequest
 } from "../src/core/exec.js";
@@ -147,19 +149,62 @@ describe("runExec unit", () => {
       )
     ).toBe("");
     expect(
+      detectPackageManagerScriptKind("npm run typecheck")
+    ).toBe("npm");
+    expect(
+      detectPackageManagerScriptKind("pnpm run lint -- --fix")
+    ).toBe("pnpm");
+    expect(
+      detectPackageManagerScriptKind("yarn run typecheck")
+    ).toBe("yarn");
+    expect(
+      detectPackageManagerScriptKind("bun run lint")
+    ).toBe("bun");
+    expect(
+      detectPackageManagerScriptKind("npx tsc --noEmit")
+    ).toBeNull();
+    expect(
+      normalizeScriptWrapperOutput({
+        commandPreview: "npm run typecheck",
+        capturedOutput: "\n> sift@0.4.4 typecheck\n> tsc --noEmit\n\n"
+      })
+    ).toBe("");
+    expect(
+      normalizeScriptWrapperOutput({
+        commandPreview: "yarn run lint",
+        capturedOutput:
+          "yarn run v1.22.19\n$ eslint .\nsrc/app.ts\n  1:1  error  Unexpected any  @typescript-eslint/no-explicit-any\nDone in 0.91s.\n"
+      })
+    ).toBe(
+      "src/app.ts\n  1:1  error  Unexpected any  @typescript-eslint/no-explicit-any"
+    );
+    expect(
+      normalizeScriptWrapperOutput({
+        commandPreview: "node -e console.log('ok')",
+        capturedOutput: "> keep this line"
+      })
+    ).toBe("> keep this line");
+    expect(
       getExecSuccessShortcut({
         presetName: "typecheck-summary",
         exitCode: 0,
-        capturedOutput: ""
+        normalizedOutput: ""
       })
     ).toBe("No type errors.");
     expect(
       getExecSuccessShortcut({
         presetName: "typecheck-summary",
         exitCode: 1,
-        capturedOutput: ""
+        normalizedOutput: ""
       })
     ).toBeNull();
+    expect(
+      getExecSuccessShortcut({
+        presetName: "lint-failures",
+        exitCode: 0,
+        normalizedOutput: ""
+      })
+    ).toBe("No lint failures.");
   });
 
   it("rejects invalid command shapes", async () => {
@@ -475,6 +520,50 @@ describe("runExec unit", () => {
     await expect(pending).resolves.toBe(0);
     expect(runSiftWithStatsMock).not.toHaveBeenCalled();
     expect(stdout).toContain("No type errors.");
+  });
+
+  it("short-circuits wrapped successful typecheck exec runs", async () => {
+    const child = new FakeChild();
+    spawnMock.mockReturnValue(child);
+
+    const { runExec } = await import("../src/core/exec.js");
+    const pending = runExec(
+      makeRequest({
+        presetName: "typecheck-summary",
+        format: "bullets",
+        shellCommand: "npm run typecheck",
+        command: undefined
+      })
+    );
+
+    child.stdout.emit("data", "\n> sift@0.4.4 typecheck\n> tsc --noEmit\n\n");
+    child.emit("close", 0, null);
+
+    await expect(pending).resolves.toBe(0);
+    expect(runSiftWithStatsMock).not.toHaveBeenCalled();
+    expect(stdout).toContain("No type errors.");
+  });
+
+  it("short-circuits wrapped successful lint exec runs", async () => {
+    const child = new FakeChild();
+    spawnMock.mockReturnValue(child);
+
+    const { runExec } = await import("../src/core/exec.js");
+    const pending = runExec(
+      makeRequest({
+        presetName: "lint-failures",
+        format: "bullets",
+        shellCommand: "npm run lint",
+        command: undefined
+      })
+    );
+
+    child.stdout.emit("data", "\n> sift@0.4.4 lint\n> eslint .\n\n");
+    child.emit("close", 0, null);
+
+    await expect(pending).resolves.toBe(0);
+    expect(runSiftWithStatsMock).not.toHaveBeenCalled();
+    expect(stdout).toContain("No lint failures.");
   });
 
   it("logs the exec shortcut when verbose mode is enabled", async () => {

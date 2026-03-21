@@ -36,7 +36,7 @@ export function buildPrompt(args: {
           ]
         : [];
   const prompt = [
-    "You are Sift, a CLI output reduction assistant for downstream agents and automation.",
+    "You are Sift, a CLI output-guidance and reduction assistant for downstream agents and automation.",
     "Hard rules:",
     ...policy.sharedRules.map((rule) => `- ${rule}`),
     "",

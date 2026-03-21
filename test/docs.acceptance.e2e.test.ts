@@ -119,6 +119,15 @@ describe("README quick start e2e", () => {
           args: [
             "exec",
             "--preset",
+            "typecheck-summary",
+            "--shell",
+            "npm run typecheck"
+          ]
+        },
+        {
+          args: [
+            "exec",
+            "--preset",
             "lint-failures",
             "--",
             "node",
@@ -186,7 +195,7 @@ describe("README quick start e2e", () => {
         }
       ];
 
-      const expectedStatuses = [0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0];
+      const expectedStatuses = [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0];
       const outputs: string[] = [];
 
       for (const [index, command] of commands.entries()) {
@@ -210,21 +219,22 @@ describe("README quick start e2e", () => {
         "tests/unit/test_auth.py::test_refresh -> assertion failed: expected token"
       );
       expect(outputs[5]).toContain("Typecheck failed");
-      expect(outputs[6]).toContain("Lint failed");
-      expect(JSON.parse(outputs[7]!)).toEqual({
+      expect(outputs[6]).toContain("No type errors.");
+      expect(outputs[7]).toContain("Lint failed");
+      expect(JSON.parse(outputs[8]!)).toEqual({
         status: "ok",
         vulnerabilities: [],
         summary: "No high or critical vulnerabilities found in the provided input."
       });
-      expect(JSON.parse(outputs[8]!).verdict).toBe("fail");
-      expect(JSON.parse(outputs[9]!).vulnerabilities).toHaveLength(1);
-      expect(outputs[10]).toBeDefined();
-      expect(JSON.parse(outputs[10] as string).verdict).toBe("fail");
-      expect(outputs[11]).toContain("Codex instructions preview");
-      expect(outputs[12]).toContain("<!-- sift:begin codex -->");
-      expect(outputs[13]).toContain("Dry run:");
-      expect(outputs[13]).toContain("Codex managed block");
-      expect(outputs[14]).toContain("<!-- sift:begin codex -->");
+      expect(JSON.parse(outputs[9]!).verdict).toBe("fail");
+      expect(JSON.parse(outputs[10]!).vulnerabilities).toHaveLength(1);
+      expect(outputs[11]).toBeDefined();
+      expect(JSON.parse(outputs[11] as string).verdict).toBe("fail");
+      expect(outputs[12]).toContain("Codex instructions preview");
+      expect(outputs[13]).toContain("<!-- sift:begin codex -->");
+      expect(outputs[14]).toContain("Dry run:");
+      expect(outputs[14]).toContain("Codex managed block");
+      expect(outputs[15]).toContain("<!-- sift:begin codex -->");
     } finally {
       await server.close();
     }

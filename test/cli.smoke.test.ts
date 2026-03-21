@@ -23,8 +23,22 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("--detail <mode>");
     expect(result.stdout).toContain("escalate");
     expect(result.stdout).toContain("rerun");
+    expect(result.stdout).toContain("install [runtime]");
     expect(result.stdout).toContain("agent <action> [name]");
     expect(result.stdout).toContain("config <action> [provider]");
+  });
+
+  it("prints install help with runtime and scope examples", () => {
+    const result = runSourceCli({
+      args: ["install", "--help"]
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("install [runtime] [options]");
+    expect(result.stdout).toContain("install codex --scope global --yes");
+    expect(result.stdout).toContain("install all --scope local --yes");
+    expect(result.stdout).toContain("--scope <scope>");
+    expect(result.stdout).toContain("--yes");
   });
 
   it("prints config help with the provider switch example", () => {

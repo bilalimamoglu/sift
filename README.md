@@ -4,9 +4,9 @@
 
 # sift
 
-### Turn noisy command output into actionable diagnoses for your coding agent
+### Turn noisy command output into a short, actionable first pass for your coding agent
 
-**Benchmark-backed test triage - Heuristic-first reductions - Agent-ready terminal workflows**
+**Local heuristics first. Group repeated failures into likely root causes and next steps before your agent reads the full log.**
 
 [![npm version](https://img.shields.io/npm/v/@bilalimamoglu/sift)](https://www.npmjs.com/package/@bilalimamoglu/sift)
 [![license](https://img.shields.io/github/license/bilalimamoglu/sift)](LICENSE)
@@ -29,14 +29,14 @@ npm install -g @bilalimamoglu/sift
 
 ## Why Sift?
 
-When an agent hits noisy output, it burns budget reading logs instead of fixing the problem.
+When an agent hits noisy output, it can eventually make sense of the log wall, but it wastes time and tokens getting there.
 
-`sift` sits in front of that output and reduces it into a small, actionable first pass. Your agent reads the diagnosis, not the wall of text.
+`sift` narrows that output locally first. It groups repeated failures, surfaces likely root causes, and points to the next useful step so your agent starts from signal instead of raw noise.
 
 Turn 13,000 lines of test output into 2 root causes.
 
 <p align="center">
-  <img src="assets/readme/test-status-demo.gif" alt="sift turning a pytest failure wall into a short diagnosis" width="960" />
+  <img src="assets/readme/test-status-demo.gif" alt="sift turning a pytest failure wall into a short, actionable first pass" width="960" />
 </p>
 
 With `sift`, the same run becomes:
@@ -59,7 +59,7 @@ In the largest benchmark fixture, sift compressed 198,026 raw output tokens to 1
 
 ## Benchmark Results
 
-The output reduction above measures a single command's raw output. The table below measures the full end-to-end debug session: how many tokens, tool calls, and seconds the agent spends to reach the same diagnosis.
+The output reduction above measures a single command's raw output. The table below measures the full end-to-end debug session: how many tokens, tool calls, and seconds the agent spends to reach the same outcome.
 
 Real debug loop on a 640-test Python backend with 124 repeated setup errors, 3 contract failures, and 511 passing tests:
 
@@ -69,9 +69,9 @@ Real debug loop on a 640-test Python backend with 124 repeated setup errors, 3 c
 | Tool calls | 40.8 | 12 | 71% fewer |
 | Wall-clock time | 244s | 85s | 65% faster |
 | Commands | 15.5 | 6 | 61% fewer |
-| Diagnosis | Same | Same | Same outcome |
+| Outcome | Same | Same | Same outcome |
 
-Same diagnosis, less agent thrash.
+Same outcome, less agent thrash.
 
 Methodology and caveats: [BENCHMARK_NOTES.md](BENCHMARK_NOTES.md)
 
@@ -83,7 +83,7 @@ Methodology and caveats: [BENCHMARK_NOTES.md](BENCHMARK_NOTES.md)
 
 1. **Capture output.** Run the noisy command or accept already-existing piped output.
 2. **Run local heuristics.** Detect known failure shapes first so common cases stay cheap and deterministic.
-3. **Return the diagnosis.** When heuristics are confident, `sift` gives the agent the root cause, anchor, and next step.
+3. **Return a useful first pass.** When heuristics are confident, `sift` gives the agent grouped failures, likely root causes, and the next step.
 4. **Fall back only when needed.** If heuristics are not enough, `sift` uses a cheaper model instead of spending your main agent budget.
 
 Your agent spends tokens fixing, not reading.
@@ -96,13 +96,13 @@ Your agent spends tokens fixing, not reading.
 <tr>
 <td width="33%" valign="top">
 
-### Test Failure Triage
-Collapse repeated pytest, vitest, and jest failures into a short diagnosis with root-cause buckets, anchors, and fix hints.
+### Test Failure Guidance
+Collapse repeated pytest, vitest, and jest failures into grouped issues with likely root causes, anchors, and fix hints.
 
 </td>
 <td width="33%" valign="top">
 
-### Typecheck and Lint Reduction
+### Typecheck and Lint Guidance
 Group noisy `tsc` and ESLint output into the few issues that actually matter instead of dumping the whole log back into the model.
 
 </td>
@@ -139,21 +139,27 @@ Use `sift` in Codex, Claude, CI, hooks, or shell scripts so downstream tooling g
 
 ## Setup and Agent Integration
 
-Most built-in presets run entirely on local heuristics with no API key needed. For presets that fall back to a model (`diff-summary`, `log-errors`, or when heuristics are not confident enough), sift supports OpenAI-compatible and OpenRouter-compatible endpoints.
+Most built-in presets run entirely on local heuristics with no API key required. If you want deeper fallback for ambiguous cases, `sift` also supports OpenAI-compatible and OpenRouter-compatible endpoints.
 
-Set up the provider first, then install the managed instruction block for the agent you want to steer:
+Start with local-first output guidance for your coding runtime:
+
+```bash
+sift install
+sift exec --preset test-status -- pytest -q
+```
+
+Then, if you want provider-assisted fallback as a parallel first-class path:
 
 ```bash
 sift config setup
 sift doctor
-sift agent install codex
-sift agent install claude
 ```
 
-You can also preview, inspect, or remove those blocks:
+If you want the older low-level controls, you can still preview, inspect, or remove the managed blocks directly:
 
 ```bash
 sift agent show codex
+sift agent install codex --dry-run
 sift agent status
 sift agent remove codex
 ```
@@ -172,7 +178,7 @@ npm install -g @bilalimamoglu/sift
 
 Requires Node.js 20+.
 
-### 2. Run Sift in front of a noisy command
+### 2. Get a useful first pass before your agent reads the full log
 
 ```bash
 sift exec --preset test-status -- pytest -q
@@ -199,7 +205,7 @@ sift rerun
 sift rerun --remaining --detail focused
 ```
 
-If `standard` already gives you the root cause, anchor, and fix, stop there and act.
+If `standard` already gives you the likely root cause, anchor, and fix, stop there and act.
 
 ---
 
@@ -257,7 +263,7 @@ sift rerun --goal diagnose --format json
 - sift adds the most value when output is long, repetitive, and shaped by a small number of root causes. For short, obvious failures it may not save much.
 - The deepest local heuristic coverage is in test debugging (pytest, vitest, jest). Other presets have solid heuristics but less depth.
 - sift does not help with interactive or TUI-based commands.
-- When heuristics cannot explain the output confidently, sift falls back to a provider. If no provider is configured, it returns what the heuristics could extract and signals that raw output may still be needed.
+- When heuristics cannot explain the output confidently, sift either falls back to a provider or returns the strongest local first pass it can, depending on how you choose to use it.
 
 ---
 
@@ -279,7 +285,7 @@ MIT
 
 <div align="center">
 
-Built for agent-first terminal workflows.
+Local-first output guidance for coding agents.
 
 [Report Bug](https://github.com/bilalimamoglu/sift/issues) | [Request Feature](https://github.com/bilalimamoglu/sift/issues)
 

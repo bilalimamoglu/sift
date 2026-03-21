@@ -1,7 +1,7 @@
 {
   "name": "@bilalimamoglu/sift",
   "version": "0.4.4",
-  "description": "Agent-first command-output reduction layer for agents, CI, and automation.",
+  "description": "Local-first output guidance for coding agents working through noisy command output.",
   "type": "module",
   "bin": {
     "sift": "dist/cli.js"
@@ -39,6 +39,10 @@
     "automation",
     "terminal",
     "logs",
+    "debugging",
+    "heuristics",
+    "root-cause",
+    "test-failures",
     "ci",
     "json"
   ],

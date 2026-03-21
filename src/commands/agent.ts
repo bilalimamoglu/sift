@@ -175,14 +175,12 @@ export function getManagedBlockMarkers(agent: AgentName): {
 
 function renderInstructionBody(): string {
   return [
-    "Use `sift` as the default reduction layer for long, noisy, non-interactive command output.",
-    "The goal is to shrink that output before it spends context-window and token budget in the model.",
+    "Use `sift` as the default local-first output guidance layer for long, noisy, non-interactive command output.",
+    "The goal is to turn failure walls into grouped issues, likely root causes, and the next useful step before reading raw logs.",
     "",
     "Start with:",
     '- `sift exec "question" -- <command> [args...]`',
     "- `sift exec --preset test-status -- <test command>`",
-    '- `sift watch "what changed between cycles?" < watcher-output.txt`',
-    '- `sift exec --watch "what changed between cycles?" -- <command> [args...]`',
     "- `sift exec --preset audit-critical -- npm audit`",
     "- `sift exec --preset infra-risk -- terraform plan`",
     "",
@@ -458,7 +456,7 @@ export function showAgent(
     `${ui.info("sift will manage one marked block in this file. It will not rewrite the whole file.")}\n`
   );
   io.write(
-    `${ui.info("The point is to reduce long command output before it burns context-window and token budget.")}\n`
+    `${ui.info("The point is to narrow long command output before your agent burns time and tokens on the raw log wall.")}\n`
   );
   io.write(
     `${ui.info("The managed block teaches the agent to default to sift first, keep raw as the last resort, and treat standard as the usual stop point.")}\n`
@@ -468,7 +466,7 @@ export function showAgent(
   io.write(`  ${ui.command("sift exec --preset audit-critical -- npm audit")}\n`);
   io.write(`  ${ui.command("sift exec --preset infra-risk -- terraform plan")}\n`);
   io.write(
-    `${ui.info("For test debugging, standard should usually be enough for first-pass triage.")}\n`
+    `${ui.info("For test debugging, standard should usually be enough for first-pass guidance.")}\n`
   );
   io.write(
     `${ui.note("If standard already names the main failure buckets and hints, stop there and read source.")}\n`

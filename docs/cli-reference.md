@@ -8,7 +8,7 @@ The main README is product-first. This page is command-first.
 
 ### `sift exec`
 
-Run a command, capture its output, reduce it, and preserve the child exit code.
+Run a command, capture its output, and turn noisy results into a smaller, more actionable first pass while preserving the child exit code.
 
 ```bash
 sift exec --preset test-status -- pytest -q
@@ -36,7 +36,7 @@ sift rerun --remaining --detail verbose --show-raw
 Notes:
 - `sift rerun` reruns the cached full command at standard detail.
 - `sift rerun --remaining` narrows automatically for cached `pytest` runs.
-- For cached `vitest` and `jest` runs, `sift rerun --remaining` reruns the original full command and keeps the diagnosis focused on what still fails relative to the cached baseline.
+- For cached `vitest` and `jest` runs, `sift rerun --remaining` reruns the original full command and keeps the result focused on what still fails relative to the cached baseline.
 - The cached `test-status` baseline is project-scoped and stored under `~/.config/sift/state/test-status/by-cwd/`.
 - That baseline is written by `sift exec --preset test-status -- <test command>` on normal non-watch runs for the command's working directory.
 - `sift rerun` and `sift escalate` only read the cached baseline for the current working directory.
@@ -52,7 +52,7 @@ sift escalate --detail verbose
 sift escalate --show-raw
 ```
 
-Use this when the cached diagnosis is close but you want one deeper render before going to raw logs.
+Use this when the cached first pass is close but you want one deeper render before going to raw logs.
 
 ### `sift watch`
 
@@ -93,7 +93,7 @@ Use this when output already exists in a pipeline and you do not want `sift exec
 
 ### `sift config setup`
 
-Interactive guided setup for provider configuration.
+Interactive guided setup for choosing how you want to use `sift`, including provider-assisted fallback.
 
 ```bash
 sift config setup
@@ -139,7 +139,7 @@ sift config use openrouter
 
 ### `sift doctor`
 
-Check which config is active and whether the local setup is complete.
+Check which config is active and how `sift` will behave in the current setup.
 
 ```bash
 sift doctor
@@ -157,9 +157,19 @@ sift presets show infra-risk --internal
 
 ## Agent commands
 
+### `sift install`
+
+Run the guided runtime installer. This is the recommended entry point for first-time setup.
+
+```bash
+sift install
+sift install codex --scope global --yes
+sift install all --scope local --yes
+```
+
 ### `sift agent install`
 
-Install a managed instruction block for a supported agent.
+Install a managed instruction block for a supported agent directly. Use this when you want dry runs, raw block output, or a low-level override.
 
 ```bash
 sift agent install codex

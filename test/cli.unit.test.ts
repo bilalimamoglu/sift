@@ -21,6 +21,7 @@ import {
 
 function createDeps(overrides: Partial<CliDeps> = {}): CliDeps {
   return {
+    installRuntimeSupport: vi.fn().mockResolvedValue(0),
     installAgent: vi.fn().mockResolvedValue(0),
     removeAgent: vi.fn().mockResolvedValue(0),
     showAgent: vi.fn(),
@@ -195,6 +196,19 @@ describe("cli app unit", () => {
         rawFallback: true,
         verbose: true
       }
+    });
+  });
+
+  it("routes install to the unified runtime installer", async () => {
+    const deps = createDeps();
+
+    await runMatched(["install", "codex", "--scope", "global", "--yes"], deps);
+
+    expect(deps.installRuntimeSupport).toHaveBeenCalledWith({
+      runtime: "codex",
+      scope: "global",
+      yes: true,
+      version: "0.3.2"
     });
   });
 

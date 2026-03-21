@@ -14,6 +14,11 @@ import {
   showAgent,
   statusAgents
 } from "./commands/agent.js";
+import {
+  installRuntimeSupport,
+  normalizeInstallRuntime,
+  normalizeInstallScope
+} from "./commands/install.js";
 import { runDoctor } from "./commands/doctor.js";
 import { listPresets, showPreset } from "./commands/presets.js";
 import { findConfigPath } from "./config/load.js";
@@ -45,6 +50,7 @@ const require = createRequire(import.meta.url);
 const pkg = require("../package.json") as { version: string };
 
 export interface CliDeps {
+  readonly installRuntimeSupport: typeof installRuntimeSupport;
   readonly installAgent: typeof installAgent;
   readonly removeAgent: typeof removeAgent;
   readonly showAgent: typeof showAgent;
@@ -74,6 +80,7 @@ export interface CliDeps {
 }
 
 const defaultCliDeps: CliDeps = {
+  installRuntimeSupport,
   installAgent,
   removeAgent,
   showAgent,
@@ -599,7 +606,7 @@ export function createCliApp(args: {
 
   applySharedOptions(
     cli
-      .command("exec [question]", "Run a command and shrink its output for the model")
+      .command("exec [question]", "Run a command and turn noisy output into a smaller first pass for the model")
       .allowUnknownOptions()
   )
     .usage("exec [question] [options] -- <program> [args...]")
@@ -943,6 +950,24 @@ export function createCliApp(args: {
     });
 
   cli
+    .command("install [runtime]", "Interactive runtime installer for Codex and Claude")
+    .usage("install [runtime] [options]")
+    .example("install")
+    .example("install codex")
+    .example("install codex --scope global --yes")
+    .example("install all --scope local --yes")
+    .option("--scope <scope>", "Install scope: local | global")
+    .option("--yes", "Skip prompts when runtime and scope are already provided")
+    .action(async (runtime: string | undefined, options: Record<string, unknown>) => {
+      process.exitCode = await deps.installRuntimeSupport({
+        runtime: normalizeInstallRuntime(runtime),
+        scope: normalizeInstallScope(options.scope),
+        yes: Boolean(options.yes),
+        version
+      });
+    });
+
+  cli
     .command("agent <action> [name]", "Agent commands: show | install | remove | status")
     .usage("agent <show|install|remove|status> [name] [options]")
     .example("agent show codex")
@@ -1152,14 +1177,14 @@ export function createCliApp(args: {
       {
         title: ui.section("Quick start"),
         body: [
-          `  ${ui.command("sift config setup")}`,
+          `  ${ui.command("sift install")}`,
           `  ${ui.command("sift exec --preset test-status -- npm test")}`,
           `  ${ui.command("sift exec --preset test-status -- npm test")}${ui.note("  # stop here if standard already shows the main buckets")}`,
           `  ${ui.command("sift rerun")}${ui.note("  # rerun the cached full suite after a fix")}`,
           `  ${ui.command("sift rerun --remaining --detail focused")}${ui.note("  # zoom into what is still failing")}`,
           `  ${ui.command("sift rerun --remaining --detail verbose --show-raw")}`,
-          `  ${ui.command('sift watch "what changed between cycles?" < watcher-output.txt')}`,
-          `  ${ui.command('sift exec --watch "what changed between cycles?" -- node watcher.js')}`,
+          `  ${ui.command("sift config setup")}${ui.note("  # optional if you want provider-assisted fallback")}`,
+          `  ${ui.command("sift install codex --scope global --yes")}`,
           `  ${ui.command("sift agent install codex --dry-run")}`,
           `  ${ui.command("sift agent install codex --dry-run --raw")}`,
           `  ${ui.command("sift agent status")}`,
