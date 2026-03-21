@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import YAML from "yaml";
 import { describe, expect, it } from "vitest";
-import { runDistCli, runSourceCli, runSourceCliAsync } from "./helpers/cli.js";
+import { runSourceCli, runSourceCliAsync } from "./helpers/cli.js";
 
 describe("CLI smoke", () => {
   it("prints help", () => {
@@ -139,14 +139,14 @@ describe("CLI smoke", () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-home-"));
     const expectedPath = path.join(home, ".config", "sift", "config.yaml");
 
-    const init = runDistCli({
+    const init = runSourceCli({
       args: ["config", "init", "--global"],
       env: {
         HOME: home
       }
     });
 
-    const validate = runDistCli({
+    const validate = runSourceCli({
       args: ["config", "validate"],
       cwd: home,
       env: {
@@ -184,7 +184,7 @@ describe("CLI smoke", () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-use-home-"));
     const expectedPath = path.join(home, ".config", "sift", "config.yaml");
 
-    const use = runDistCli({
+    const use = runSourceCli({
       args: ["config", "use", "openrouter"],
       cwd: home,
       env: {
@@ -211,7 +211,7 @@ describe("CLI smoke", () => {
   it("fails config use when no saved key or provider env key exists", async () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-use-fail-home-"));
 
-    const result = runDistCli({
+    const result = runSourceCli({
       args: ["config", "use", "openrouter"],
       cwd: home,
       env: {
@@ -376,7 +376,7 @@ describe("CLI smoke", () => {
 
   it("reports api key presence from environment in doctor output", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
-    const result = runDistCli({
+    const result = runSourceCli({
       args: ["doctor"],
       cwd,
       env: {
@@ -402,7 +402,7 @@ describe("CLI smoke", () => {
 
     try {
       const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
-      const result = runDistCli({
+      const result = runSourceCli({
         args: ["doctor"],
         cwd,
         env: {
@@ -456,7 +456,7 @@ describe("CLI smoke", () => {
 
     try {
       const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
-      const result = runDistCli({
+      const result = runSourceCli({
         args: ["doctor"],
         cwd
       });
@@ -479,7 +479,7 @@ describe("CLI smoke", () => {
 
   it("accepts OPENAI_API_KEY for the openai provider", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
-    const result = runDistCli({
+    const result = runSourceCli({
       args: ["doctor"],
       cwd,
       env: {
@@ -497,7 +497,7 @@ describe("CLI smoke", () => {
 
   it("still accepts OPENAI_API_KEY for the default OpenAI-compatible endpoint", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
-    const result = runDistCli({
+    const result = runSourceCli({
       args: ["doctor"],
       cwd,
       env: {
@@ -514,7 +514,7 @@ describe("CLI smoke", () => {
 
   it("accepts OPENROUTER_API_KEY for the openrouter provider defaults", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
-    const result = runDistCli({
+    const result = runSourceCli({
       args: ["doctor"],
       cwd,
       env: {
@@ -533,7 +533,7 @@ describe("CLI smoke", () => {
   it("fails doctor when api key is missing for openai-compatible", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-home-"));
-    const result = runDistCli({
+    const result = runSourceCli({
       args: ["doctor"],
       cwd,
       env: {
@@ -553,7 +553,7 @@ describe("CLI smoke", () => {
   it("fails doctor when api key is missing for openrouter", async () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-doctor-"));
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-home-"));
-    const result = runDistCli({
+    const result = runSourceCli({
       args: ["doctor"],
       cwd,
       env: {
