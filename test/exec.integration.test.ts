@@ -119,17 +119,30 @@ describe("runExec integration", () => {
 
   it("normalizes npm-style wrapper output before reduction and short-circuits silent typecheck success", async () => {
     const { runExec } = await import("../src/core/exec.js");
+    const originalNpmConfigUserconfig = process.env.npm_config_userconfig;
+    const warnConfigPath = path.join(os.tmpdir(), `sift-npm-warn-${Date.now()}.npmrc`);
+    fs.writeFileSync(warnConfigPath, "always-auth=true\n", "utf8");
+    process.env.npm_config_userconfig = warnConfigPath;
 
-    await expect(
-      runExec(
-        makeRequest({
-          presetName: "typecheck-summary",
-          format: "bullets",
-          shellCommand: "npm run typecheck",
-          command: undefined
-        })
-      )
-    ).resolves.toBe(0);
+    try {
+      await expect(
+        runExec(
+          makeRequest({
+            presetName: "typecheck-summary",
+            format: "bullets",
+            shellCommand: "npm run typecheck",
+            command: undefined
+          })
+        )
+      ).resolves.toBe(0);
+    } finally {
+      if (originalNpmConfigUserconfig === undefined) {
+        delete process.env.npm_config_userconfig;
+      } else {
+        process.env.npm_config_userconfig = originalNpmConfigUserconfig;
+      }
+      fs.rmSync(warnConfigPath, { force: true });
+    }
 
     expect(runSiftWithStatsMock).not.toHaveBeenCalled();
     expect(stdout).toContain("No type errors.");
@@ -141,6 +154,10 @@ describe("runExec integration", () => {
       stats: null
     });
     const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "sift-exec-int-typecheck-"));
+    const warnConfigPath = path.join(cwd, ".npmrc-ci-warning");
+    const originalNpmConfigUserconfig = process.env.npm_config_userconfig;
+    fs.writeFileSync(warnConfigPath, "always-auth=true\n", "utf8");
+    process.env.npm_config_userconfig = warnConfigPath;
     fs.writeFileSync(
       path.join(cwd, "package.json"),
       JSON.stringify(
@@ -172,17 +189,25 @@ describe("runExec integration", () => {
 
     const { runExec } = await import("../src/core/exec.js");
 
-    await expect(
-      runExec(
-        makeRequest({
-          cwd,
-          presetName: "typecheck-summary",
-          format: "bullets",
-          shellCommand: "npm run typecheck",
-          command: undefined
-        })
-      )
-    ).resolves.toBe(1);
+    try {
+      await expect(
+        runExec(
+          makeRequest({
+            cwd,
+            presetName: "typecheck-summary",
+            format: "bullets",
+            shellCommand: "npm run typecheck",
+            command: undefined
+          })
+        )
+      ).resolves.toBe(1);
+    } finally {
+      if (originalNpmConfigUserconfig === undefined) {
+        delete process.env.npm_config_userconfig;
+      } else {
+        process.env.npm_config_userconfig = originalNpmConfigUserconfig;
+      }
+    }
 
     expect(runSiftWithStatsMock).toHaveBeenCalledWith(
       expect.objectContaining({

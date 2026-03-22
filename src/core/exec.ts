@@ -184,7 +184,40 @@ export function normalizeScriptWrapperOutput(args: {
     }
   };
 
+  const stripLeadingWrapperNoise = () => {
+    let removed = false;
+
+    while (lines.length > 0) {
+      const line = lines[0]!;
+      const trimmed = line.trim();
+
+      if (trimmed === "") {
+        lines.shift();
+        removed = true;
+        continue;
+      }
+
+      if (
+        /^(?:npm|pnpm)\s+warn\s+unknown user config\b/i.test(trimmed) ||
+        /^npm\s+warn\s+config\b/i.test(trimmed) ||
+        /^yarn\s+warning\b/i.test(trimmed) ||
+        /^bun\s+warn\b/i.test(trimmed)
+      ) {
+        lines.shift();
+        removed = true;
+        continue;
+      }
+
+      break;
+    }
+
+    if (removed) {
+      trimBlankEdges();
+    }
+  };
+
   trimBlankEdges();
+  stripLeadingWrapperNoise();
 
   if (kind === "npm" || kind === "pnpm") {
     let removed = 0;
@@ -192,6 +225,7 @@ export function normalizeScriptWrapperOutput(args: {
       lines.shift();
       removed += 1;
     }
+    trimBlankEdges();
   }
 
   if (kind === "yarn") {
