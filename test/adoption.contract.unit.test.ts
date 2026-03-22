@@ -63,7 +63,7 @@ describe("adoption contract", () => {
 
     expect(readme).toContain("If you are new, start here");
     expect(readme).toContain("use `sift exec` for the normal first pass");
-    expect(readme).toContain("sift hook match -- pytest -q");
+    expect(readme).toContain("use `sift hook` only as an optional beta shortcut");
     expect(readme).not.toContain("sift hook run -- pytest -q");
 
     expect(cliReference).toContain("If you are new, ignore the lower-level surfaces for now");

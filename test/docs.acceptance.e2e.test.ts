@@ -11,23 +11,20 @@ describe("README quick start e2e", () => {
     const readme = await fs.readFile(path.join(root, "README.md"), "utf8");
     const cliReference = await fs.readFile(path.join(root, "docs", "cli-reference.md"), "utf8");
 
+    expect(readme).toContain("Turn noisy command output into a short, actionable first pass");
+    expect(readme).toContain("not a generic repo summarizer");
     expect(readme).toContain("agent-escalation");
     expect(readme).toContain("provider-assisted");
     expect(readme).toContain("local-only");
-    expect(readme).toContain("gpt-5-nano");
-    expect(readme).toContain("gpt-5.4-nano");
-    expect(readme).toContain("sift hook match -- pytest -q");
-    expect(readme).toContain("unknown commands pass through untouched");
-    expect(readme).toContain("use `sift exec` for the normal first pass");
-    expect(readme).toContain("What Sift Will Touch");
-    expect(readme).toContain("narrow safety assist");
-    expect(readme).toContain("extraRiskPatterns");
+    expect(readme).toContain("sift exec --preset test-status -- pytest -q");
+    expect(readme).toContain("sift rerun --remaining --detail focused");
+    expect(readme).toContain("one replayed end-to-end debug loop");
+    expect(readme).toContain("sift hook` only as an optional beta shortcut");
     expect(readme).toContain("sift gain");
     expect(readme).toContain("sift discover");
-    expect(readme).toContain("local history only");
-    expect(readme).toContain("metadata only");
-    expect(readme).toContain("sift install cursor");
-    expect(readme).toContain(".cursor/skills/sift/SKILL.md");
+    expect(readme).toContain("metadata-only first-pass history");
+    expect(readme).toContain("sift` does **not** write shell rc files, PATH entries, git hooks, or arbitrary repo files during install");
+    expect(readme).toContain("npm run setup:hooks");
     expect(readme).not.toContain("sift hook run -- pytest -q");
 
     expect(cliReference).toContain("agent-escalation");

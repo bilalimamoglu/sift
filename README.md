@@ -241,6 +241,12 @@ sift discover
 
 If you want the full install, ownership, and touched-files details, see [docs/cli-reference.md](docs/cli-reference.md). The short version: `sift` does **not** write shell rc files, PATH entries, git hooks, or arbitrary repo files during install.
 
+If you want this repo's tracked pre-push verification hook to actually run on your machine, you still need to activate it once:
+
+```bash
+npm run setup:hooks
+```
+
 ---
 
 ## Test Debugging Workflow
