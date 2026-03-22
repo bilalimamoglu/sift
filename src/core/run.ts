@@ -195,7 +195,8 @@ function withInsufficientHint(args: {
     presetName: args.request.presetName,
     originalLength: args.prepared.meta.originalLength,
     truncatedApplied: args.prepared.meta.truncatedApplied,
-    recognizedRunner: detectTestRunner(args.prepared.redacted)
+    recognizedRunner: detectTestRunner(args.prepared.redacted),
+    inputText: args.prepared.redacted
   });
 
   if (args.responseMode === "text") {

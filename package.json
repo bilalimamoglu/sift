@@ -20,6 +20,7 @@
   "packageManager": "npm@11.8.0",
   "scripts": {
     "build": "tsup",
+    "bench": "node --import tsx scripts/bench/test-status-ab.ts --real --live",
     "bench:history": "node --import tsx scripts/bench/generate-version-history.ts --since v0.3.0",
     "bench:test-status-ab": "node --import tsx scripts/bench/test-status-ab.ts",
     "bench:test-status-live": "node --import tsx scripts/bench/test-status-ab.ts --live",

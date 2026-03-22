@@ -1,4 +1,4 @@
-export type TestStatusShowcaseSourceType = "synthetic-derived" | "repo-captured";
+import { loadScenarioFamily } from "../../scenarios/catalog.js";
 
 export interface TestStatusShowcaseCase {
   id: string;
@@ -11,35 +11,19 @@ export interface TestStatusShowcaseCase {
   companionOutputPath: string;
 }
 
-export const testStatusShowcaseCases: TestStatusShowcaseCase[] = [
-  {
-    id: "pytest-mixed-suite",
-    fixtureName: "mixed-full-suite-real",
-    docsSlug: "08-pytest-mixed-suite",
-    renderMode: "standard",
-    title: "Pytest Mixed Suite",
-    sourceType: "repo-captured",
-    rawPath: "test/fixtures/bench/test-status/real/mixed-full-suite.txt",
-    companionOutputPath: "examples/test-status/mixed-full-suite-real.standard.txt"
-  },
-  {
-    id: "vitest-mixed-failures",
-    fixtureName: "vitest-mixed-js",
-    docsSlug: "09-vitest-mixed-failures",
-    renderMode: "standard",
-    title: "Vitest Mixed Failures",
-    sourceType: "synthetic-derived",
-    rawPath: "test/fixtures/bench/test-status/synthetic/vitest-mixed-js.txt",
-    companionOutputPath: "examples/test-status/vitest-mixed-js.standard.txt"
-  },
-  {
-    id: "test-status-diagnose-json",
-    fixtureName: "mixed-full-suite-real",
-    docsSlug: "10-test-status-diagnose-json",
-    renderMode: "diagnose-json",
-    title: "Test Status Diagnose JSON",
-    sourceType: "repo-captured",
-    rawPath: "test/fixtures/bench/test-status/real/mixed-full-suite.txt",
-    companionOutputPath: "examples/test-status/mixed-full-suite-real.diagnose.json"
-  }
-];
+export type TestStatusShowcaseSourceType = "synthetic-derived" | "repo-captured";
+
+export const testStatusShowcaseCases: TestStatusShowcaseCase[] = loadScenarioFamily("test-status")
+  .flatMap((scenario) =>
+    scenario.renders.map((render) => ({
+      id: render.id,
+      fixtureName: scenario.fixtureName,
+      docsSlug: render.docsSlug,
+      renderMode: render.renderMode,
+      title: render.title,
+      sourceType: scenario.sourceType,
+      rawPath: scenario.rawPath,
+      companionOutputPath: render.companionOutputPath
+    }))
+  )
+  .sort((left, right) => left.docsSlug.localeCompare(right.docsSlug));

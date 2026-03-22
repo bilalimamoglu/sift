@@ -29,10 +29,10 @@ function buildEvent(overrides: Partial<HistoryEvent> = {}): HistoryEvent {
     layer: "heuristic",
     detail: null,
     resultKind: "reduced",
-    inputChars: 400,
-    outputChars: 120,
-    estimatedInputTokens: 100,
-    estimatedOutputTokens: 30,
+    inputChars: 4_000,
+    outputChars: 600,
+    estimatedInputTokens: 1_000,
+    estimatedOutputTokens: 150,
     exactProviderTokens: null,
     durationMs: 42,
     safetySuppressedLineCount: 0,
@@ -79,10 +79,10 @@ describe("history core", () => {
         presetName: "typecheck-summary",
         commandFamily: "npm run typecheck",
         candidatePresetName: "typecheck-summary",
-        inputChars: 800,
-        outputChars: 200,
-        estimatedInputTokens: 200,
-        estimatedOutputTokens: 50,
+        inputChars: 8_000,
+        outputChars: 1_200,
+        estimatedInputTokens: 2_000,
+        estimatedOutputTokens: 300,
         safetySuppressedLineCount: 1
       }),
       buildEvent({
@@ -118,17 +118,22 @@ describe("history core", () => {
     });
 
     expect(summary.totalRuns).toBe(3);
+    expect(summary.meaningfulRuns).toBe(3);
+    expect(summary.lowSignalRuns).toBe(0);
     expect(summary.insufficientRuns).toBe(1);
     expect(summary.safetySuppressionRuns).toBe(1);
     expect(summary.measuredDurationRuns).toBe(3);
     expect(report).toContain("Sift gain (all local history)");
+    expect(report).toContain("Meaningful runs: 3");
+    expect(report).toContain("Low-signal runs: 0");
     expect(report).toContain("Estimated output reduction");
     expect(report).toContain("Observed runtime:");
     expect(report).toContain("Top presets:");
-    expect(report).toContain("Notes: size/token savings are local estimates");
+    expect(report).toContain("evidence is still exploratory");
+    expect(report).toContain("Notes: size/token savings above use meaningful runs only.");
   });
 
-  it("keeps discover quiet on thin evidence and emits hints only on repeated patterns", () => {
+  it("keeps discover quiet on thin evidence and emits hints only on repeated meaningful patterns", () => {
     const thinEvents = [buildEvent(), buildEvent(), buildEvent(), buildEvent()];
     expect(buildDiscoverHints(thinEvents)).toEqual([]);
     expect(
@@ -167,6 +172,99 @@ describe("history core", () => {
     expect(report).toContain("Sift discover (all local history)");
     expect(report).toContain("Built-in preset fit: typecheck-summary");
     expect(report).toContain("Repeated explicit pytest runs");
+  });
+
+  it("filters tiny high-contamination preset samples out of strategic gain conclusions", () => {
+    const summary = summarizeHistory([
+      buildEvent({
+        presetName: "build-failure",
+        commandFamily: "node",
+        inputChars: 10,
+        outputChars: 14,
+        estimatedInputTokens: 3,
+        estimatedOutputTokens: 4
+      }),
+      buildEvent({
+        presetName: "build-failure",
+        commandFamily: "node",
+        inputChars: 12,
+        outputChars: 14,
+        estimatedInputTokens: 3,
+        estimatedOutputTokens: 4
+      }),
+      buildEvent({
+        presetName: "typecheck-summary",
+        commandFamily: "npm run typecheck",
+        inputChars: 120,
+        outputChars: 40,
+        estimatedInputTokens: 30,
+        estimatedOutputTokens: 10
+      })
+    ]);
+
+    const report = renderGainReport({
+      summary,
+      events: [
+        buildEvent({
+          presetName: "build-failure",
+          commandFamily: "node",
+          inputChars: 10,
+          outputChars: 14,
+          estimatedInputTokens: 3,
+          estimatedOutputTokens: 4
+        }),
+        buildEvent({
+          presetName: "build-failure",
+          commandFamily: "node",
+          inputChars: 12,
+          outputChars: 14,
+          estimatedInputTokens: 3,
+          estimatedOutputTokens: 4
+        }),
+        buildEvent({
+          presetName: "typecheck-summary",
+          commandFamily: "npm run typecheck",
+          inputChars: 120,
+          outputChars: 40,
+          estimatedInputTokens: 30,
+          estimatedOutputTokens: 10
+        })
+      ],
+      byPreset: true
+    });
+
+    expect(summary.meaningfulRuns).toBe(0);
+    expect(summary.lowSignalRuns).toBe(3);
+    expect(summary.topPresets[0]?.confidenceBucket).toBe("exploratory");
+    expect(summary.topPresets[0]?.contaminationRate).toBe(1);
+    expect(report).toContain("Low-signal runs: 3");
+    expect(report).toContain("Confidence note:");
+    expect(report).toContain("build-failure: 2 run(s), 0 meaningful, 2 low-signal, evidence is still exploratory, 100% low-signal contamination");
+    expect(report).toContain("roughly neutral");
+  });
+
+  it("keeps discover quiet when repeated misses are still trivial", () => {
+    const trivialMisses = Array.from({ length: 6 }, (_, index) =>
+      buildEvent({
+        timestamp: `2026-03-22T10:02:0${index}.000Z`,
+        commandFamily: "npm run typecheck",
+        presetName: null,
+        candidatePresetName: "typecheck-summary",
+        inputChars: 120,
+        outputChars: 30,
+        estimatedInputTokens: 30,
+        estimatedOutputTokens: 8
+      })
+    );
+
+    const hints = buildDiscoverHints(trivialMisses);
+    expect(hints).toEqual([]);
+    expect(
+      renderDiscoverReport({
+        events: trivialMisses,
+        hints
+      })
+    ).toContain("No strong discover hints");
   });
 
   it("clears local history state", async () => {

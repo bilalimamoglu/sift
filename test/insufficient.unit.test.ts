@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildInsufficientSignalOutput,
+  classifyEvidenceShape,
   isInsufficientSignalOutput
 } from "../src/core/insufficient.js";
 
@@ -81,7 +82,8 @@ describe("insufficient signal helpers", () => {
         presetName: "lint-failures",
         originalLength: 20,
         truncatedApplied: false,
-        recognizedRunner: "pytest"
+        recognizedRunner: "pytest",
+        inputText: "============================= test session starts =============================\nFAILED tests/test_app.py::test_it_works"
       })
     ).toContain(
       "Hint: captured output looks like pytest test output; try --preset test-status."
@@ -95,7 +97,80 @@ describe("insufficient signal helpers", () => {
         originalLength: 100,
         truncatedApplied: false,
         exitCode: 0,
-        recognizedRunner: "pytest"
+        recognizedRunner: "pytest",
+        inputText: "============================= test session starts =============================\nFAILED tests/test_app.py::test_it_works"
+      })
+    ).not.toContain("try --preset test-status");
+  });
+
+  it("classifies common repo evidence shapes", () => {
+    expect(
+      classifyEvidenceShape("# README\n\n- Install with npm\n- Run sift exec first\n")
+    ).toBe("prose-doc");
+    expect(
+      classifyEvidenceShape("src/commands/install.ts:42:  io.write('hello')\ndocs/cli-reference.md:15: run sift exec first")
+    ).toBe("grep-hits");
+    expect(
+      classifyEvidenceShape("src/commands/install.ts\nsrc/core/run.ts\ndocs/cli-reference.md\n")
+    ).toBe("path-list");
+    expect(
+      classifyEvidenceShape("src/core/run.ts | 14 +++++++---\ntest/history.unit.test.ts | 9 +++++-\n2 files changed, 18 insertions(+), 5 deletions(-)\n")
+    ).toBe("diff-stat");
+    expect(
+      classifyEvidenceShape('{\n  "name": "sift",\n  "version": "0.5.0"\n}\n')
+    ).toBe("structured-data");
+  });
+
+  it("uses repo-evidence-aware hints instead of test hints", () => {
+    expect(
+      buildInsufficientSignalOutput({
+        presetName: "lint-failures",
+        originalLength: 120,
+        truncatedApplied: false,
+        recognizedRunner: "pytest",
+        inputText: "# README\n\n- Install with npm\n- Run sift exec first\n"
+      })
+    ).toContain("captured output looks like prose or markdown");
+
+    expect(
+      buildInsufficientSignalOutput({
+        presetName: "lint-failures",
+        originalLength: 120,
+        truncatedApplied: false,
+        recognizedRunner: "pytest",
+        inputText: "src/commands/install.ts:42:  io.write('hello')\ndocs/cli-reference.md:15: run sift exec first"
+      })
+    ).toContain("captured output looks like code-search results");
+
+    expect(
+      buildInsufficientSignalOutput({
+        presetName: "lint-failures",
+        originalLength: 120,
+        truncatedApplied: false,
+        recognizedRunner: "pytest",
+        inputText: "src/commands/install.ts\nsrc/core/run.ts\ndocs/cli-reference.md\n"
+      })
+    ).toContain("captured output looks like a file/path listing");
+
+    expect(
+      buildInsufficientSignalOutput({
+        presetName: "lint-failures",
+        originalLength: 120,
+        truncatedApplied: false,
+        recognizedRunner: "pytest",
+        inputText: '{\n  "name": "sift",\n  "version": "0.5.0"\n}\n'
+      })
+    ).toContain("captured output looks like structured config or JSON text");
+  });
+
+  it("suppresses runner suggestions for non-test repo evidence", () => {
+    expect(
+      buildInsufficientSignalOutput({
+        presetName: "lint-failures",
+        originalLength: 120,
+        truncatedApplied: false,
+        recognizedRunner: "pytest",
+        inputText: "# README\n\n- Install with npm\n- Run sift exec first\n"
       })
     ).not.toContain("try --preset test-status");
   });

@@ -89,7 +89,11 @@ tests/contracts/test_frontend_catalog_payload.py::test_provider_capabilities_pay
       "line": null,
       "why": "it contains the PGTEST_POSTGRES_DSN setup guard",
       "bucket_index": 1,
+      "anchor_kind": "test_label",
+      "anchor_confidence": 0.72,
       "context_hint": {
+        "kind": "search_only",
+        "confidence": 0.72,
         "start_line": null,
         "end_line": null,
         "search_hint": "PGTEST_POSTGRES_DSN"
@@ -100,7 +104,11 @@ tests/contracts/test_frontend_catalog_payload.py::test_provider_capabilities_pay
       "line": null,
       "why": "it maps to the visible route drift bucket",
       "bucket_index": 2,
+      "anchor_kind": "test_label",
+      "anchor_confidence": 0.72,
       "context_hint": {
+        "kind": "search_only",
+        "confidence": 0.72,
         "start_line": null,
         "end_line": null,
         "search_hint": "/api/v1/admin/landing-gallery"
@@ -144,8 +152,8 @@ tests/contracts/test_frontend_catalog_payload.py::test_provider_capabilities_pay
 ## Impact
 
 - Raw: `816753` chars / `195406` tokens
-- Reduced: `3553` chars / `945` tokens
-- Reduction: `99.52%`
+- Reduced: `3807` chars / `1019` tokens
+- Reduction: `99.48%`
 
 ## Related Files
 

@@ -88,6 +88,21 @@ describe("siftConfigSchema", () => {
     expect(parsed.providerProfiles?.openrouter?.apiKey).toBe("or-key");
   });
 
+  it("accepts the built-in contract-drift policy", () => {
+    const parsed = siftConfigSchema.parse({
+      ...defaultConfig,
+      presets: {
+        drift: {
+          question: "What drift is visible?",
+          format: "bullets",
+          policy: "contract-drift"
+        }
+      }
+    });
+
+    expect(parsed.presets.drift?.policy).toBe("contract-drift");
+  });
+
   it("accepts all supported runtime operation modes", () => {
     expect(
       siftConfigSchema.parse({

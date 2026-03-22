@@ -295,6 +295,34 @@ function buildContractVsSnapshotOutput(): string {
   ].join("\n");
 }
 
+function buildStandaloneContractDriftOutput(): string {
+  return [
+    "Contract freeze check failed.",
+    "python scripts/update_contract_snapshots.py",
+    "- '/api/v1/admin/landing-gallery'",
+    "- 'openai-gpt-image-1.5'",
+    "expected task matrix to stay frozen"
+  ].join("\n");
+}
+
+function buildGeneratedArtifactDriftOutput(): string {
+  return [
+    "Generated client artifact is out of sync with the current OpenAPI schema.",
+    "Please run pnpm generate:client",
+    "- '/api/v1/users'",
+    "- 'gpt-4.1-mini'"
+  ].join("\n");
+}
+
+function buildContractDriftFalsePositiveOutput(): string {
+  return [
+    "Build failed while booting preview server.",
+    "ECONNREFUSED 127.0.0.1:5432",
+    "Missing environment variable: DATABASE_URL",
+    "See logs for details."
+  ].join("\n");
+}
+
 function buildTscStandardErrors(): string {
   return [
     "src/components/UserCard.tsx(12,3): error TS2322: Type 'string' is not assignable to type 'number'.",
@@ -1480,6 +1508,27 @@ describe("heuristic policies", () => {
     );
   });
 
+  it("short-circuits a narrow standalone contract-drift preset", () => {
+    const output = applyHeuristicPolicy("contract-drift", buildStandaloneContractDriftOutput());
+
+    expect(output).toMatch(/(?:Contract|OpenAPI) drift detected\./);
+    expect(output).toContain("/api/v1/admin/landing-gallery");
+    expect(output).toContain("openai-gpt-image-1.5");
+    expect(output).toContain("python scripts/update_contract_snapshots.py");
+  });
+
+  it("recognizes generated artifact drift for the standalone preset", () => {
+    const output = applyHeuristicPolicy("contract-drift", buildGeneratedArtifactDriftOutput());
+
+    expect(output).toContain("Generated artifact drift detected.");
+    expect(output).toContain("pnpm generate:client");
+    expect(output).toContain("/api/v1/users");
+  });
+
+  it("keeps env and connection failures out of standalone contract-drift", () => {
+    expect(applyHeuristicPolicy("contract-drift", buildContractDriftFalsePositiveOutput())).toBeNull();
+  });
+
   it("parses mixed jest failures into configuration and snapshot buckets", () => {
     const input = buildJestMixedFailureOutput();
     const analysis = analyzeTestStatus(input);
@@ -1550,6 +1599,8 @@ describe("heuristic policies", () => {
       "Fix bucket 1 first, then rerun the full suite at standard."
     );
     expect(decision.contract.read_targets[0]?.context_hint).toEqual({
+      kind: "search_only",
+      confidence: 0.72,
       start_line: null,
       end_line: null,
       search_hint: "PGTEST_POSTGRES_DSN"
@@ -1722,7 +1773,11 @@ describe("heuristic policies", () => {
       line: 374,
       why: "it contains the PGTEST_POSTGRES_DSN setup guard",
       bucket_index: 1,
+      anchor_kind: "traceback",
+      anchor_confidence: 1,
       context_hint: {
+        kind: "exact_window",
+        confidence: 1,
         start_line: 369,
         end_line: 379,
         search_hint: null

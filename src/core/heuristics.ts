@@ -1931,6 +1931,12 @@ interface ContractDriftEntities {
   snapshotKeys: string[];
 }
 
+const CONTRACT_DRIFT_STRONG_PATTERN =
+  /(snapshot(?:\s+`[^`]+`)?\s+(?:mismatch(?:ed)?|expectations?\s+differ|is out of date)|golden output drift|expected .+ to stay frozen|generated (?:client|artifact|schema).+(?:out of sync|out of date)|openapi.+(?:frozen|out of sync|drift)|manifest.+(?:frozen|out of sync|drift)|contract.+(?:frozen|out of sync|drift))/i;
+const CONTRACT_DRIFT_LABEL_PATTERN = /(freeze|contract|manifest|openapi|golden|snapshot)/i;
+const CONTRACT_DRIFT_EXCLUDE_PATTERN =
+  /(ECONNREFUSED|connection refused|missing env|environment variable|port .* in use|Cannot find name|Type '.*' is not assignable|Module not found|Failed to resolve import|Cannot use import statement outside a module)/i;
+
 function collectFailureLabels(input: string): VisibleFailureLabel[] {
   const labels: VisibleFailureLabel[] = [];
   const seen = new Set<string>();
@@ -2361,6 +2367,106 @@ function synthesizeImportDependencyBucket(args: {
 
 function isContractDriftLabel(label: string): boolean {
   return /(freeze|contract|manifest|openapi|golden)/i.test(label);
+}
+
+function collectContractDriftEvidence(input: string): string[] {
+  const evidence: string[] = [];
+  const lines = stripAnsiText(input).split("\n").map((line) => line.trim()).filter(Boolean);
+
+  for (const line of lines) {
+    if (!CONTRACT_DRIFT_STRONG_PATTERN.test(line) && !CONTRACT_DRIFT_LABEL_PATTERN.test(line)) {
+      continue;
+    }
+
+    if (CONTRACT_DRIFT_EXCLUDE_PATTERN.test(line)) {
+      continue;
+    }
+
+    evidence.push(line);
+    if (evidence.length >= 4) {
+      break;
+    }
+  }
+
+  return evidence;
+}
+
+function inferContractDriftKind(input: string, evidence: string[]): string {
+  const source = [input, ...evidence].join("\n");
+  if (/generated (?:client|artifact|schema)/i.test(source)) {
+    return "generated artifact drift";
+  }
+
+  if (/golden output drift/i.test(source)) {
+    return "golden output drift";
+  }
+
+  if (/snapshot(?:\s+`[^`]+`)?\s+(?:mismatch(?:ed)?|expectations?\s+differ|is out of date)/i.test(source)) {
+    return "snapshot drift";
+  }
+
+  if (/openapi/i.test(source) || /\/api\//.test(source)) {
+    return "OpenAPI drift";
+  }
+
+  if (/manifest/i.test(source)) {
+    return "manifest drift";
+  }
+
+  return "contract drift";
+}
+
+function buildContractDriftHint(input: string): string {
+  const explicitCommand = input.match(
+    /\b(?:python|node|pnpm|npm|bun|make)\s+[^\n]*(?:update|generate|regen|refresh|freeze)[^\n]*/i
+  );
+
+  if (explicitCommand) {
+    return `If the changes are intentional, run ${explicitCommand[0]} and rerun the drift check.`;
+  }
+
+  return "If the changes are intentional, regenerate or refresh the expected artifact and rerun the drift check.";
+}
+
+function contractDriftHeuristic(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (CONTRACT_DRIFT_EXCLUDE_PATTERN.test(trimmed) && !CONTRACT_DRIFT_STRONG_PATTERN.test(trimmed)) {
+    return null;
+  }
+
+  const evidence = collectContractDriftEvidence(trimmed);
+  const entities = extractContractDriftEntities(trimmed);
+  const entityMentions = [
+    ...entities.apiPaths,
+    ...entities.modelIds,
+    ...entities.taskKeys,
+    ...entities.snapshotKeys
+  ].slice(0, 4);
+  const driftKind = inferContractDriftKind(trimmed, evidence);
+
+  const hasStrongSignal =
+    CONTRACT_DRIFT_STRONG_PATTERN.test(trimmed) ||
+    evidence.some((line) => CONTRACT_DRIFT_STRONG_PATTERN.test(line));
+  const hasLabelPlusEntities =
+    evidence.some((line) => CONTRACT_DRIFT_LABEL_PATTERN.test(line)) && entityMentions.length > 0;
+
+  if (!hasStrongSignal && !hasLabelPlusEntities) {
+    return null;
+  }
+
+  const lines = [`- ${driftKind[0]!.toUpperCase()}${driftKind.slice(1)} detected.`];
+  if (entityMentions.length > 0) {
+    lines.push(`- Visible drift touches ${entityMentions.join(", ")}.`);
+  } else if (evidence.length > 0) {
+    lines.push(`- Visible evidence: ${evidence[0]}.`);
+  }
+  lines.push(`- ${buildContractDriftHint(trimmed)}`);
+
+  return lines.join("\n");
 }
 
 function looksLikeTaskKey(value: string): boolean {
@@ -3871,6 +3977,10 @@ export function applyHeuristicPolicy(
 
   if (policyName === "build-failure") {
     return buildFailureHeuristic(input);
+  }
+
+  if (policyName === "contract-drift") {
+    return contractDriftHeuristic(input);
   }
 
   return null;

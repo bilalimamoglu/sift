@@ -16,6 +16,10 @@ describe("getPreset", () => {
       format: "bullets",
       policy: "lint-failures"
     });
+    expect(getPreset(defaultConfig, "contract-drift")).toMatchObject({
+      format: "bullets",
+      policy: "contract-drift"
+    });
   });
 
   it("throws for an unknown preset", () => {

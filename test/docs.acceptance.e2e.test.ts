@@ -326,7 +326,9 @@ describe("README quick start e2e", () => {
       expect(outputs[20]).toContain("name: sift");
       expect(outputs[21]).toContain("Cursor skill preview");
       expect(outputs[22]).toContain("Sift gain");
-      expect(outputs[22]).toContain("Notes: size/token savings are local estimates");
+      expect(outputs[22]).toContain("Meaningful runs:");
+      expect(outputs[22]).toContain("Low-signal runs:");
+      expect(outputs[22]).toContain("Notes: size/token savings above use meaningful runs only.");
       expect(outputs[23]).toMatch(/No strong discover hints|Sift discover/);
     } finally {
       await server.close();

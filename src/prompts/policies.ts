@@ -78,6 +78,18 @@ const BUILT_IN_POLICIES: Record<PromptPolicyName, Omit<PromptPolicy, "sharedRule
       `If the root cause is not visible, reply exactly with: ${INSUFFICIENT_SIGNAL_TEXT}`
     ]
   },
+  "contract-drift": {
+    name: "contract-drift",
+    responseMode: "text",
+    taskRules: [
+      "Return at most 4 short bullet points.",
+      "Use this policy only for explicit drift signals: snapshot drift, golden output drift, frozen manifest or contract drift, OpenAPI drift, or generated artifact mismatch.",
+      "State the visible drift type and the smallest concrete entities that appear in the output, such as API paths, model ids, manifest keys, or snapshot names.",
+      "Recommend regenerate, refresh, or re-freeze only when the input explicitly shows expected-vs-generated drift.",
+      "Do not broaden into generic repository analysis, plain diffs, path lists, config review, or environment troubleshooting.",
+      `If the input does not clearly show explicit drift evidence, reply exactly with: ${INSUFFICIENT_SIGNAL_TEXT}`
+    ]
+  },
   "log-errors": {
     name: "log-errors",
     responseMode: "text",

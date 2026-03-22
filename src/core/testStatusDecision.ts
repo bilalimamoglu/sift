@@ -54,7 +54,11 @@ export interface TestStatusReadTarget {
   line: number | null;
   why: string;
   bucket_index: number;
+  anchor_kind: "traceback" | "test_label" | "entity" | "none";
+  anchor_confidence: number;
   context_hint: {
+    kind: "exact_window" | "representative_window" | "search_only" | "none";
+    confidence: number;
     start_line: number | null;
     end_line: number | null;
     search_hint: string | null;
@@ -146,7 +150,7 @@ export interface TestStatusContractOverrides {
 }
 
 export const TEST_STATUS_DIAGNOSE_JSON_CONTRACT =
-  '{"status":"ok|insufficient","diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","remaining_mode":"none|subset_rerun|full_rerun_diff","primary_suspect_kind":"test|app_code|config|environment|tooling|unknown","confidence_reason":string,"dominant_blocker_bucket_index":number|null,"provider_used":boolean,"provider_confidence":number|null,"provider_failed":boolean,"raw_slice_used":boolean,"raw_slice_strategy":"none|bucket_evidence|traceback_window|head_tail","resolved_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_subset_available":boolean,"main_buckets":[{"bucket_index":number,"label":string,"count":number,"root_cause":string,"suspect_kind":"test|app_code|config|environment|tooling|unknown","fix_hint":string,"evidence":string[],"bucket_confidence":number,"root_cause_confidence":number,"dominant":boolean,"secondary_visible_despite_blocker":boolean,"mini_diff":{"added_paths"?:number,"removed_models"?:number,"changed_task_mappings"?:number}|null}],"read_targets":[{"file":string,"line":number|null,"why":string,"bucket_index":number,"context_hint":{"start_line":number|null,"end_line":number|null,"search_hint":string|null}}],"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string},"resolved_tests"?:string[],"remaining_tests"?:string[]}';
+  '{"status":"ok|insufficient","diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","remaining_mode":"none|subset_rerun|full_rerun_diff","primary_suspect_kind":"test|app_code|config|environment|tooling|unknown","confidence_reason":string,"dominant_blocker_bucket_index":number|null,"provider_used":boolean,"provider_confidence":number|null,"provider_failed":boolean,"raw_slice_used":boolean,"raw_slice_strategy":"none|bucket_evidence|traceback_window|head_tail","resolved_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_summary":{"count":number,"families":[{"prefix":string,"count":number}]},"remaining_subset_available":boolean,"main_buckets":[{"bucket_index":number,"label":string,"count":number,"root_cause":string,"suspect_kind":"test|app_code|config|environment|tooling|unknown","fix_hint":string,"evidence":string[],"bucket_confidence":number,"root_cause_confidence":number,"dominant":boolean,"secondary_visible_despite_blocker":boolean,"mini_diff":{"added_paths"?:number,"removed_models"?:number,"changed_task_mappings"?:number}|null}],"read_targets":[{"file":string,"line":number|null,"why":string,"bucket_index":number,"anchor_kind":"traceback|test_label|entity|none","anchor_confidence":number,"context_hint":{"kind":"exact_window|representative_window|search_only|none","confidence":number,"start_line":number|null,"end_line":number|null,"search_hint":string|null}}],"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string},"resolved_tests"?:string[],"remaining_tests"?:string[]}';
 export const TEST_STATUS_PROVIDER_SUPPLEMENT_JSON_CONTRACT =
   '{"diagnosis_complete":boolean,"raw_needed":boolean,"additional_source_read_likely_low_value":boolean,"read_raw_only_if":string|null,"decision":"stop|zoom|read_source|read_raw","provider_confidence":number|null,"bucket_supplements":[{"label":string,"count":number,"root_cause":string,"anchor":{"file":string|null,"line":number|null,"search_hint":string|null},"fix_hint":string|null,"confidence":number}],"next_best_action":{"code":"fix_dominant_blocker|read_source_for_bucket|read_raw_for_exact_traceback|insufficient_signal","bucket_index":number|null,"note":string}}';
 
@@ -248,7 +252,11 @@ export const testStatusDiagnoseContractSchema = z.object({
         line: z.number().int().nullable(),
         why: z.string().min(1),
         bucket_index: z.number().int(),
+        anchor_kind: z.enum(["traceback", "test_label", "entity", "none"]),
+        anchor_confidence: z.number().min(0).max(1),
         context_hint: z.object({
+          kind: z.enum(["exact_window", "representative_window", "search_only", "none"]),
+          confidence: z.number().min(0).max(1),
           start_line: z.number().int().nullable(),
           end_line: z.number().int().nullable(),
           search_hint: z.string().nullable()
@@ -1330,16 +1338,21 @@ function buildReadTargetContextHint(args: {
 }): TestStatusReadTarget["context_hint"] {
   if (args.anchor.line !== null) {
     return {
+      kind: args.anchor.anchor_kind === "traceback" ? "exact_window" : "representative_window",
+      confidence: args.anchor.anchor_confidence,
       start_line: Math.max(1, args.anchor.line - 5),
       end_line: args.anchor.line + 5,
       search_hint: null
     };
   }
 
+  const searchHint = buildReadTargetSearchHint(args.bucket, args.anchor);
   return {
+    kind: searchHint ? "search_only" : "none",
+    confidence: searchHint ? args.anchor.anchor_confidence : 0,
     start_line: null,
     end_line: null,
-    search_hint: buildReadTargetSearchHint(args.bucket, args.anchor)
+    search_hint: searchHint
   };
 }
 
@@ -1568,6 +1581,8 @@ function buildReadTargets(args: {
             bucketLabel
           }),
           bucket_index: bucketIndex,
+          anchor_kind: anchor.anchor_kind,
+          anchor_confidence: anchor.anchor_confidence,
           context_hint: buildReadTargetContextHint({
             bucket,
             anchor

@@ -585,4 +585,66 @@ describe("runSift hardening", () => {
     expect(output).toContain("does not expose a concrete compiler error");
     expect(server.requests).toHaveLength(1);
   });
+
+  it("short-circuits contract-drift through the heuristic path", async () => {
+    const preset = defaultConfig.presets["contract-drift"]!;
+
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [
+          {
+            message: {
+              content: "- provider fallback should not run"
+            }
+          }
+        ]
+      }
+    }));
+
+    const output = await runSift({
+      question: preset.question,
+      format: "bullets",
+      policyName: "contract-drift",
+      stdin: [
+        "Contract freeze check failed.",
+        "python scripts/update_contract_snapshots.py",
+        "- '/api/v1/admin/landing-gallery'",
+        "- 'openai-gpt-image-1.5'",
+        "expected task matrix to stay frozen"
+      ].join("\n"),
+      config: makeConfig(server.baseUrl)
+    });
+
+    expect(output).toMatch(/(?:Contract|OpenAPI) drift detected\./);
+    expect(output).toContain("/api/v1/admin/landing-gallery");
+    expect(server.requests).toHaveLength(0);
+  });
+
+  it("falls back to the provider for unsupported contract-drift input", async () => {
+    const preset = defaultConfig.presets["contract-drift"]!;
+
+    server = await createFakeOpenAIServer(() => ({
+      body: {
+        choices: [
+          {
+            message: {
+              content:
+                "- Contract drift is not proven from this output.\n- The visible signal looks like an environment blocker instead.\n- Check the missing env/config before treating it as drift."
+            }
+          }
+        ]
+      }
+    }));
+
+    const output = await runSift({
+      question: preset.question,
+      format: "bullets",
+      policyName: "contract-drift",
+      stdin: "ECONNREFUSED 127.0.0.1:5432 while booting preview server\nMissing environment variable: DATABASE_URL\n",
+      config: makeConfig(server.baseUrl)
+    });
+
+    expect(output).toContain("environment blocker");
+    expect(server.requests).toHaveLength(1);
+  });
 });

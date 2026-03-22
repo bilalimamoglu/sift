@@ -39,13 +39,20 @@ export interface RecordHistoryEventInput {
 export interface GainPresetSummary {
   presetName: string;
   runs: number;
+  meaningfulRuns: number;
+  lowSignalRuns: number;
   estimatedInputTokens: number;
   estimatedOutputTokens: number;
   providerSkippedRuns: number;
+  confidenceBucket: GainConfidenceBucket;
+  contaminationRate: number;
+  signalDirection: "positive" | "mixed" | "neutral";
 }
 
 export interface GainSummary {
   totalRuns: number;
+  meaningfulRuns: number;
+  lowSignalRuns: number;
   reducedRuns: number;
   providerSkippedRuns: number;
   insufficientRuns: number;
@@ -59,6 +66,32 @@ export interface GainSummary {
   totalDurationMs: number | null;
   safetySuppressionRuns: number;
   topPresets: GainPresetSummary[];
+}
+
+export type GainConfidenceBucket = "exploratory" | "emerging" | "credible" | "decision-grade";
+
+type WorkloadSizeBucket = "tiny" | "small" | "medium" | "large" | "very-large";
+type WorkloadMeaningfulness = "trivial" | "potentially-meaningful" | "meaningful" | "highly-meaningful";
+
+interface EventEvidenceAssessment {
+  sizeBucket: WorkloadSizeBucket;
+  meaningfulness: WorkloadMeaningfulness;
+  lowSignal: boolean;
+  discoverEligible: boolean;
+  strategyEligible: boolean;
+}
+
+interface PresetEvidenceSummary {
+  presetName: string;
+  runs: number;
+  meaningfulRuns: number;
+  lowSignalRuns: number;
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
+  providerSkippedRuns: number;
+  signalDirection: "positive" | "mixed" | "neutral";
+  confidenceBucket: GainConfidenceBucket;
+  contaminationRate: number;
 }
 
 export interface DiscoverHint {
@@ -77,6 +110,144 @@ export interface HistoryReadOptions {
 
 function estimateTokenCount(textLength: number): number {
   return Math.max(1, Math.ceil(textLength / 4));
+}
+
+function classifyWorkloadSize(event: Pick<HistoryEvent, "inputChars" | "estimatedInputTokens">): WorkloadSizeBucket {
+  if (event.inputChars >= 50_000 || event.estimatedInputTokens >= 12_500) {
+    return "very-large";
+  }
+  if (event.inputChars >= 10_000 || event.estimatedInputTokens >= 2_500) {
+    return "large";
+  }
+  if (event.inputChars >= 2_000 || event.estimatedInputTokens >= 500) {
+    return "medium";
+  }
+  if (event.inputChars >= 300 || event.estimatedInputTokens >= 75) {
+    return "small";
+  }
+  return "tiny";
+}
+
+function hasHighTinyContaminationRisk(presetName: string | null): boolean {
+  return presetName === "typecheck-summary" || presetName === "build-failure";
+}
+
+function assessHistoryEvent(event: HistoryEvent): EventEvidenceAssessment {
+  const sizeBucket = classifyWorkloadSize(event);
+  const highRiskPreset = hasHighTinyContaminationRisk(event.presetName);
+
+  if (sizeBucket === "tiny") {
+    return {
+      sizeBucket,
+      meaningfulness: "trivial",
+      lowSignal: true,
+      discoverEligible: false,
+      strategyEligible: false
+    };
+  }
+
+  if (highRiskPreset && sizeBucket === "small") {
+    return {
+      sizeBucket,
+      meaningfulness: "trivial",
+      lowSignal: true,
+      discoverEligible: false,
+      strategyEligible: false
+    };
+  }
+
+  if (sizeBucket === "small") {
+    return {
+      sizeBucket,
+      meaningfulness: "potentially-meaningful",
+      lowSignal: true,
+      discoverEligible: false,
+      strategyEligible: false
+    };
+  }
+
+  if (sizeBucket === "medium") {
+    return {
+      sizeBucket,
+      meaningfulness: "meaningful",
+      lowSignal: false,
+      discoverEligible: true,
+      strategyEligible: true
+    };
+  }
+
+  return {
+    sizeBucket,
+    meaningfulness: "highly-meaningful",
+    lowSignal: false,
+    discoverEligible: true,
+    strategyEligible: true
+  };
+}
+
+function confidenceBucketForPreset(args: {
+  meaningfulRuns: number;
+  contaminationRate: number;
+}): GainConfidenceBucket {
+  if (args.meaningfulRuns >= 20 && args.contaminationRate < 0.2) {
+    return "decision-grade";
+  }
+  if (args.meaningfulRuns >= 10 && args.contaminationRate < 0.35) {
+    return "credible";
+  }
+  if (args.meaningfulRuns >= 5 && args.contaminationRate < 0.5) {
+    return "emerging";
+  }
+  return "exploratory";
+}
+
+function signalDirectionForPreset(args: {
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
+  meaningfulRuns: number;
+}): "positive" | "mixed" | "neutral" {
+  if (args.meaningfulRuns === 0) {
+    return "neutral";
+  }
+
+  const delta = args.estimatedInputTokens - args.estimatedOutputTokens;
+  if (delta > 0) {
+    return "positive";
+  }
+  if (delta < 0) {
+    return "mixed";
+  }
+  return "neutral";
+}
+
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function describeConfidenceBucket(bucket: GainConfidenceBucket): string {
+  switch (bucket) {
+    case "decision-grade":
+      return "evidence looks decision-grade";
+    case "credible":
+      return "evidence looks credible";
+    case "emerging":
+      return "evidence is emerging";
+    case "exploratory":
+    default:
+      return "evidence is still exploratory";
+  }
+}
+
+function describeSignalDirection(direction: "positive" | "mixed" | "neutral"): string {
+  switch (direction) {
+    case "positive":
+      return "usefulness looks positive so far";
+    case "mixed":
+      return "usefulness looks mixed so far";
+    case "neutral":
+    default:
+      return "signal is still neutral so far";
+  }
 }
 
 function buildCwdHash(cwd: string): string {
@@ -225,10 +396,14 @@ export async function readHistoryEvents(options: HistoryReadOptions = {}): Promi
 }
 
 export function summarizeHistory(events: HistoryEvent[]): GainSummary {
-  const presetMap = new Map<string, GainPresetSummary>();
+  const presetMap = new Map<string, PresetEvidenceSummary>();
   let exactProviderTokens: number | null = 0;
+  const assessments = events.map((event) => ({
+    event,
+    assessment: assessHistoryEvent(event)
+  }));
 
-  for (const event of events) {
+  for (const { event, assessment } of assessments) {
     if (event.exactProviderTokens === null) {
       exactProviderTokens = null;
     }
@@ -242,28 +417,62 @@ export function summarizeHistory(events: HistoryEvent[]): GainSummary {
       {
         presetName: event.presetName,
         runs: 0,
+        meaningfulRuns: 0,
+        lowSignalRuns: 0,
         estimatedInputTokens: 0,
         estimatedOutputTokens: 0,
-        providerSkippedRuns: 0
+        providerSkippedRuns: 0,
+        confidenceBucket: "exploratory",
+        contaminationRate: 0,
+        signalDirection: "neutral"
       };
 
     current.runs += 1;
-    current.estimatedInputTokens += event.estimatedInputTokens;
-    current.estimatedOutputTokens += event.estimatedOutputTokens;
+    current.meaningfulRuns += assessment.strategyEligible ? 1 : 0;
+    current.lowSignalRuns += assessment.lowSignal ? 1 : 0;
+    current.estimatedInputTokens += assessment.strategyEligible ? event.estimatedInputTokens : 0;
+    current.estimatedOutputTokens += assessment.strategyEligible ? event.estimatedOutputTokens : 0;
     current.providerSkippedRuns += event.providerCalled ? 0 : 1;
     presetMap.set(event.presetName, current);
   }
 
+  for (const preset of presetMap.values()) {
+    preset.contaminationRate = preset.runs === 0 ? 0 : preset.lowSignalRuns / preset.runs;
+    preset.confidenceBucket = confidenceBucketForPreset({
+      meaningfulRuns: preset.meaningfulRuns,
+      contaminationRate: preset.contaminationRate
+    });
+    preset.signalDirection = signalDirectionForPreset({
+      estimatedInputTokens: preset.estimatedInputTokens,
+      estimatedOutputTokens: preset.estimatedOutputTokens,
+      meaningfulRuns: preset.meaningfulRuns
+    });
+  }
+
   return {
     totalRuns: events.length,
+    meaningfulRuns: assessments.filter(({ assessment }) => assessment.strategyEligible).length,
+    lowSignalRuns: assessments.filter(({ assessment }) => assessment.lowSignal).length,
     reducedRuns: events.filter((event) => event.resultKind === "reduced").length,
     providerSkippedRuns: events.filter((event) => !event.providerCalled).length,
     insufficientRuns: events.filter((event) => event.resultKind === "insufficient").length,
     passThroughRuns: events.filter((event) => event.resultKind === "pass-through").length,
-    estimatedInputTokens: events.reduce((sum, event) => sum + event.estimatedInputTokens, 0),
-    estimatedOutputTokens: events.reduce((sum, event) => sum + event.estimatedOutputTokens, 0),
-    estimatedInputChars: events.reduce((sum, event) => sum + event.inputChars, 0),
-    estimatedOutputChars: events.reduce((sum, event) => sum + event.outputChars, 0),
+    estimatedInputTokens: assessments.reduce(
+      (sum, { event, assessment }) => sum + (assessment.strategyEligible ? event.estimatedInputTokens : 0),
+      0
+    ),
+    estimatedOutputTokens: assessments.reduce(
+      (sum, { event, assessment }) => sum + (assessment.strategyEligible ? event.estimatedOutputTokens : 0),
+      0
+    ),
+    estimatedInputChars: assessments.reduce(
+      (sum, { event, assessment }) => sum + (assessment.strategyEligible ? event.inputChars : 0),
+      0
+    ),
+    estimatedOutputChars: assessments.reduce(
+      (sum, { event, assessment }) => sum + (assessment.strategyEligible ? event.outputChars : 0),
+      0
+    ),
     exactProviderTokens:
       exactProviderTokens === null
         ? events.every((event) => event.exactProviderTokens === null)
@@ -280,7 +489,9 @@ export function summarizeHistory(events: HistoryEvent[]): GainSummary {
         (left, right) =>
           right.estimatedInputTokens -
             right.estimatedOutputTokens -
-            (left.estimatedInputTokens - left.estimatedOutputTokens) || right.runs - left.runs
+            (left.estimatedInputTokens - left.estimatedOutputTokens) ||
+          right.meaningfulRuns - left.meaningfulRuns ||
+          right.runs - left.runs
       )
       .slice(0, 3)
   };
@@ -322,7 +533,10 @@ export function buildDiscoverHints(events: HistoryEvent[]): DiscoverHint[] {
   const hookCandidateMap = new Map<string, { count: number; presetName: string }>();
 
   for (const event of events) {
+    const assessment = assessHistoryEvent(event);
+
     if (
+      assessment.discoverEligible &&
       event.candidatePresetName &&
       event.candidatePresetName !== event.presetName &&
       event.entrypoint !== "hook"
@@ -337,6 +551,7 @@ export function buildDiscoverHints(events: HistoryEvent[]): DiscoverHint[] {
     }
 
     if (
+      assessment.discoverEligible &&
       event.presetName &&
       event.entrypoint === "exec" &&
       event.commandFamily &&
@@ -420,6 +635,8 @@ export function renderGainReport(args: {
   const lines = [
     `Sift gain${args.days ? ` (last ${args.days}d)` : " (all local history)"}`,
     `- Recorded runs: ${args.summary.totalRuns}`,
+    `- Meaningful runs: ${args.summary.meaningfulRuns}`,
+    `- Low-signal runs: ${args.summary.lowSignalRuns}`,
     `- Reduced first passes: ${args.summary.reducedRuns}`,
     `- Provider skipped: ${args.summary.providerSkippedRuns}/${args.summary.totalRuns}`,
     sizeLine,
@@ -437,22 +654,31 @@ export function renderGainReport(args: {
     lines.push(`- Insufficient runs: ${args.summary.insufficientRuns}`);
   }
 
+  if (args.summary.lowSignalRuns > 0) {
+    lines.push(
+      `- Confidence note: ${args.summary.lowSignalRuns} run(s) looked too small or too trivial for strategy-grade preset conclusions.`
+    );
+  }
+
   if (args.byPreset && args.summary.topPresets.length > 0) {
     lines.push("- Top presets:");
     for (const preset of args.summary.topPresets) {
       lines.push(
-        `  ${preset.presetName}: ${preset.runs} run(s), ~${preset.estimatedInputTokens - preset.estimatedOutputTokens} tokens smaller, provider skipped ${preset.providerSkippedRuns} time(s)`
+        `  ${preset.presetName}: ${preset.runs} run(s), ${preset.meaningfulRuns} meaningful, ${preset.lowSignalRuns} low-signal, ${describeConfidenceBucket(preset.confidenceBucket)}, ${formatPercent(preset.contaminationRate)} low-signal contamination, ${describeSignalDirection(preset.signalDirection)}, ~${preset.estimatedInputTokens - preset.estimatedOutputTokens} tokens smaller, provider skipped ${preset.providerSkippedRuns} time(s)`
       );
     }
   } else if (args.summary.topPresets.length > 0) {
     const top = args.summary.topPresets
-      .map((preset) => `${preset.presetName} (${preset.runs})`)
+      .map(
+        (preset) =>
+          `${preset.presetName} (${preset.runs}, ${describeConfidenceBucket(preset.confidenceBucket)}, ${preset.meaningfulRuns} meaningful)`
+      )
       .join(", ");
     lines.push(`- Top presets: ${top}`);
   }
 
   lines.push(
-    "- Notes: size/token savings are local estimates based on captured input vs reduced output. Provider token counts are only exact when the provider reported them."
+    "- Notes: size/token savings above use meaningful runs only. Tiny or low-signal runs stay recorded locally but should not drive preset-level conclusions. Provider token counts are only exact when the provider reported them."
   );
 
   return lines.join("\n");
@@ -488,7 +714,7 @@ export function renderDiscoverReport(args: {
   }
 
   lines.push(
-    "Notes: discover only speaks when local history is thick enough. Suggestions are based on repeated observed patterns, not shell-wide telemetry."
+    "Notes: discover only speaks when local history is thick enough and the repeated pattern is meaningful enough to trust. Suggestions are based on repeated observed patterns, not shell-wide telemetry."
   );
 
   return lines.join("\n");

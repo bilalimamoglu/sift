@@ -405,12 +405,18 @@ Useful flags:
 - `--include-test-ids` when you need full raw failing test IDs
 - `--detail focused` or `--detail verbose` when supported by the flow
 
+Read-target trust notes:
+- `read_targets.anchor_kind=traceback` plus `read_targets.context_hint.kind=exact_window` is the strongest source-read hint
+- `read_targets.context_hint.kind=search_only` means search first instead of trusting an exact line range
+- lower-confidence or non-traceback read targets are representative hints, not exact root-cause proof
+
 ## Current preset list
 
 The built-in presets are:
 - `test-status`
 - `typecheck-summary`
 - `lint-failures`
+- `contract-drift`
 - `audit-critical`
 - `infra-risk`
 - `diff-summary`

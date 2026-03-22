@@ -37,7 +37,8 @@ describe("agent installer smoke", () => {
       "`sift rerun --remaining` narrows automatically for `pytest` and reruns the full original command for `vitest` and `jest` while keeping the diagnosis focused on what still fails."
     );
     expect(rawCodex.stdout).toContain("--include-test-ids");
-    expect(rawCodex.stdout).toContain("read_targets.context_hint.start_line/end_line");
+    expect(rawCodex.stdout).toContain("read_targets.anchor_kind=traceback");
+    expect(rawCodex.stdout).toContain("read_targets.context_hint.kind=search_only");
     expect(rawCodex.stdout).toContain("read_targets.context_hint.search_hint");
     expect(rawCodex.stdout).toContain("trust it and report from it directly");
     expect(rawCodex.stdout).toContain("unknown bucket or ends with `Decision: zoom`");

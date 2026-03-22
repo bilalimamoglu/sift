@@ -1039,7 +1039,11 @@ describe("runSift unit", () => {
           line: 21,
           why: "it contains the failing setup for the refresh token payload",
           bucket_index: 1,
+          anchor_kind: "traceback",
+          anchor_confidence: 1,
           context_hint: {
+            kind: "exact_window",
+            confidence: 1,
             start_line: 18,
             end_line: 24,
             search_hint: null

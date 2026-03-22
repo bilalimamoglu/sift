@@ -375,6 +375,7 @@ If `standard` already gives you the likely root cause, anchor, and fix, stop the
 | `typecheck-summary` | Parses `tsc` output and groups issues by error code. | No |
 | `lint-failures` | Parses ESLint output and groups failures by rule. | No |
 | `build-failure` | Extracts the first concrete build error from common toolchains. | Fallback only |
+| `contract-drift` | Detects explicit snapshot, golden, OpenAPI, manifest, or generated-artifact drift without broadening into generic repo analysis. | Fallback only |
 | `audit-critical` | Pulls high and critical `npm audit` findings. | No |
 | `infra-risk` | Detects destructive signals in `terraform plan`. | No |
 | `diff-summary` | Summarizes change sets and likely risks in diff output. | Yes |
@@ -413,6 +414,8 @@ For machine branching or automation, `test-status` also supports diagnose JSON:
 sift exec --preset test-status --goal diagnose --format json -- pytest -q
 sift rerun --goal diagnose --format json
 ```
+
+Diagnose JSON is summary-first on purpose. If `read_targets.anchor_kind=traceback` and `read_targets.context_hint.kind=exact_window`, read that narrow range first. If the read target is lower-confidence or `search_only`, treat it as a representative hint rather than exact root-cause proof.
 
 ---
 

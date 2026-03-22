@@ -1,0 +1,18 @@
+{
+  "id": "test-status.vitest-mixed-js",
+  "family": "test-status",
+  "fixtureName": "vitest-mixed-js",
+  "title": "Vitest Mixed Failures",
+  "description": "Synthetic Vitest fixture with mixed JS failure shapes for the standard first-pass showcase.",
+  "sourceType": "synthetic-derived",
+  "rawPath": "test/fixtures/bench/test-status/synthetic/vitest-mixed-js.txt",
+  "renders": [
+    {
+      "id": "vitest-mixed-failures",
+      "renderMode": "standard",
+      "docsSlug": "09-vitest-mixed-failures",
+      "title": "Vitest Mixed Failures",
+      "companionOutputPath": "examples/test-status/vitest-mixed-js.standard.txt"
+    }
+  ]
+}

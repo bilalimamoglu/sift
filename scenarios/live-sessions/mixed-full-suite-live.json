@@ -1,0 +1,41 @@
+{
+  "name": "mixed-full-suite-live",
+  "description": "Captured mixed full-suite agent session comparing raw pytest against sift-first diagnosis.",
+  "capture": {
+    "sourceType": "captured-session",
+    "measuredBy": "manual-scorecard",
+    "tokenMethod": "session-estimate",
+    "notes": "Bootstrap canonical live-session benchmark manifest for the existing scorecard fixture."
+  },
+  "rawFirst": {
+    "totalTokens": 63206,
+    "consumedChars": 75000,
+    "externalToolCalls": 14,
+    "internalToolUses": 34,
+    "wallClockSeconds": 330,
+    "providerInvocations": 0,
+    "stopDepth": "raw",
+    "diagnosisCorrect": true
+  },
+  "siftFirst": {
+    "totalTokens": 47573,
+    "consumedChars": 35000,
+    "externalToolCalls": 9,
+    "internalToolUses": 24,
+    "wallClockSeconds": 297,
+    "providerInvocations": null,
+    "stopDepth": "standard",
+    "diagnosisCorrect": true,
+    "standardSurfacedDominantBlocker": true,
+    "standardSurfacedSecondaryBucket": true,
+    "standardSelfSufficientForVisibleBuckets": true,
+    "sourceReadCount": 3,
+    "firstSourceReadCoveredByReadTargets": true,
+    "firstSourceReadNarrowedByContextHint": null,
+    "rawReverificationAvoided": true,
+    "sourceReadsStayedTargeted": true,
+    "sourceReadAfterZoomSteps": 0,
+    "remainingIdsExposedPublicly": false,
+    "diagnosisCompleteAtLayer": "heuristic"
+  }
+}

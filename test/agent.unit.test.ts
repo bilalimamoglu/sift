@@ -140,10 +140,13 @@ describe("agent command helpers", () => {
       "Diagnose JSON is summary-first by default. Add `--include-test-ids` only when you truly need the raw failing test IDs."
     );
     expect(block).toContain(
-      "If diagnose JSON returns `read_targets.context_hint.start_line/end_line`, read only that small line range first."
+      "If diagnose JSON returns `read_targets.anchor_kind=traceback` and `read_targets.context_hint.kind=exact_window`, read only that small line range first."
     );
     expect(block).toContain(
-      "If diagnose JSON returns only `read_targets.context_hint.search_hint`, search for that string in the target file before reading the whole file."
+      "If diagnose JSON returns `read_targets.context_hint.kind=search_only`, search for `read_targets.context_hint.search_hint` before reading the whole file."
+    );
+    expect(block).toContain(
+      "Treat lower-confidence or non-traceback read targets as representative hints, not exact root-cause proof."
     );
     expect(block).toContain("--show-raw");
     expect(block).not.toContain("When debugging test failures, use this order:");

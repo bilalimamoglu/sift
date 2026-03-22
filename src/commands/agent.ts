@@ -543,6 +543,9 @@ export function showAgent(
     `${ui.note("Use diagnose JSON only for automation or machine branching. It is summary-first by default, and full test IDs stay opt-in.")}\n`
   );
   io.write(
+    `${ui.note("Treat `read_targets.anchor_kind=traceback` plus `context_hint.kind=exact_window` as the strongest read hint. Lower-confidence or search-only targets are representative hints, not exact proof.")}\n`
+  );
+  io.write(
     `${ui.note("If standard already shows bucket-level root cause, anchor, and fix lines, report from it directly and avoid re-verifying the same bucket with raw pytest.")}\n`
   );
   io.write(

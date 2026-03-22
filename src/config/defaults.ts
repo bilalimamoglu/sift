@@ -62,6 +62,12 @@ export const defaultConfig: SiftConfig = {
       format: "brief",
       policy: "build-failure"
     },
+    "contract-drift": {
+      question:
+        "Summarize only the visible contract drift or generated-artifact drift and the next useful step.",
+      format: "bullets",
+      policy: "contract-drift"
+    },
     "log-errors": {
       question: "Extract only the most relevant errors or failure signals.",
       format: "bullets",

@@ -68,6 +68,20 @@ describe("buildPrompt", () => {
     expect(prompt.prompt).toContain("Do not invent autofixability");
   });
 
+  it("builds a contract-drift policy prompt", () => {
+    const prompt = buildPrompt({
+      question: "is this contract drift?",
+      format: "bullets",
+      policyName: "contract-drift",
+      input: "Generated schema artifact is out of sync with the current OpenAPI spec."
+    });
+
+    expect(prompt.responseMode).toBe("text");
+    expect(prompt.prompt).toContain("Task policy: contract-drift");
+    expect(prompt.prompt).toContain("snapshot drift, golden output drift");
+    expect(prompt.prompt).toContain("Do not broaden into generic repository analysis");
+  });
+
   it("builds focused test-status instructions when requested", () => {
     const prompt = buildPrompt({
       question: "what failed?",

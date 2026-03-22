@@ -1,0 +1,25 @@
+{
+  "id": "test-status.mixed-full-suite-real",
+  "family": "test-status",
+  "fixtureName": "mixed-full-suite-real",
+  "title": "Pytest Mixed Suite",
+  "description": "Real project full suite: shared DB blocker plus contract drift in a larger pytest run.",
+  "sourceType": "repo-captured",
+  "rawPath": "test/fixtures/bench/test-status/real/mixed-full-suite.txt",
+  "renders": [
+    {
+      "id": "pytest-mixed-suite",
+      "renderMode": "standard",
+      "docsSlug": "08-pytest-mixed-suite",
+      "title": "Pytest Mixed Suite",
+      "companionOutputPath": "examples/test-status/mixed-full-suite-real.standard.txt"
+    },
+    {
+      "id": "test-status-diagnose-json",
+      "renderMode": "diagnose-json",
+      "docsSlug": "10-test-status-diagnose-json",
+      "title": "Test Status Diagnose JSON",
+      "companionOutputPath": "examples/test-status/mixed-full-suite-real.diagnose.json"
+    }
+  ]
+}

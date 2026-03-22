@@ -211,6 +211,7 @@ describe("misc core and UI helpers", () => {
 
   it("recognizes built-in policy names", () => {
     expect(isPromptPolicyName("test-status")).toBe(true);
+    expect(isPromptPolicyName("contract-drift")).toBe(true);
     expect(isPromptPolicyName("not-a-policy")).toBe(false);
   });
 });

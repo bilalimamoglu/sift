@@ -24,6 +24,7 @@ export type PromptPolicyName =
   | "audit-critical"
   | "diff-summary"
   | "build-failure"
+  | "contract-drift"
   | "log-errors"
   | "infra-risk"
   | "typecheck-summary"
