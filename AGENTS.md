@@ -2,70 +2,20 @@
 Use `sift` as the default local-first output guidance layer for long, noisy, non-interactive command output.
 The goal is to turn failure walls into grouped issues, likely root causes, and the next useful step before reading raw logs.
 
+Default operating mode: Provider-assisted.
+Best when you want sift itself to take one more cheap swing at the problem before you fall back to an agent or raw logs. Built-in rules first, API-backed backup second.
+If the first pass is still fuzzy, sift can ask the fallback model so you do not have to escalate every annoying edge case by hand.
+
+Default path: use `sift exec` when you want the first useful diagnosis on a noisy command.
+Optional beta shortcut: use `sift hook` only for a tiny known-command set when you want less typing, and keep in mind that unknown commands stay raw.
+`sift exec` is the explicit full-control path; `sift hook` is only a known-preset convenience wrapper.
+Experimental shortcut: if sift recognizes the command, it picks a preset for you. If not, it just runs the original command.
+
 Start with:
 - `sift exec "question" -- <command> [args...]`
 - `sift exec --preset test-status -- <test command>`
 - `sift exec --preset audit-critical -- npm audit`
 - `sift exec --preset infra-risk -- terraform plan`
-
-When working inside the `sift` repo itself:
-- For product-facing changes, read the relevant notes under `scripts/docs/product/` if they exist and the task touches product direction, onboarding, install flow, docs, or messaging.
-- For install flow, onboarding, product copy, terminal interaction polish, or positioning work, consult the `gsd-product-visionary` lens first if available. If the runtime cannot spawn that exact registered agent, emulate the same skeptical, taste-driven product review before implementation.
-- For install flow, setup flow, README getting-started, or other first-contact consumer surfaces, also consult the `gsd-first-user-tester` lens if available. If the runtime cannot spawn that exact registered agent, emulate a zero-context first-time user review before implementation.
-- For marketing, launch planning, social posts, content repurposing, competitor analysis, or GitHub traction review, consult `gsd-marketing-strategist` first and save durable notes under `.planning/marketing/`.
-- For auditing the marketing system itself, use `gsd-marketing-auditor` to critique gaps in tracking, platform memory, attribution, and review discipline.
-- Repo-standard agent model matrix:
-  - `gsd-product-visionary` -> `gpt-5.4` with high reasoning for product direction, positioning, onboarding judgment, and final tradeoff calls
-  - `gsd-first-user-tester` -> `gpt-5.4-mini` with low reasoning for zero-context consumer friction and "bilinçsiz kullanıcı" review
-  - `gsd-user-profiler` -> `gpt-5.4` with high reasoning when we need to reconstruct the repo owner's actual skepticism, preferences, and rejection patterns from thread history
-  - `gsd-phase-researcher` -> `gpt-5.4-mini` with medium reasoning for bounded discovery and artifact gathering
-  - `gsd-codebase-mapper` -> `gpt-5.4-mini` with medium reasoning for fast repo mapping and surface discovery
-  - `gsd-planner` -> `gpt-5.4-mini` with medium reasoning for routine execution-plan drafting; escalate to `gpt-5.4` high when the phase is cross-cutting or architecture-heavy
-  - `gsd-plan-checker` -> `gpt-5.4` with high reasoning for pre-execution goal-backward review
-  - `gsd-verifier` -> `gpt-5.4` with high reasoning for post-implementation goal verification
-  - `gsd-integration-checker` -> `gpt-5.4` with medium-to-high reasoning for end-to-end flow validation across linked surfaces
-  - `gsd-nyquist-auditor` -> `gpt-5.4-mini` with medium reasoning for focused validation-gap discovery; escalate to `gpt-5.4` if the missing coverage is release-critical
-  - `gsd-marketing-strategist` -> `gpt-5.4-mini` with medium reasoning for content, hooks, and platform-native message iteration
-  - `gsd-marketing-auditor` -> `gpt-5.4` with high reasoning for strategic critique and anti-vanity-metric review
-- When the runtime supports sub-agents, lightweight consumer-facing review passes should actually run on mini sub-agents instead of only being simulated as a lens in the main thread. Use the main `gpt-5.4` thread for final synthesis, tradeoff calls, and high-stakes product decisions after the lighter review agents report back.
-- In this repo, default to the full GSD working style for meaningful product, planning, onboarding, packaging, and release-adjacent work. That means: use the relevant GSD role lenses or actual sub-agents first, keep local `.planning/` artifacts up to date, and only skip that overhead for truly trivial `gsd-fast`-class tasks.
-- Do not wait for the user to restate "use GSD fully" on each turn. Treat full GSD usage as the standing default here unless the user explicitly asks for a lightweight or one-off path.
-- For Phase 2 and Phase 3 product work in this repo, treat the minimum consensus loop as: `gsd-product-visionary` + `gsd-first-user-tester` + one architecture/planning lens (`gsd-planner` or equivalent) + one critical review lens (`gsd-plan-checker`, `gsd-verifier`, or `gsd-integration-checker`). Final implementation direction should be chosen only after those views are synthesized in the main `gpt-5.4` thread.
-- For Phase 5, Phase 6, and any similarly broad product/distribution/measurement phase, upgrade the consensus loop. Minimum required signoff set:
-  - `gsd-product-visionary`
-  - `gsd-first-user-tester`
-  - one technical architecture lens (`gsd-planner`, `gsd-codebase-mapper`, or equivalent)
-  - one critical checker (`gsd-plan-checker`, `gsd-verifier`, or `gsd-integration-checker`)
-  - one skeptical user proxy derived from the owner's actual conversation history
-- The skeptical user proxy should be stricter than the literal user prompt. Build it by first using `gsd-user-profiler` on the current thread or recent thread set, then either:
-  - spawn a dedicated proxy review agent from that profile, or
-  - emulate the proxy in the main thread if agent limits prevent another spawn
-- The skeptical user proxy should assume:
-  - low patience for conceptual complexity
-  - strong distrust of overengineered UX
-  - preference for small, obvious commands and visible truth over cleverness
-  - strong sensitivity to fake certainty, vanity features, and drift from the product's core identity
-- For big phases, do not mark a plan complete just because product and technical lenses agree. The skeptical user proxy must also reach at least a reluctant pass, and any remaining objections should be written down as explicit residual risk or next-phase work.
-- For first-contact copy surfaces such as README hero copy, installer one-liners, launch hooks, Reddit titles, Hacker News titles, and top-of-page product blurbs, treat the current positioning documents as a hard contract, not soft inspiration. Read `.planning/marketing/messaging/POSITIONING.md` and the relevant `scripts/docs/product/messaging/` notes before proposing final copy.
-- On title-only or first-impression surfaces, do not rely on the body text or later comments to carry the category, core mechanism, or differentiation. Put the essential product truth in the title if reasonably possible.
-- Before offering final first-contact copy, check that it still carries the current product truth: local-first, heuristics-first or fallback-only-when-needed, grouped failures or likely root causes, and the next useful step when space allows. If the copy drops the core product truth in favor of sounding clever, rewrite it.
-- Do not bump `sift`'s version number unless the user explicitly asks for a release/version change. Release notes or changelog updates can be prepared when release-oriented work is requested, but version bumps are not automatic after large changes.
-- Before pushing code from this repo, make sure the full expected verification surface is in good shape, not just the narrow local fix. That means being confident the relevant CI checks and release-facing pipelines would pass, or explicitly calling out what was not verified yet.
-- Treat `npm run verify:release` as the default shared gate before pushing release-sensitive changes. It is the source-of-truth verification chain for CI parity and intentionally runs with CI-like npm wrapper noise enabled.
-- Keep the tracked `.githooks/pre-push` hook healthy. It should default to `npm run verify:release:core` so the repo catches most publish-facing regressions before the push leaves the machine.
-- For especially risky release or packaging work, prefer adding `npm run verify:release:clean` before push or publish so a temporary clean-room `npm ci` pass can catch warm-worktree blind spots.
-- After a release lands, refresh the globally installed `sift` from this repo with `npm install -g .` and confirm `sift --version` matches `package.json` before treating the global binary as trustworthy again.
-- When verifying new `sift` CLI behavior, prefer the repo-local entrypoint (`node --import tsx src/cli.ts ...` or the built local package) unless you have already confirmed the globally installed `sift` version matches `package.json`.
-- If global and local `sift` versions differ, treat repo-local results as source of truth for development verification.
-- If `sift` is insufficient or says the signal is not enough while developing `sift` itself, append a short timestamped note to `.local/agent-insufficient-log.md` with the command, preset or question, likely cause, and next step, then keep trying to resolve the gap instead of stopping at the first insufficient result.
-- Treat new `sift` insufficient/error incidents as product signal, not just local friction. Default handling order:
-  1. log the incident immediately in `.local/agent-insufficient-log.md`
-  2. try to fix it in the same turn if the gap looks local, bounded, and phase-compatible
-  3. if a real fix lands, verify it and record the resolution in the same incident entry
-  4. if the gap is not safely fixable inline or needs a broader design, testing, or measurement pass, adapt the active or next phase plan explicitly so the incident becomes scheduled work instead of forgotten residue
-- Do not quietly accumulate unresolved `sift` insufficiency cases across phases. Either close them quickly, or promote them into the planning system with a named phase/plan consequence.
-- When a phase uncovers repeated `sift` insufficiency patterns, treat that as evidence for measurement, hardening, or capability work in the next phase rather than leaving it as an informal note.
-- Even if internal planning, GSD artifacts, and implementation reasoning happen in English, explain progress, outcomes, why the work was needed, and the next plan back to the user in simple, detailed Turkish by default.
 
 When debugging test failures, default to `sift` first and treat `standard` as the usual stop point:
 - Run the full suite first: `sift exec --preset test-status -- <test command>`
