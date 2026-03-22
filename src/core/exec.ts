@@ -3,12 +3,15 @@ import { constants as osConstants } from "node:os";
 import pc from "picocolors";
 import { CAPTURE_OMITTED_MARKER, getScopedTestStatusStatePath } from "../constants.js";
 import type { OutputFormat, RunRequest, SiftConfig } from "../types.js";
+import type { HistoryEntrypoint, HistoryResultKind } from "../types.js";
 import { evaluateGate, supportsFailOnPreset } from "./gate.js";
 import { analyzeTestStatus, detectTestRunner } from "./heuristics.js";
+import { recordHistoryEvent } from "./history.js";
 import {
   buildInsufficientSignalOutput,
   isInsufficientSignalOutput
 } from "./insufficient.js";
+import { matchKnownCommand } from "./known-command-match.js";
 import { runSiftWithStats, startPendingNotice } from "./run.js";
 import { emitStatsFooter, type RunStats } from "./stats.js";
 import { looksLikeWatchStream, runWatch } from "./watch.js";
@@ -127,6 +130,7 @@ export interface ExecRequest extends Omit<RunRequest, "stdin"> {
   readCachedBaseline?: boolean;
   writeCachedBaseline?: boolean;
   watch?: boolean;
+  historyEntrypoint?: HistoryEntrypoint;
 }
 
 export function buildCommandPreview(request: ExecRequest): string {
@@ -407,6 +411,21 @@ export async function runExec(request: ExecRequest): Promise<number> {
         });
 
     if (execSuccessShortcut && !request.dryRun) {
+      await maybeRecordExecHistory({
+        request,
+        commandPreview,
+        exitCode,
+        normalizedOutput,
+        output: execSuccessShortcut,
+        stats: {
+          layer: "heuristic",
+          providerCalled: false,
+          totalTokens: null,
+          durationMs: Date.now() - reductionStartedAt,
+          presetName: request.presetName
+        },
+        resultKind: "reduced"
+      });
       if (request.config.runtime.verbose) {
         process.stderr.write(
           `${pc.dim("sift")} exec_shortcut=${request.presetName}\n`
@@ -445,6 +464,15 @@ export async function runExec(request: ExecRequest): Promise<number> {
       }
 
       process.stdout.write(`${output}\n`);
+      await maybeRecordExecHistory({
+        request,
+        commandPreview,
+        exitCode,
+        normalizedOutput,
+        output,
+        stats: null,
+        resultKind: "watch-summary"
+      });
       return exitCode;
     }
 
@@ -584,6 +612,18 @@ export async function runExec(request: ExecRequest): Promise<number> {
       stats: result.stats,
       quiet: Boolean(request.quiet)
     });
+    await maybeRecordExecHistory({
+      request,
+      commandPreview,
+      exitCode,
+      normalizedOutput,
+      output,
+      stats: result.stats,
+      resultKind: classifyExecHistoryResultKind({
+        output,
+        stats: result.stats
+      })
+    });
 
     if (
       request.failOn &&
@@ -600,4 +640,72 @@ export async function runExec(request: ExecRequest): Promise<number> {
   }
 
   return exitCode;
+}
+
+function classifyExecHistoryResultKind(args: {
+  output: string;
+  stats: RunStats | null;
+}): HistoryResultKind {
+  if (isInsufficientSignalOutput(args.output)) {
+    return "insufficient";
+  }
+
+  if (args.stats === null) {
+    return "pass-through";
+  }
+
+  return "reduced";
+}
+
+async function maybeRecordExecHistory(args: {
+  request: ExecRequest;
+  commandPreview: string;
+  exitCode: number;
+  normalizedOutput: string;
+  output: string;
+  stats: RunStats | null;
+  resultKind: HistoryResultKind;
+}): Promise<void> {
+  if (args.request.dryRun || !args.request.config.history.enabled) {
+    return;
+  }
+
+  let commandMatch = null;
+  try {
+    commandMatch = matchKnownCommand({
+      command: args.request.command,
+      shellCommand: args.request.shellCommand
+    });
+  } catch {
+    commandMatch = null;
+  }
+
+  try {
+    await recordHistoryEvent({
+      cwd: args.request.cwd ?? process.cwd(),
+      entrypoint: args.request.historyEntrypoint ?? "exec",
+      operationMode: args.request.config.runtime.operationMode,
+      commandFamily: commandMatch?.commandFamily ?? null,
+      presetName: args.request.presetName ?? null,
+      candidatePresetName: commandMatch?.presetName ?? null,
+      providerCalled: args.stats?.providerCalled ?? false,
+      layer: args.stats?.layer ?? "none",
+      detail: args.request.detail ?? null,
+      resultKind: args.resultKind,
+      inputChars: args.normalizedOutput.length,
+      outputChars: args.output.length,
+      exactProviderTokens: args.stats?.totalTokens ?? null,
+      durationMs: args.stats?.durationMs ?? null,
+      safetySuppressedLineCount: 0,
+      historyConfig: args.request.config.history,
+      homeDir: process.env.HOME
+    });
+  } catch (error) {
+    if (!args.request.config.runtime.verbose) {
+      return;
+    }
+
+    const reason = error instanceof Error ? error.message : "unknown_error";
+    process.stderr.write(`${pc.dim("sift")} history_write=failed reason=${reason}\n`);
+  }
 }

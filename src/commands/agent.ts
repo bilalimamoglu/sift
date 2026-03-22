@@ -565,7 +565,7 @@ export function showAgent(
     io.write(
       `${ui.labelValue(
         "skill status",
-        describeSkillStatus(readOptionalFile(skillTargetPath), skillTargetPath)
+        describeSkillStatus(readOptionalFile(skillTargetPath), skillTargetPath, "codex")
       )}\n`
     );
   }
@@ -632,7 +632,7 @@ export async function installAgent(args: AgentInstallArgs): Promise<number> {
         : undefined;
     const codexSkillOwnership =
       codexSkillTargetPath !== undefined
-        ? inspectSkillOwnership(readOptionalFile(codexSkillTargetPath))
+        ? inspectSkillOwnership(readOptionalFile(codexSkillTargetPath), "codex")
         : undefined;
     const claudeCommandPack =
       agent === "claude"
@@ -825,7 +825,7 @@ export async function removeAgent(args: AgentRemoveArgs): Promise<number> {
         : undefined;
     const codexSkillOwnership =
       codexSkillTargetPath !== undefined
-        ? inspectSkillOwnership(readOptionalFile(codexSkillTargetPath))
+        ? inspectSkillOwnership(readOptionalFile(codexSkillTargetPath), "codex")
         : undefined;
 
     const claudeCommandRemoval =
@@ -942,7 +942,7 @@ export function statusAgents(args: {
           cwd: args.cwd,
           homeDir: args.homeDir
         });
-        const skillStatus = describeSkillStatus(readOptionalFile(skillPath), skillPath);
+        const skillStatus = describeSkillStatus(readOptionalFile(skillPath), skillPath, "codex");
         const styled =
           skillStatus.startsWith("installed")
             ? ui.success(`Codex skill: ${skillStatus}`)

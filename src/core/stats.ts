@@ -1,7 +1,8 @@
 import pc from "picocolors";
+import type { RunLayer } from "../types.js";
 
 export interface RunStats {
-  layer: "heuristic" | "provider" | "fallback";
+  layer: RunLayer;
   providerCalled: boolean;
   totalTokens: number | null;
   durationMs: number;

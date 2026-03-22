@@ -344,6 +344,7 @@ describe("command modules", () => {
     expect(stdout).toContain("configuredMode: Agent escalation");
     expect(stdout).toContain("effectiveMode: Agent escalation");
     expect(stdout).toContain("apiKey: set");
+    expect(stdout).toContain("history: Enabled (30d retention, metadata only)");
     expect(stderr).toBe("");
   });
 
@@ -402,6 +403,7 @@ describe("command modules", () => {
     expect(stdout).toContain("configuredMode: Agent escalation");
     expect(stdout).toContain("effectiveMode: Agent escalation");
     expect(stdout).toContain("insufficientBehavior:");
+    expect(stdout).toContain("history: Enabled (30d retention, metadata only)");
     expect(stderr).toBe("");
   });
 

@@ -44,7 +44,8 @@ describe("skill commands", () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-skill-home-"));
 
     expect(normalizeSkillRuntime("codex")).toBe("codex");
-    expect(() => normalizeSkillRuntime("claude")).toThrow("Unknown skill runtime. Use codex.");
+    expect(normalizeSkillRuntime("cursor")).toBe("cursor");
+    expect(() => normalizeSkillRuntime("claude")).toThrow("Unknown skill runtime. Use codex or cursor.");
     expect(normalizeSkillScope("local")).toBe("repo");
     expect(normalizeSkillScope("global")).toBe("global");
 
@@ -62,6 +63,20 @@ describe("skill commands", () => {
         homeDir: home
       })
     ).toBe(path.join(home, ".codex", "skills", "sift", "SKILL.md"));
+    expect(
+      resolveSkillTargetPath({
+        runtime: "cursor",
+        scope: "repo",
+        cwd
+      })
+    ).toBe(path.join(cwd, ".cursor", "skills", "sift", "SKILL.md"));
+    expect(
+      resolveSkillTargetPath({
+        runtime: "cursor",
+        scope: "global",
+        homeDir: home
+      })
+    ).toBe(path.join(home, ".cursor", "skills", "sift", "SKILL.md"));
   });
 
   it("shows, installs, reports, and removes the codex skill safely", async () => {
@@ -196,5 +211,85 @@ describe("skill commands", () => {
     });
     expect(removeStatus).toBe(0);
     await expect(fs.access(targetPath)).rejects.toThrow();
+  });
+
+  it("shows, installs, reports, and removes the cursor skill safely", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cursor-skill-flow-"));
+    const io = createIo();
+
+    showSkill({
+      runtime: "cursor",
+      scope: "repo",
+      cwd,
+      io
+    });
+
+    expect(io.stdout).toContain("Cursor skill preview");
+    expect(io.stdout).toContain("Default path: use `sift exec`");
+
+    const installIo = createIo();
+    const installStatus = await installSkill({
+      runtime: "cursor",
+      scope: "repo",
+      cwd,
+      yes: true,
+      io: installIo
+    });
+
+    const targetPath = path.join(cwd, ".cursor", "skills", "sift", "SKILL.md");
+    const written = await fs.readFile(targetPath, "utf8");
+
+    expect(installStatus).toBe(0);
+    expect(written).toContain("name: sift");
+    expect(written).toContain("workflow guide for Cursor");
+
+    const statusIo = createIo();
+    statusSkills({
+      cwd,
+      homeDir: cwd,
+      io: statusIo
+    });
+    expect(statusIo.stdout).toContain("Cursor skill status");
+    expect(statusIo.stdout).toContain("repo: installed");
+
+    const removeIo = createIo();
+    const removeStatus = await removeSkill({
+      runtime: "cursor",
+      scope: "repo",
+      cwd,
+      yes: true,
+      io: removeIo
+    });
+
+    expect(removeStatus).toBe(0);
+    await expect(fs.access(targetPath)).rejects.toThrow();
+  });
+
+  it("refuses to install a native cursor skill when a compatible codex skill already exists in the same scope", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cursor-skill-conflict-"));
+    const codexPath = path.join(cwd, ".codex", "skills", "sift", "SKILL.md");
+    await fs.mkdir(path.dirname(codexPath), { recursive: true });
+    await fs.writeFile(codexPath, `${renderCodexSkill("agent-escalation")}\n`, "utf8");
+
+    const showIo = createIo();
+    showSkill({
+      runtime: "cursor",
+      scope: "repo",
+      cwd,
+      io: showIo
+    });
+    expect(showIo.stdout).toContain("Cursor already loads the compatible Codex skill");
+
+    const installIo = createIo();
+    const installStatus = await installSkill({
+      runtime: "cursor",
+      scope: "repo",
+      cwd,
+      yes: true,
+      io: installIo
+    });
+
+    expect(installStatus).toBe(1);
+    expect(installIo.stderr).toContain("Refusing to install a duplicate native Cursor skill");
   });
 });

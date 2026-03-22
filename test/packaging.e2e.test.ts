@@ -48,6 +48,16 @@ describe("packaging e2e", () => {
       env,
       encoding: "utf8"
     });
+    const gain = spawnSync("npx", ["--no-install", "sift", "gain"], {
+      cwd: dir,
+      env,
+      encoding: "utf8"
+    });
+    const discover = spawnSync("npx", ["--no-install", "sift", "discover"], {
+      cwd: dir,
+      env,
+      encoding: "utf8"
+    });
     const agentPreview = spawnSync("npx", ["--no-install", "sift", "agent", "show", "codex"], {
       cwd: dir,
       env,
@@ -74,6 +84,8 @@ describe("packaging e2e", () => {
 
     expect(result.status).toBe(0);
     expect(doctor.status).toBe(0);
+    expect(gain.status).toBe(0);
+    expect(discover.status).toBe(0);
     expect(agentPreview.status).toBe(0);
     expect(skillInstall.status).toBe(0);
     expect(claudeInstall.status).toBe(0);
@@ -81,8 +93,12 @@ describe("packaging e2e", () => {
     expect(result.stdout).toContain("sift [question]");
     expect(result.stdout).toContain("  \\\\  //");
     expect(result.stdout).toContain("choose agent-escalation, provider-assisted, or local-only");
+    expect(result.stdout).toContain("gain [action]");
+    expect(result.stdout).toContain("discover");
     expect(doctor.stdout).toContain("setupStatus: Configured");
     expect(doctor.stdout).toContain("defaultPath: Default path: use `sift exec`");
+    expect(gain.stdout).toContain("No local sift history yet.");
+    expect(discover.stdout).toContain("Not enough local history yet for discover.");
     expect(agentPreview.stdout).toContain("Codex instructions preview");
     expect(agentPreview.stdout).toContain("Default path: use `sift exec`");
     expect(
@@ -181,5 +197,49 @@ describe("packaging e2e", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).not.toContain("Safety note:");
     expect(result.stdout).toContain("Cannot find module");
+  });
+
+  it("installs the cursor-native skill from the packed binary", async () => {
+    const root = repoRoot();
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-pack-cursor-home-"));
+    const npmCache = await fs.mkdtemp(path.join(os.tmpdir(), "sift-pack-cursor-cache-"));
+    const env = {
+      ...process.env,
+      HOME: home,
+      NPM_CONFIG_CACHE: npmCache,
+      npm_config_cache: npmCache
+    };
+    const tarball = execSync("npm pack", {
+      cwd: root,
+      encoding: "utf8",
+      env
+    }).trim();
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-pack-cursor-"));
+
+    execSync("npm init -y", {
+      cwd: dir,
+      stdio: "pipe",
+      env
+    });
+    execSync(`npm install "${path.join(root, tarball)}"`, {
+      cwd: dir,
+      stdio: "pipe",
+      env
+    });
+
+    const result = spawnSync(
+      "npx",
+      ["--no-install", "sift", "skill", "install", "cursor", "--scope", "repo", "--yes"],
+      {
+        cwd: dir,
+        env,
+        encoding: "utf8"
+      }
+    );
+
+    expect(result.status).toBe(0);
+    expect(
+      await fs.readFile(path.join(dir, ".cursor", "skills", "sift", "SKILL.md"), "utf8")
+    ).toContain("<!-- sift:generated cursor-skill -->");
   });
 });

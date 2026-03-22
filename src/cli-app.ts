@@ -28,6 +28,8 @@ import {
   normalizeInstallRuntime,
   normalizeInstallScope
 } from "./commands/install.js";
+import { runGain } from "./commands/gain.js";
+import { runDiscover } from "./commands/discover.js";
 import { runDoctor } from "./commands/doctor.js";
 import { listPresets, showPreset } from "./commands/presets.js";
 import { findConfigPath } from "./config/load.js";
@@ -36,6 +38,8 @@ import { runEscalate } from "./core/escalate.js";
 import { runExec } from "./core/exec.js";
 import { runRerun } from "./core/rerun.js";
 import { looksLikeWatchStream, runWatch } from "./core/watch.js";
+import { recordHistoryEvent } from "./core/history.js";
+import { isInsufficientSignalOutput } from "./core/insufficient.js";
 import {
   assertSupportedFailOnFormat,
   assertSupportedFailOnPreset,
@@ -385,6 +389,23 @@ export function resolveExecDiff(args: {
   return true;
 }
 
+export function resolveHistoryDays(options: Record<string, unknown>): number | undefined {
+  if (Boolean(options.today)) {
+    return 1;
+  }
+
+  if (options.last === undefined || options.last === null || options.last === "") {
+    return undefined;
+  }
+
+  const value = Number(options.last);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error("Use --last <days> with a positive integer.");
+  }
+
+  return value;
+}
+
 export function extractExecCommand(options: Record<string, unknown>): {
   command?: string[];
   shellCommand?: string;
@@ -515,6 +536,37 @@ export function createCliApp(args: {
       stats: result.stats,
       quiet: Boolean(input.options.quiet)
     });
+    if (!Boolean(input.options.dryRun) && config.history.enabled) {
+      try {
+        await recordHistoryEvent({
+          cwd: process.cwd(),
+          entrypoint: isWatchStream ? "watch" : "pipe",
+          operationMode: config.runtime.operationMode,
+          commandFamily: null,
+          presetName: input.presetName ?? null,
+          candidatePresetName: null,
+          providerCalled: result.stats?.providerCalled ?? false,
+          layer: result.stats?.layer ?? (isWatchStream ? "none" : "fallback"),
+          detail: input.detail ?? null,
+          resultKind: isWatchStream
+            ? "watch-summary"
+            : isInsufficientSignalOutput(output)
+              ? "insufficient"
+              : "reduced",
+          inputChars: stdin.length,
+          outputChars: output.length,
+          exactProviderTokens: result.stats?.totalTokens ?? null,
+          durationMs: result.stats?.durationMs ?? null,
+          historyConfig: config.history,
+          homeDir: env.HOME
+        });
+      } catch (error) {
+        if (config.runtime.verbose) {
+          const reason = error instanceof Error ? error.message : "unknown_error";
+          stderr.write(`sift history_write=failed reason=${reason}\n`);
+        }
+      }
+    }
 
     if (
       Boolean(input.options.failOn) &&
@@ -737,6 +789,45 @@ export function createCliApp(args: {
           options
         }),
         options
+      });
+    });
+
+  cli
+    .command("gain [action]", "Show local usage/value history or clear it")
+    .usage("gain [clear] [options]")
+    .example("gain")
+    .example("gain --today")
+    .example("gain --last 7 --by-preset")
+    .example("gain clear --yes")
+    .option("--today", "Use only the last 24 hours of local sift history")
+    .option("--last <days>", "Use only the last N days of local sift history")
+    .option("--by-preset", "Expand the top preset breakdown")
+    .option("--yes", "Skip confirmation prompts for destructive actions")
+    .action(async (action: string | undefined, options: Record<string, unknown>) => {
+      const config = deps.resolveConfig({
+        configPath: options.config as string | undefined,
+        env,
+        cliOverrides: buildCliOverrides(options)
+      });
+      await runGain({
+        config,
+        days: resolveHistoryDays(options),
+        byPreset: Boolean(options.byPreset),
+        clear: action?.trim().toLowerCase() === "clear",
+        yes: Boolean(options.yes)
+      });
+    });
+
+  cli
+    .command("discover", "Show evidence-backed missed-use hints from local sift history")
+    .usage("discover [options]")
+    .example("discover")
+    .example("discover --last 7")
+    .option("--today", "Use only the last 24 hours of local sift history")
+    .option("--last <days>", "Use only the last N days of local sift history")
+    .action(async (options: Record<string, unknown>) => {
+      await runDiscover({
+        days: resolveHistoryDays(options)
       });
     });
 
@@ -972,10 +1063,11 @@ export function createCliApp(args: {
     });
 
   cli
-    .command("install [runtime]", "Interactive runtime installer for Codex and Claude")
+    .command("install [runtime]", "Interactive runtime installer for Codex, Claude, and tiny Cursor packaging")
     .usage("install [runtime] [options]")
     .example("install")
     .example("install codex")
+    .example("install cursor")
     .example("install codex --scope global --yes")
     .example("install all --scope local --yes")
     .option("--scope <scope>", "Install scope: local | global")
@@ -1106,8 +1198,10 @@ export function createCliApp(args: {
     .command("skill <action> [runtime]", "Skill commands: show | install | remove | status")
     .usage("skill <show|install|remove|status> [runtime] [options]")
     .example("skill show codex")
+    .example("skill show cursor")
     .example("skill show codex --raw")
     .example("skill install codex --scope global --yes")
+    .example("skill install cursor --scope repo --yes")
     .example("skill install codex --dry-run")
     .example("skill status")
     .example("skill remove codex --scope repo --yes")

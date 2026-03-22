@@ -75,6 +75,11 @@ export const safetyConfigSchema = z.object({
   ignoredRiskPatterns: z.array(z.string().trim().min(1))
 });
 
+export const historyConfigSchema = z.object({
+  enabled: z.boolean(),
+  retentionDays: z.number().int().min(1).max(365)
+});
+
 export const presetDefinitionSchema = z.object({
   question: z.string().min(1),
   format: outputFormatSchema,
@@ -88,6 +93,7 @@ export const siftConfigSchema = z.object({
   input: inputConfigSchema,
   runtime: runtimeConfigSchema,
   safety: safetyConfigSchema,
+  history: historyConfigSchema,
   presets: z.record(presetDefinitionSchema),
   providerProfiles: providerProfilesSchema
 });

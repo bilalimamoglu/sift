@@ -28,6 +28,8 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("rerun");
     expect(result.stdout).toContain("install [runtime]");
     expect(result.stdout).toContain("hook <action>");
+    expect(result.stdout).toContain("gain [action]");
+    expect(result.stdout).toContain("discover");
     expect(result.stdout).toContain("skill <action> [runtime]");
     expect(result.stdout).toContain("agent <action> [name]");
     expect(result.stdout).toContain("config <action> [provider]");
@@ -41,6 +43,7 @@ describe("CLI smoke", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("install [runtime] [options]");
     expect(result.stdout).toContain("install codex --scope global --yes");
+    expect(result.stdout).toContain("install cursor");
     expect(result.stdout).toContain("install all --scope local --yes");
     expect(result.stdout).toContain("--scope <scope>");
     expect(result.stdout).toContain("--yes");
@@ -127,7 +130,9 @@ describe("CLI smoke", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("skill <show|install|remove|status> [runtime] [options]");
     expect(result.stdout).toContain("skill show codex");
+    expect(result.stdout).toContain("skill show cursor");
     expect(result.stdout).toContain("skill install codex --scope global --yes");
+    expect(result.stdout).toContain("skill install cursor --scope repo --yes");
     expect(result.stdout).toContain("--raw");
   });
 
@@ -142,6 +147,24 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain('hook run --shell "npm audit --json"');
     expect(result.stdout).toContain("Optional beta shortcut: use `sift hook`");
     expect(result.stdout).toContain("--shell <command>");
+  });
+
+  it("prints gain and discover help", () => {
+    const gain = runSourceCli({
+      args: ["gain", "--help"]
+    });
+    const discover = runSourceCli({
+      args: ["discover", "--help"]
+    });
+
+    expect(gain.status).toBe(0);
+    expect(gain.stdout).toContain("gain [clear] [options]");
+    expect(gain.stdout).toContain("gain --last 7 --by-preset");
+    expect(gain.stdout).toContain("gain clear --yes");
+
+    expect(discover.status).toBe(0);
+    expect(discover.stdout).toContain("discover [options]");
+    expect(discover.stdout).toContain("discover --last 7");
   });
 
   it("supports config init, show, and validate", async () => {
@@ -203,6 +226,35 @@ describe("CLI smoke", () => {
     expect(init.stdout.trim()).toBe(expectedPath);
     expect(validate.status).toBe(0);
     expect(validate.stdout).toContain(expectedPath);
+  });
+
+  it("shows empty-state gain/discover and can clear local history", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-cli-history-home-"));
+    const gainEmpty = runSourceCli({
+      args: ["gain"],
+      env: {
+        HOME: home
+      }
+    });
+    const discoverEmpty = runSourceCli({
+      args: ["discover"],
+      env: {
+        HOME: home
+      }
+    });
+    const clear = runSourceCli({
+      args: ["gain", "clear", "--yes"],
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(gainEmpty.status).toBe(0);
+    expect(gainEmpty.stdout).toContain("No local sift history yet.");
+    expect(discoverEmpty.status).toBe(0);
+    expect(discoverEmpty.stdout).toContain("Not enough local history yet for discover.");
+    expect(clear.status).toBe(0);
+    expect(clear.stdout).toContain("Cleared local sift history.");
   });
 
   it("masks secrets in config show by default and reveals them with --show-secrets", async () => {

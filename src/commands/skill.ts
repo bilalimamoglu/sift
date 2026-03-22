@@ -1,14 +1,18 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { getDefaultCodexGlobalSkillPath } from "../constants.js";
+import {
+  getDefaultCodexGlobalSkillPath,
+  getDefaultCursorGlobalSkillPath
+} from "../constants.js";
 import { getDefaultExecPathLine, getHookBetaLine } from "../content/adoption.js";
 import { CODEX_SKILL_MARKER, renderCodexSkill } from "../runtime-payloads/codex-skill.js";
+import { CURSOR_SKILL_MARKER, renderCursorSkill } from "../runtime-payloads/cursor-skill.js";
 import { resolveConfig, resolveEffectiveOperationMode } from "../config/resolve.js";
 import type { OperationMode } from "../types.js";
 import { createPresentation } from "../ui/presentation.js";
 
-export type SkillRuntime = "codex";
+export type SkillRuntime = "codex" | "cursor";
 export type SkillScope = "repo" | "global";
 
 export interface SkillCommandIO {
@@ -77,11 +81,11 @@ function createTerminalIO(): SkillCommandIO {
 }
 
 export function normalizeSkillRuntime(value: string): SkillRuntime {
-  if (value === "codex") {
+  if (value === "codex" || value === "cursor") {
     return value;
   }
 
-  throw new Error("Unknown skill runtime. Use codex.");
+  throw new Error("Unknown skill runtime. Use codex or cursor.");
 }
 
 export function normalizeSkillScope(value: unknown): SkillScope | undefined {
@@ -113,10 +117,18 @@ export function resolveSkillTargetPath(args: {
 
   const scope = args.scope ?? "repo";
   if (scope === "global") {
-    return getDefaultCodexGlobalSkillPath(args.homeDir ?? os.homedir());
+    return args.runtime === "codex"
+      ? getDefaultCodexGlobalSkillPath(args.homeDir ?? os.homedir())
+      : getDefaultCursorGlobalSkillPath(args.homeDir ?? os.homedir());
   }
 
-  return path.resolve(args.cwd ?? process.cwd(), ".codex", "skills", "sift", "SKILL.md");
+  return path.resolve(
+    args.cwd ?? process.cwd(),
+    args.runtime === "codex" ? ".codex" : ".cursor",
+    "skills",
+    "sift",
+    "SKILL.md"
+  );
 }
 
 function inferOperationMode(args: {
@@ -145,11 +157,67 @@ function inferOperationMode(args: {
   }
 }
 
+function getSkillTitle(runtime: SkillRuntime): string {
+  return runtime === "codex" ? "Codex" : "Cursor";
+}
+
+function renderSkillForRuntime(runtime: SkillRuntime, mode: OperationMode): string {
+  return runtime === "codex" ? renderCodexSkill(mode) : renderCursorSkill(mode);
+}
+
+function getSkillMarker(runtime: SkillRuntime): string {
+  return runtime === "codex" ? CODEX_SKILL_MARKER : CURSOR_SKILL_MARKER;
+}
+
+function getSkillOwnerNote(runtime: SkillRuntime): string {
+  return runtime === "codex"
+    ? "The CLI is the product runtime. This skill is a discoverability and workflow guide for Codex."
+    : "The CLI is the product runtime. This skill is a discoverability and workflow guide for Cursor.";
+}
+
+function getSkillPreviewNote(runtime: SkillRuntime): string {
+  return runtime === "codex"
+    ? "This is a tiny Codex-native workflow guide, not a second runtime or command system."
+    : "This is a tiny Cursor-native workflow guide, not a second runtime or command system.";
+}
+
+function getSkillInstallNote(runtime: SkillRuntime): string {
+  return runtime === "codex"
+    ? "This writes a single generated SKILL.md file for Codex discoverability."
+    : "This writes a single generated SKILL.md file for Cursor discoverability.";
+}
+
+function getCompatibleCodexSkillPath(args: {
+  scope?: SkillScope;
+  cwd?: string;
+  homeDir?: string;
+}): string {
+  return resolveSkillTargetPath({
+    runtime: "codex",
+    scope: args.scope,
+    cwd: args.cwd,
+    homeDir: args.homeDir
+  });
+}
+
+function inspectCompatibleCodexOwnership(args: {
+  runtime: SkillRuntime;
+  scope?: SkillScope;
+  cwd?: string;
+  homeDir?: string;
+}): SkillOwnershipState {
+  if (args.runtime !== "cursor") {
+    return "missing";
+  }
+
+  return inspectSkillOwnership(readOptionalSkillFile(getCompatibleCodexSkillPath(args)), "codex");
+}
+
 export function showSkill(args: SkillShowArgs): void {
   const io = args.io ?? createStdoutOnlyIO();
   const targetPath = resolveSkillTargetPath(args);
   const mode = inferOperationMode(args);
-  const content = renderCodexSkill(mode);
+  const content = renderSkillForRuntime(args.runtime, mode);
 
   if (args.raw) {
     io.write(`${content}\n`);
@@ -157,7 +225,8 @@ export function showSkill(args: SkillShowArgs): void {
   }
 
   const ui = createPresentation(Boolean(io.stdoutIsTTY));
-  const ownership = inspectSkillOwnership(readOptionalSkillFile(targetPath));
+  const ownership = inspectSkillOwnership(readOptionalSkillFile(targetPath), args.runtime);
+  const compatibleCodexOwnership = inspectCompatibleCodexOwnership(args);
   const status =
     ownership === "managed" || ownership === "legacy-managed"
       ? "sift-managed skill already installed here"
@@ -165,11 +234,18 @@ export function showSkill(args: SkillShowArgs): void {
         ? "custom SKILL.md present here; sift will not overwrite it"
         : "not installed yet";
 
-  io.write(`${ui.section("Codex skill preview")}\n`);
+  io.write(`${ui.section(`${getSkillTitle(args.runtime)} skill preview`)}\n`);
   io.write(`${ui.labelValue("scope", args.scope ?? "repo")}\n`);
   io.write(`${ui.labelValue("target", targetPath)}\n`);
   io.write(`${ui.labelValue("status", status)}\n`);
-  io.write(`${ui.info("This is a tiny Codex-native workflow guide, not a second runtime or command system.")}\n`);
+  io.write(`${ui.info(getSkillPreviewNote(args.runtime))}\n`);
+  if (args.runtime === "cursor" && (compatibleCodexOwnership === "managed" || compatibleCodexOwnership === "legacy-managed")) {
+    io.write(
+      `${ui.note(
+        `Cursor already loads the compatible Codex skill at ${getCompatibleCodexSkillPath(args)}. Install the native Cursor copy only if you explicitly want the .cursor/skills path instead.`
+      )}\n`
+    );
+  }
   io.write(`${ui.note(getDefaultExecPathLine())}\n`);
   io.write(`${ui.note(getHookBetaLine())}\n`);
   io.write(`${ui.note("The skill complements the CLI and managed block. It does not replace them.")}\n`);
@@ -183,10 +259,11 @@ export async function installSkill(args: SkillInstallArgs): Promise<number> {
   const io = args.io ?? createTerminalIO();
   const targetPath = resolveSkillTargetPath(args);
   const mode = inferOperationMode(args);
-  const content = `${renderCodexSkill(mode)}\n`;
+  const content = `${renderSkillForRuntime(args.runtime, mode)}\n`;
   const ui = createPresentation(Boolean(io.stdoutIsTTY));
   const existingContent = readOptionalSkillFile(targetPath);
-  const ownership = inspectSkillOwnership(existingContent);
+  const ownership = inspectSkillOwnership(existingContent, args.runtime);
+  const compatibleCodexOwnership = inspectCompatibleCodexOwnership(args);
   const action =
     ownership === "missing"
       ? "create"
@@ -200,7 +277,9 @@ export async function installSkill(args: SkillInstallArgs): Promise<number> {
       return 0;
     }
 
-    io.write(`${ui.section(`Dry run: ${action === "update" ? "update" : "create"} Codex skill`)}\n`);
+    io.write(
+      `${ui.section(`Dry run: ${action === "update" ? "update" : "create"} ${getSkillTitle(args.runtime)} skill`)}\n`
+    );
     io.write(`${ui.labelValue("scope", args.scope ?? "repo")}\n`);
     io.write(`${ui.labelValue("target", targetPath)}\n`);
     io.write(`${ui.labelValue("file exists", existingContent !== undefined ? "yes" : "no")}\n`);
@@ -216,7 +295,14 @@ export async function installSkill(args: SkillInstallArgs): Promise<number> {
               : "sift-managed file"
       )}\n`
     );
-    io.write(`${ui.note("This writes a single generated SKILL.md file for Codex discoverability.")}\n`);
+    io.write(`${ui.note(getSkillInstallNote(args.runtime))}\n`);
+    if (args.runtime === "cursor" && (compatibleCodexOwnership === "managed" || compatibleCodexOwnership === "legacy-managed")) {
+      io.write(
+        `${ui.warning(
+          `Cursor already loads the compatible Codex skill at ${getCompatibleCodexSkillPath(args)}. Installing a second native Cursor skill would duplicate the same discoverability surface.`
+        )}\n`
+      );
+    }
     if (ownership === "custom") {
       io.write(`${ui.warning("A custom SKILL.md already exists here, so sift would refuse to overwrite it.")}\n`);
     }
@@ -234,8 +320,15 @@ export async function installSkill(args: SkillInstallArgs): Promise<number> {
     return 1;
   }
 
+  if (args.runtime === "cursor" && (compatibleCodexOwnership === "managed" || compatibleCodexOwnership === "legacy-managed")) {
+    io.error(
+      `Refusing to install a duplicate native Cursor skill because Cursor already loads the compatible Codex skill at ${getCompatibleCodexSkillPath(args)}.\n`
+    );
+    return 1;
+  }
+
   writeTextFileAtomic(targetPath, content);
-  io.write(`${ui.success(`Codex skill ${action === "update" ? "updated" : "installed"}.`)}\n`);
+  io.write(`${ui.success(`${getSkillTitle(args.runtime)} skill ${action === "update" ? "updated" : "installed"}.`)}\n`);
   io.write(`${ui.labelValue("target", targetPath)}\n`);
   return 0;
 }
@@ -245,10 +338,10 @@ export async function removeSkill(args: SkillRemoveArgs): Promise<number> {
   const targetPath = resolveSkillTargetPath(args);
   const ui = createPresentation(Boolean(io.stdoutIsTTY));
   const existingContent = readOptionalSkillFile(targetPath);
-  const ownership = inspectSkillOwnership(existingContent);
+  const ownership = inspectSkillOwnership(existingContent, args.runtime);
 
   if (args.dryRun) {
-    io.write(`${ui.section("Dry run: remove Codex skill")}\n`);
+    io.write(`${ui.section(`Dry run: remove ${getSkillTitle(args.runtime)} skill`)}\n`);
     io.write(`${ui.labelValue("target", targetPath)}\n`);
     io.write(`${ui.labelValue("file exists", existingContent !== undefined ? "yes" : "no")}\n`);
     io.write(
@@ -272,7 +365,7 @@ export async function removeSkill(args: SkillRemoveArgs): Promise<number> {
   }
 
   if (ownership === "missing") {
-    io.write(`${ui.note("No Codex skill found at the target path.")}\n`);
+    io.write(`${ui.note(`No ${getSkillTitle(args.runtime)} skill found at the target path.`)}\n`);
     return 0;
   }
 
@@ -282,12 +375,13 @@ export async function removeSkill(args: SkillRemoveArgs): Promise<number> {
   }
 
   fs.unlinkSync(targetPath);
-  cleanupEmptyDirectories(path.dirname(targetPath), args.scope ?? "repo", args.cwd, args.homeDir);
-  io.write(`${ui.success("Codex skill removed.")}\n`);
+  cleanupEmptyDirectories(args.runtime, path.dirname(targetPath), args.scope ?? "repo", args.cwd, args.homeDir);
+  io.write(`${ui.success(`${getSkillTitle(args.runtime)} skill removed.`)}\n`);
   return 0;
 }
 
 function cleanupEmptyDirectories(
+  runtime: SkillRuntime,
   startDir: string,
   scope: SkillScope,
   cwd?: string,
@@ -295,8 +389,8 @@ function cleanupEmptyDirectories(
 ): void {
   const stopDir =
     scope === "global"
-      ? path.join(homeDir ?? os.homedir(), ".codex")
-      : path.resolve(cwd ?? process.cwd(), ".codex");
+      ? path.join(homeDir ?? os.homedir(), runtime === "codex" ? ".codex" : ".cursor")
+      : path.resolve(cwd ?? process.cwd(), runtime === "codex" ? ".codex" : ".cursor");
 
   let current = startDir;
   while (current.startsWith(stopDir) && current !== stopDir) {
@@ -316,33 +410,52 @@ export function statusSkills(args: {
 } = {}): void {
   const io = args.io ?? createStdoutOnlyIO();
   const ui = createPresentation(Boolean(io.stdoutIsTTY));
-  const repoPath = resolveSkillTargetPath({ runtime: "codex", scope: "repo", cwd: args.cwd });
-  const globalPath = resolveSkillTargetPath({
-    runtime: "codex",
-    scope: "global",
-    homeDir: args.homeDir
-  });
-  const repoStatus = describeSkillStatus(readOptionalSkillFile(repoPath), repoPath);
-  const globalStatus = describeSkillStatus(readOptionalSkillFile(globalPath), globalPath);
+  for (const runtime of ["codex", "cursor"] as const) {
+    const repoPath = resolveSkillTargetPath({ runtime, scope: "repo", cwd: args.cwd });
+    const globalPath = resolveSkillTargetPath({
+      runtime,
+      scope: "global",
+      homeDir: args.homeDir
+    });
+    const repoStatus = describeSkillStatus(readOptionalSkillFile(repoPath), repoPath, runtime);
+    const globalStatus = describeSkillStatus(readOptionalSkillFile(globalPath), globalPath, runtime);
 
-  io.write(`${ui.section("Codex skill status")}\n`);
-  io.write(`${ui.labelValue("repo", repoStatus)}\n`);
-  io.write(`${ui.labelValue("global", globalStatus)}\n`);
+    io.write(`${ui.section(`${getSkillTitle(runtime)} skill status`)}\n`);
+    io.write(`${ui.labelValue("repo", repoStatus)}\n`);
+    io.write(`${ui.labelValue("global", globalStatus)}\n`);
+    if (runtime === "cursor") {
+      const compatibleRepo = describeSkillStatus(
+        readOptionalSkillFile(getCompatibleCodexSkillPath({ scope: "repo", cwd: args.cwd })),
+        getCompatibleCodexSkillPath({ scope: "repo", cwd: args.cwd }),
+        "codex"
+      );
+      const compatibleGlobal = describeSkillStatus(
+        readOptionalSkillFile(getCompatibleCodexSkillPath({ scope: "global", homeDir: args.homeDir })),
+        getCompatibleCodexSkillPath({ scope: "global", homeDir: args.homeDir }),
+        "codex"
+      );
+      io.write(`${ui.labelValue("compatibleCodexRepo", compatibleRepo)}\n`);
+      io.write(`${ui.labelValue("compatibleCodexGlobal", compatibleGlobal)}\n`);
+    }
+  }
 }
 
-export function inspectSkillOwnership(content: string | undefined): SkillOwnershipState {
+export function inspectSkillOwnership(
+  content: string | undefined,
+  runtime: SkillRuntime
+): SkillOwnershipState {
   if (content === undefined) {
     return "missing";
   }
 
-  if (content.includes(CODEX_SKILL_MARKER)) {
+  if (content.includes(getSkillMarker(runtime))) {
     return "managed";
   }
 
   if (
     content.includes("name: sift") &&
     content.includes("## Decision Table") &&
-    content.includes("The CLI is the product runtime. This skill is a discoverability and workflow guide for Codex.")
+    content.includes(getSkillOwnerNote(runtime))
   ) {
     return "legacy-managed";
   }
@@ -350,8 +463,12 @@ export function inspectSkillOwnership(content: string | undefined): SkillOwnersh
   return "custom";
 }
 
-export function describeSkillStatus(content: string | undefined, targetPath: string): string {
-  const ownership = inspectSkillOwnership(content);
+export function describeSkillStatus(
+  content: string | undefined,
+  targetPath: string,
+  runtime: SkillRuntime
+): string {
+  const ownership = inspectSkillOwnership(content, runtime);
 
   if (ownership === "missing") {
     return `not installed (${targetPath})`;

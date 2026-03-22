@@ -11,7 +11,8 @@ import {
   getDefaultGlobalConfigPath,
   getDefaultClaudeGlobalCommandsDir,
   getDefaultClaudeGlobalInstructionsPath,
-  getDefaultCodexGlobalInstructionsPath
+  getDefaultCodexGlobalInstructionsPath,
+  getDefaultCursorGlobalSkillPath
 } from "../constants.js";
 import {
   describeOperationMode,
@@ -33,8 +34,9 @@ import {
   type AgentScope
 } from "./agent.js";
 import { CLAUDE_COMMAND_NAMES } from "../runtime-payloads/claude-commands.js";
+import { installSkill, type SkillRuntime } from "./skill.js";
 
-export type InstallRuntime = AgentName | "all";
+export type InstallRuntime = AgentName | SkillRuntime | "all";
 
 export interface InstallRuntimeIO extends AgentCommandIO {
   select?(
@@ -50,9 +52,10 @@ interface MenuChoice<T> {
   readonly value: T;
 }
 
-const INSTALL_TITLES: Record<AgentName, string> = {
+const INSTALL_TITLES: Record<Exclude<InstallRuntime, "all">, string> = {
   codex: "Codex",
-  claude: "Claude"
+  claude: "Claude",
+  cursor: "Cursor"
 };
 
 export function createInstallTerminalIO(): InstallRuntimeIO {
@@ -111,11 +114,11 @@ export function normalizeInstallRuntime(value: unknown): InstallRuntime | undefi
     return undefined;
   }
 
-  if (value === "codex" || value === "claude" || value === "all") {
+  if (value === "codex" || value === "claude" || value === "cursor" || value === "all") {
     return value;
   }
 
-  throw new Error("Invalid runtime. Use codex, claude, or all.");
+  throw new Error("Invalid runtime. Use codex, claude, cursor, or all.");
 }
 
 export function normalizeInstallScope(value: unknown): AgentScope | undefined {
@@ -152,7 +155,7 @@ function renderInstallBanner(version: string): string {
   ].join("\n");
 }
 
-function getInstallTargets(runtime: InstallRuntime): AgentName[] {
+function getInstallTargets(runtime: InstallRuntime): Exclude<InstallRuntime, "all">[] {
   if (runtime === "all") {
     return ["codex", "claude"];
   }
@@ -160,16 +163,24 @@ function getInstallTargets(runtime: InstallRuntime): AgentName[] {
   return [runtime];
 }
 
-function getGlobalTargetLabel(agent: AgentName, homeDir = os.homedir()): string {
-  return agent === "codex"
-    ? getDefaultCodexGlobalInstructionsPath(homeDir)
-    : getDefaultClaudeGlobalInstructionsPath(homeDir);
+function getGlobalTargetLabel(runtime: Exclude<InstallRuntime, "all">, homeDir = os.homedir()): string {
+  if (runtime === "codex") {
+    return getDefaultCodexGlobalInstructionsPath(homeDir);
+  }
+  if (runtime === "claude") {
+    return getDefaultClaudeGlobalInstructionsPath(homeDir);
+  }
+  return getDefaultCursorGlobalSkillPath(homeDir);
 }
 
-function getLocalTargetLabel(agent: AgentName, cwd = process.cwd()): string {
-  return agent === "codex"
-    ? path.join(cwd, "AGENTS.md")
-    : path.join(cwd, "CLAUDE.md");
+function getLocalTargetLabel(runtime: Exclude<InstallRuntime, "all">, cwd = process.cwd()): string {
+  if (runtime === "codex") {
+    return path.join(cwd, "AGENTS.md");
+  }
+  if (runtime === "claude") {
+    return path.join(cwd, "CLAUDE.md");
+  }
+  return path.join(cwd, ".cursor", "skills", "sift", "SKILL.md");
 }
 
 function describeScopeChoice(args: {
@@ -257,7 +268,11 @@ async function promptForRuntime(io: InstallRuntimeIO): Promise<InstallRuntime | 
         value: "claude"
       },
       {
-        label: "All      - if you refuse to pick favorites today",
+        label: "Cursor  (.cursor/skills/sift/SKILL.md / ~/.cursor/skills/sift/SKILL.md) - native skill path for Cursor without inventing a second runtime",
+        value: "cursor"
+      },
+      {
+        label: "All      - Codex + Claude together if you refuse to pick favorites today",
         value: "all"
       }
     ]
@@ -371,6 +386,11 @@ function writeSuccessSummary(args: {
   if (targets.includes("claude")) {
     args.io.write(`${ui.note("Claude install also writes a tiny `.claude/commands/sift/` command pack so Claude has native `sift` entry points.")}\n`);
   }
+  if (targets.includes("cursor")) {
+    args.io.write(
+      `${ui.note("Cursor install writes a tiny native `.cursor/skills/sift/SKILL.md` workflow guide and avoids rules/runtime-platform drift.")}\n`
+    );
+  }
   args.io.write(`${ui.note("The CLI is still the real runtime. The native files are guidance surfaces, not a second execution system.")}\n`);
   args.io.write(`\n${ui.section("Try next")}\n`);
   args.io.write(`  ${ui.command("sift exec --preset test-status -- pytest -q")}${ui.note("  # default first pass")}\n`);
@@ -397,8 +417,8 @@ function writePreflightSummary(args: {
 }): void {
   const ui = createPresentation(args.io.stdoutIsTTY);
   const runtimeTargets = getInstallTargets(args.runtime);
-  const writeTargets = runtimeTargets.flatMap((agent) => {
-    if (agent === "codex") {
+  const writeTargets = runtimeTargets.flatMap((runtime) => {
+    if (runtime === "codex") {
       return [
         args.scope === "global"
           ? getDefaultCodexGlobalInstructionsPath(args.homeDir)
@@ -406,6 +426,14 @@ function writePreflightSummary(args: {
         args.scope === "global"
           ? path.join(args.homeDir ?? os.homedir(), ".codex", "skills", "sift", "SKILL.md")
           : path.join(args.cwd ?? process.cwd(), ".codex", "skills", "sift", "SKILL.md")
+      ];
+    }
+
+    if (runtime === "cursor") {
+      return [
+        args.scope === "global"
+          ? getDefaultCursorGlobalSkillPath(args.homeDir)
+          : getLocalTargetLabel("cursor", args.cwd)
       ];
     }
 
@@ -433,6 +461,11 @@ function writePreflightSummary(args: {
   }
   args.io.write(`${ui.note("Will not write shell rc files, PATH entries, git hooks, or arbitrary repo files.")}\n`);
   args.io.write(`${ui.note("Managed blocks update only inside sift markers. Generated skill/command files update only when sift can prove ownership.")}\n`);
+  if (runtimeTargets.includes("cursor")) {
+    args.io.write(
+      `${ui.note("If a compatible Codex skill already exists in the same scope, sift refuses to install a duplicate native Cursor skill.")}\n`
+    );
+  }
 }
 
 export async function installRuntimeSupport(options: {
@@ -607,16 +640,27 @@ export async function installRuntimeSupport(options: {
 
     const nestedIo = createNestedInstallIO(io);
 
-    for (const agent of getInstallTargets(runtime!)) {
-      const status = await installAgent({
-        agent,
-        scope: scope!,
-        yes: true,
-        io: nestedIo,
-        operationMode: operationMode!,
-        cwd: options.cwd,
-        homeDir: options.homeDir
-      });
+    for (const runtimeTarget of getInstallTargets(runtime!)) {
+      const status =
+        runtimeTarget === "cursor"
+          ? await installSkill({
+              runtime: "cursor",
+              scope: scope!,
+              yes: true,
+              io: nestedIo,
+              operationMode: operationMode!,
+              cwd: options.cwd,
+              homeDir: options.homeDir
+            })
+          : await installAgent({
+              agent: runtimeTarget,
+              scope: scope!,
+              yes: true,
+              io: nestedIo,
+              operationMode: operationMode!,
+              cwd: options.cwd,
+              homeDir: options.homeDir
+            });
       if (status !== 0) {
         return status;
       }

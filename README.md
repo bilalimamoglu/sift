@@ -155,6 +155,7 @@ During install, pick the mode that matches reality:
 Install writes small runtime-native guidance surfaces too:
 - Codex: managed `AGENTS.md` block plus a generated `SKILL.md`
 - Claude: managed `CLAUDE.md` block plus a generated `.claude/commands/sift/` command pack
+- Cursor: an explicit `.cursor/skills/sift/SKILL.md` path when you want a native Cursor skill instead of relying on Codex-skill compatibility
 
 The CLI is still the real runtime. These native files are guidance surfaces, not a second execution system.
 
@@ -184,6 +185,30 @@ Important boundary:
 - unknown commands pass through untouched
 - if the hook path fails internally, the original raw command path wins
 
+After a few real runs, you can inspect the local evidence instead of guessing:
+
+```bash
+sift gain
+sift discover
+```
+
+`sift gain` shows the local first-pass history:
+- recorded runs
+- rough size/token reduction estimates
+- which presets you actually use
+- whether `sift` stayed heuristic or needed provider help
+
+`sift discover` is intentionally quieter.
+It only speaks when your own local `sift` history is thick enough to justify a concrete suggestion, such as:
+- "your local `sift` history keeps showing the same command family without the matching built-in preset"
+- "your local `sift` history keeps showing the same known command through explicit `sift exec`; check whether the optional hook shortcut is worth it"
+
+Important boundary here too:
+- local history only
+- metadata only, not raw logs
+- rough estimates, not fake precision
+- if the evidence is thin, `discover` says so and stays quiet
+
 Safety boundary:
 - `sift` now suppresses obvious instruction-like or hostile-looking output lines before they get treated like trustworthy guidance
 - this is a narrow safety assist, not a security guarantee or a full prompt-injection solution
@@ -201,9 +226,22 @@ First-use trust matters, so here is the blunt version:
 | Codex skill | repo or global `SKILL.md` | Codex install when `sift` owns the generated skill | custom `SKILL.md` is never overwritten | `sift skill remove codex` |
 | Claude instructions | `CLAUDE.md` or `~/.claude/CLAUDE.md` | `sift install claude` / `sift agent install claude` | only inside managed `sift` markers | `sift agent remove claude` |
 | Claude command pack | `.claude/commands/sift/` | Claude install when `sift` owns the generated command files | custom command files are never overwritten | `sift agent remove claude` |
+| Cursor skill | `.cursor/skills/sift/SKILL.md` or `~/.cursor/skills/sift/SKILL.md` | explicit Cursor install when you want the native path | if a compatible Codex skill already exists in the same scope, `sift` refuses to write a duplicate Cursor copy | `sift skill remove cursor` |
 | Provider config | `~/.config/sift/config.yaml` | `provider-assisted` setup unless you later create repo-local config | repo-local `sift.config.yaml` can override machine config for that repo | `sift config setup` / edit config / remove file |
 
 Sift does **not** write shell rc files, PATH entries, git hooks, or arbitrary repo files during install.
+
+If you want the explicit Cursor-native path, use:
+
+```bash
+sift install cursor
+# or
+sift skill install cursor --scope repo --yes
+```
+
+Why this is separate:
+- Cursor already loads compatible skills from `.codex/skills`
+- so `sift` will not install a duplicate native Cursor skill when the same managed Codex skill already exists in that scope
 
 Use `sift config setup` later when you want to revisit or change those choices:
 
@@ -226,6 +264,17 @@ safety:
 ```
 
 Keep it small. These are substring hints for the hardening pass, not a custom filtering DSL.
+
+The same config also exposes a tiny history block:
+
+```yaml
+history:
+  enabled: true
+  retentionDays: 30
+```
+
+This controls local `sift gain` / `sift discover` history only.
+It does not turn `sift` into shell-wide telemetry, and it does not store raw command output.
 
 Before pushing release-sensitive changes, run the same shared gate used by CI and the release workflow:
 

@@ -216,6 +216,15 @@ describe("cli app unit", () => {
       yes: true,
       version: "0.3.2"
     });
+
+    await runMatched(["install", "cursor", "--scope", "repo", "--yes"], deps);
+
+    expect(deps.installRuntimeSupport).toHaveBeenLastCalledWith({
+      runtime: "cursor",
+      scope: "repo",
+      yes: true,
+      version: "0.3.2"
+    });
   });
 
   it("routes hook match and hook run to the hook command surface", async () => {
@@ -255,6 +264,14 @@ describe("cli app unit", () => {
       dryRun: false,
       raw: false,
       yes: true
+    });
+
+    await runMatched(["skill", "show", "cursor"], deps);
+    expect(deps.showSkill).toHaveBeenLastCalledWith({
+      runtime: "cursor",
+      scope: undefined,
+      targetPath: undefined,
+      raw: false
     });
 
     await runMatched(["skill", "remove", "codex", "--scope", "repo", "--yes"], deps);

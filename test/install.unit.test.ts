@@ -68,9 +68,10 @@ describe("install runtime support", () => {
     expect(normalizeInstallRuntime(undefined)).toBeUndefined();
     expect(normalizeInstallRuntime("codex")).toBe("codex");
     expect(normalizeInstallRuntime("claude")).toBe("claude");
+    expect(normalizeInstallRuntime("cursor")).toBe("cursor");
     expect(normalizeInstallRuntime("all")).toBe("all");
-    expect(() => normalizeInstallRuntime("cursor")).toThrow(
-      "Invalid runtime. Use codex, claude, or all."
+    expect(() => normalizeInstallRuntime("windsurf")).toThrow(
+      "Invalid runtime. Use codex, claude, cursor, or all."
     );
 
     expect(normalizeInstallScope(undefined)).toBeUndefined();
@@ -144,6 +145,31 @@ describe("install runtime support", () => {
     );
     expect(io.stdout).toContain("Codex + Claude");
     expect(io.stdout).toContain("Operating mode: Agent escalation");
+  });
+
+  it("installs the tiny cursor skill explicitly without dragging in extra runtime surfaces", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-install-cursor-"));
+    const homeDir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-install-cursor-home-"));
+    const io = createFakeIO();
+
+    const status = await installRuntimeSupport({
+      runtime: "cursor",
+      scope: "repo",
+      yes: true,
+      io,
+      cwd,
+      homeDir,
+      version: "0.5.0"
+    });
+
+    expect(status).toBe(0);
+    expect(await fs.readFile(path.join(cwd, ".cursor", "skills", "sift", "SKILL.md"), "utf8")).toContain(
+      "<!-- sift:generated cursor-skill -->"
+    );
+    await expect(fs.access(path.join(cwd, "AGENTS.md"))).rejects.toThrow();
+    await expect(fs.access(path.join(cwd, "CLAUDE.md"))).rejects.toThrow();
+    expect(io.stdout).toContain("Cursor");
+    expect(io.stdout).toContain(".cursor/skills/sift/SKILL.md");
   });
 
   it("continues straight into provider setup when provider-assisted is selected", async () => {

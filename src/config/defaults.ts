@@ -30,6 +30,10 @@ export const defaultConfig: SiftConfig = {
     extraRiskPatterns: [],
     ignoredRiskPatterns: []
   },
+  history: {
+    enabled: true,
+    retentionDays: 30
+  },
   presets: {
     "test-status": {
       question: "Did the tests pass? If not, list only the failing tests or suites.",

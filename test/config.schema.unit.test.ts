@@ -21,6 +21,19 @@ describe("siftConfigSchema", () => {
     expect(parsed.safety.ignoredRiskPatterns).toContain("ignore previous instructions");
   });
 
+  it("accepts tiny local history settings", () => {
+    const parsed = siftConfigSchema.parse({
+      ...defaultConfig,
+      history: {
+        enabled: true,
+        retentionDays: 14
+      }
+    });
+
+    expect(parsed.history.enabled).toBe(true);
+    expect(parsed.history.retentionDays).toBe(14);
+  });
+
   it("accepts the native openai provider", () => {
     const parsed = siftConfigSchema.parse({
       ...defaultConfig,

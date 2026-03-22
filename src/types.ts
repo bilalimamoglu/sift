@@ -62,6 +62,11 @@ export interface SafetyConfig {
   ignoredRiskPatterns: string[];
 }
 
+export interface HistoryConfig {
+  enabled: boolean;
+  retentionDays: number;
+}
+
 export interface PresetDefinition {
   question: string;
   format: OutputFormat;
@@ -75,6 +80,7 @@ export interface SiftConfig {
   input: InputConfig;
   runtime: RuntimeConfig;
   safety: SafetyConfig;
+  history: HistoryConfig;
   presets: Record<string, PresetDefinition>;
   providerProfiles?: ProviderProfiles;
 }
@@ -84,6 +90,7 @@ export interface PartialSiftConfig {
   input?: Partial<InputConfig>;
   runtime?: Partial<RuntimeConfig>;
   safety?: Partial<SafetyConfig>;
+  history?: Partial<HistoryConfig>;
   presets?: Record<string, PresetDefinition>;
   providerProfiles?: ProviderProfiles;
 }
@@ -157,3 +164,42 @@ export interface SafetyReport {
   suppressedLineCount: number;
   signals: SafetySignal[];
 }
+
+export type HistoryEntrypoint =
+  | "pipe"
+  | "exec"
+  | "hook"
+  | "rerun"
+  | "escalate"
+  | "watch";
+
+export type HistoryResultKind =
+  | "reduced"
+  | "insufficient"
+  | "pass-through"
+  | "watch-summary";
+
+export interface HistoryEvent {
+  version: 1;
+  timestamp: string;
+  cwdHash: string;
+  cwdLabel: string;
+  entrypoint: HistoryEntrypoint;
+  operationMode: OperationMode;
+  commandFamily: string | null;
+  presetName: string | null;
+  candidatePresetName: string | null;
+  providerCalled: boolean;
+  layer: RunLayer;
+  detail: DetailLevel | null;
+  resultKind: HistoryResultKind;
+  inputChars: number;
+  outputChars: number;
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
+  exactProviderTokens: number | null;
+  durationMs: number | null;
+  safetySuppressedLineCount: number;
+}
+
+export type RunLayer = "heuristic" | "provider" | "fallback" | "none";

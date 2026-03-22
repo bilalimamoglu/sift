@@ -22,6 +22,12 @@ describe("README quick start e2e", () => {
     expect(readme).toContain("What Sift Will Touch");
     expect(readme).toContain("narrow safety assist");
     expect(readme).toContain("extraRiskPatterns");
+    expect(readme).toContain("sift gain");
+    expect(readme).toContain("sift discover");
+    expect(readme).toContain("local history only");
+    expect(readme).toContain("metadata only");
+    expect(readme).toContain("sift install cursor");
+    expect(readme).toContain(".cursor/skills/sift/SKILL.md");
     expect(readme).not.toContain("sift hook run -- pytest -q");
 
     expect(cliReference).toContain("agent-escalation");
@@ -33,6 +39,13 @@ describe("README quick start e2e", () => {
     expect(cliReference).toContain("unknown commands run unchanged");
     expect(cliReference).toContain("suspicious instruction-like log lines");
     expect(cliReference).toContain("extraRiskPatterns");
+    expect(cliReference).toContain("sift gain");
+    expect(cliReference).toContain("sift discover");
+    expect(cliReference).toContain("metadata only, not raw logs");
+    expect(cliReference).toContain("discover only speaks when local history is thick enough");
+    expect(cliReference).toContain("sift install cursor");
+    expect(cliReference).toContain("sift skill show cursor");
+    expect(cliReference).toContain("duplicate native Cursor skill");
     expect(cliReference).toContain("This is the default product path.");
     expect(cliReference).toContain("This is an optional shortcut, not the main workflow.");
   });
@@ -249,10 +262,19 @@ describe("README quick start e2e", () => {
         },
         {
           args: ["skill", "show", "codex", "--raw"]
+        },
+        {
+          args: ["skill", "show", "cursor"]
+        },
+        {
+          args: ["gain"]
+        },
+        {
+          args: ["discover"]
         }
       ];
 
-      const expectedStatuses = [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+      const expectedStatuses = [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
       const outputs: string[] = [];
 
       for (const [index, command] of commands.entries()) {
@@ -302,6 +324,10 @@ describe("README quick start e2e", () => {
       expect(outputs[18]).toContain("<!-- sift:begin codex -->");
       expect(outputs[19]).toContain("Codex skill preview");
       expect(outputs[20]).toContain("name: sift");
+      expect(outputs[21]).toContain("Cursor skill preview");
+      expect(outputs[22]).toContain("Sift gain");
+      expect(outputs[22]).toContain("Notes: size/token savings are local estimates");
+      expect(outputs[23]).toMatch(/No strong discover hints|Sift discover/);
     } finally {
       await server.close();
     }

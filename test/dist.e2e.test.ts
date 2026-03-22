@@ -160,4 +160,62 @@ describe("dist e2e", () => {
     expect(result.stdout).not.toContain("Safety note:");
     expect(result.stdout).toContain("Cannot find module");
   });
+
+  it("reports local gain/discover surfaces in the built cli", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-dist-history-home-"));
+
+    const execResult = await runDistCliAsync({
+      args: [
+        "exec",
+        "--preset",
+        "build-failure",
+        "--",
+        "node",
+        "-e",
+        "console.error('Error: Cannot find module x')"
+      ],
+      env: {
+        HOME: home
+      }
+    });
+    const gain = await runDistCliAsync({
+      args: ["gain"],
+      env: {
+        HOME: home
+      }
+    });
+    const discover = await runDistCliAsync({
+      args: ["discover"],
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(execResult.status).toBe(0);
+    expect(gain.status).toBe(0);
+    expect(gain.stdout).toContain("Sift gain");
+    expect(gain.stdout).toContain("Recorded runs: 1");
+    expect(discover.status).toBe(0);
+    expect(discover.stdout).toContain("Not enough local history yet for discover.");
+  });
+
+  it("installs the tiny cursor-native skill without duplicating agent surfaces", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-dist-cursor-home-"));
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-dist-cursor-cwd-"));
+
+    const cursorInstall = await runDistCliAsync({
+      args: ["skill", "install", "cursor", "--scope", "repo", "--yes"],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(cursorInstall.status).toBe(0);
+    expect(
+      await fs.readFile(path.join(cwd, ".cursor", "skills", "sift", "SKILL.md"), "utf8")
+    ).toContain("<!-- sift:generated cursor-skill -->");
+    await expect(fs.access(path.join(cwd, "AGENTS.md"))).rejects.toThrow();
+    await expect(fs.access(path.join(cwd, "CLAUDE.md"))).rejects.toThrow();
+  });
 });

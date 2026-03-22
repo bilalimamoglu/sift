@@ -171,6 +171,12 @@ The config now includes a tiny `safety` section:
 
 These are substring hints for the hostile-output hardening pass. They are intentionally not a rules engine.
 
+The config also includes a tiny `history` section:
+- `enabled`
+- `retentionDays`
+
+This only controls local metadata history for `sift gain` and `sift discover`.
+
 ### `sift config validate`
 
 Validate the current config or a specific config file.
@@ -203,6 +209,57 @@ Check which config is active and how `sift` will behave in the current setup.
 sift doctor
 ```
 
+### `sift gain`
+
+Show local `sift` history in plain language.
+
+This is a lightweight measurement surface, not a dashboard.
+Use it when you want to check whether `sift` is actually reducing the size of what you feed into the agent.
+
+```bash
+sift gain
+sift gain --today
+sift gain --last 7 --by-preset
+```
+
+What it reports:
+- recorded local runs
+- rough size/token reduction estimates
+- whether provider help was skipped
+- which presets you use most
+
+Important boundary:
+- local history only
+- metadata only, not raw logs
+- token numbers are estimates unless the provider reported exact usage
+
+If you want to wipe that local history:
+
+```bash
+sift gain clear --yes
+```
+
+### `sift discover`
+
+Show evidence-backed missed-use hints from local `sift` history.
+
+This command is intentionally conservative.
+If your local history is thin or noisy, it stays quiet instead of inventing advice.
+
+```bash
+sift discover
+sift discover --last 7
+```
+
+Current hint types are deliberately small:
+- repeated command shapes that fit an existing built-in preset
+- repeated explicit runs where checking the optional hook matcher may save typing
+
+Notes:
+- discover only speaks when local history is thick enough
+- suggestions come from repeated observed patterns, not shell-wide telemetry
+- if there is no convincing pattern yet, `sift discover` should say so
+
 ### `sift presets`
 
 List presets or inspect a single preset.
@@ -224,6 +281,11 @@ The installer now asks which operating mode matches your actual workflow:
 - `provider-assisted`: best if you want API-backed cheap fallback inside `sift`
 - `local-only`: best if you want `sift` by itself with no provider credentials
 
+Supported runtime paths:
+- `codex`: managed `AGENTS.md` plus tiny Codex skill
+- `claude`: managed `CLAUDE.md` plus tiny Claude command pack
+- `cursor`: tiny native `.cursor/skills/sift/SKILL.md` only
+
 If you pick `provider-assisted`, the installer continues directly into provider/model/API-key setup instead of telling you to run `sift config setup` separately.
 
 The install summary should leave you with one obvious default next step, then mention `sift hook match -- pytest -q` only as an optional beta shortcut for a known preset.
@@ -237,6 +299,7 @@ The installer also shows an explicit preflight:
 ```bash
 sift install
 sift install codex --scope global --yes
+sift install cursor
 sift install all --scope local --yes
 ```
 
@@ -286,30 +349,33 @@ sift agent remove claude
 
 ### `sift skill show`
 
-Preview the generated Codex-native `sift` skill without writing anything.
+Preview the generated native `sift` skill without writing anything.
 
 ```bash
 sift skill show codex
+sift skill show cursor
 sift skill show codex --raw
 ```
 
-Use this when you want to inspect the tiny native workflow guide for Codex that reinforces the normal `sift exec` path.
+Use this when you want to inspect the tiny native workflow guide that reinforces the normal `sift exec` path.
 
 ### `sift skill install`
 
-Install or update the generated Codex skill directly.
+Install or update the generated native skill directly.
 
 ```bash
 sift skill install codex --scope global --yes
+sift skill install cursor --scope repo --yes
 sift skill install codex --dry-run
 ```
 
 This complements the CLI and managed block. It does not replace them.
 If a custom `SKILL.md` is already present, `sift` refuses to overwrite it.
+If a compatible Codex skill already exists in the same scope, `sift` refuses to install a duplicate native Cursor skill.
 
 ### `sift skill status`
 
-Show whether the Codex skill is installed in repo or global scope, or whether a custom `SKILL.md` is blocking ownership-safe updates.
+Show whether the Codex and Cursor skills are installed in repo or global scope, or whether a custom `SKILL.md` is blocking ownership-safe updates.
 
 ```bash
 sift skill status

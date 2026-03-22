@@ -13,6 +13,10 @@ export function getDefaultCodexGlobalSkillPath(homeDir = os.homedir()): string {
   return path.join(homeDir, ".codex", "skills", "sift", "SKILL.md");
 }
 
+export function getDefaultCursorGlobalSkillPath(homeDir = os.homedir()): string {
+  return path.join(homeDir, ".cursor", "skills", "sift", "SKILL.md");
+}
+
 export function getDefaultClaudeGlobalInstructionsPath(homeDir = os.homedir()): string {
   return path.join(homeDir, ".claude", "CLAUDE.md");
 }
@@ -35,6 +39,14 @@ export function getDefaultTestStatusStatePath(homeDir = os.homedir()): string {
 
 export function getDefaultScopedTestStatusStateDir(homeDir = os.homedir()): string {
   return path.join(getDefaultGlobalStateDir(homeDir), "test-status", "by-cwd");
+}
+
+export function getDefaultHistoryStateDir(homeDir = os.homedir()): string {
+  return path.join(getDefaultGlobalStateDir(homeDir), "history");
+}
+
+export function getDefaultHistoryEventsDir(homeDir = os.homedir()): string {
+  return path.join(getDefaultHistoryStateDir(homeDir), "events");
 }
 
 export function getScopedTestStatusStatePath(cwd: string, homeDir = os.homedir()): string {

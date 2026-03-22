@@ -1,19 +1,19 @@
 import { spawn } from "node:child_process";
 import { stderr as defaultStderr } from "node:process";
+import pc from "picocolors";
 import { createPresentation } from "../ui/presentation.js";
 import { runExec, type ExecRequest, normalizeChildExitCode } from "../core/exec.js";
+import { recordHistoryEvent } from "../core/history.js";
+import {
+  matchKnownCommand,
+  type KnownCommandMatchArgs,
+  type KnownCommandMatchResult
+} from "../core/known-command-match.js";
 import type { DetailLevel, SiftConfig } from "../types.js";
 
-export interface HookMatchArgs {
-  command?: string[];
-  shellCommand?: string;
-}
+export interface HookMatchArgs extends KnownCommandMatchArgs {}
 
-export interface HookMatchResult {
-  matched: boolean;
-  presetName?: string;
-  reason: string;
-}
+export interface HookMatchResult extends KnownCommandMatchResult {}
 
 export interface HookRunArgs extends HookMatchArgs {
   config: SiftConfig;
@@ -36,205 +36,8 @@ const defaultHookDeps: HookDeps = {
   runRaw: runRawHookCommand
 };
 
-function isBareCommandName(value: string | undefined): boolean {
-  if (!value) {
-    return false;
-  }
-
-  return !/[\\/]/.test(value);
-}
-
-function shellStartsWith(pattern: RegExp, shellCommand: string): boolean {
-  return pattern.test(shellCommand.trim());
-}
-
-function matchArgvCommand(command: string[]): HookMatchResult {
-  const first = command[0];
-  const second = command[1];
-  const third = command[2];
-
-  if (!first) {
-    return {
-      matched: false,
-      reason: "Missing command."
-    };
-  }
-
-  if (!isBareCommandName(first)) {
-    return {
-      matched: false,
-      reason: "Path-prefixed binaries stay out of the beta matcher."
-    };
-  }
-
-  if (first === "sift") {
-    return {
-      matched: false,
-      reason: "sift commands are never re-hooked."
-    };
-  }
-
-  if (first === "python" && second === "-m" && third === "pytest") {
-    return {
-      matched: true,
-      presetName: "test-status",
-      reason: "Matched python -m pytest -> test-status."
-    };
-  }
-
-  if (first === "pytest" || first === "vitest" || first === "jest") {
-    return {
-      matched: true,
-      presetName: "test-status",
-      reason: `Matched ${first} -> test-status.`
-    };
-  }
-
-  if (first === "tsc") {
-    return {
-      matched: true,
-      presetName: "typecheck-summary",
-      reason: "Matched tsc -> typecheck-summary."
-    };
-  }
-
-  if (first === "eslint" || first === "biome" || first === "ruff" || first === "flake8") {
-    return {
-      matched: true,
-      presetName: "lint-failures",
-      reason: `Matched ${first} -> lint-failures.`
-    };
-  }
-
-  if (
-    (first === "npm" || first === "pnpm" || first === "yarn" || first === "bun") &&
-    second === "audit"
-  ) {
-    return {
-      matched: true,
-      presetName: "audit-critical",
-      reason: `Matched ${first} audit -> audit-critical.`
-    };
-  }
-
-  if (first === "terraform" && second === "plan") {
-    return {
-      matched: true,
-      presetName: "infra-risk",
-      reason: "Matched terraform plan -> infra-risk."
-    };
-  }
-
-  if (first === "git" && second === "diff") {
-    return {
-      matched: true,
-      presetName: "diff-summary",
-      reason: "Matched git diff -> diff-summary."
-    };
-  }
-
-  return {
-    matched: false,
-    reason: "No known preset matcher for this command."
-  };
-}
-
-function matchShellCommand(shellCommand: string): HookMatchResult {
-  const trimmed = shellCommand.trim();
-
-  if (trimmed.length === 0) {
-    return {
-      matched: false,
-      reason: "Missing shell command."
-    };
-  }
-
-  if (shellStartsWith(/^sift(?:\s|$)/, trimmed)) {
-    return {
-      matched: false,
-      reason: "sift commands are never re-hooked."
-    };
-  }
-
-  if (shellStartsWith(/^python\s+-m\s+pytest(?:\s|$)/, trimmed)) {
-    return {
-      matched: true,
-      presetName: "test-status",
-      reason: "Matched python -m pytest -> test-status."
-    };
-  }
-
-  if (shellStartsWith(/^(pytest|vitest|jest)(?:\s|$)/, trimmed)) {
-    const tool = trimmed.split(/\s+/, 1)[0]!;
-    return {
-      matched: true,
-      presetName: "test-status",
-      reason: `Matched ${tool} -> test-status.`
-    };
-  }
-
-  if (shellStartsWith(/^tsc(?:\s|$)/, trimmed)) {
-    return {
-      matched: true,
-      presetName: "typecheck-summary",
-      reason: "Matched tsc -> typecheck-summary."
-    };
-  }
-
-  if (shellStartsWith(/^(eslint|biome|ruff|flake8)(?:\s|$)/, trimmed)) {
-    const tool = trimmed.split(/\s+/, 1)[0]!;
-    return {
-      matched: true,
-      presetName: "lint-failures",
-      reason: `Matched ${tool} -> lint-failures.`
-    };
-  }
-
-  if (shellStartsWith(/^(npm|pnpm|yarn|bun)\s+audit(?:\s|$)/, trimmed)) {
-    const tool = trimmed.split(/\s+/, 1)[0]!;
-    return {
-      matched: true,
-      presetName: "audit-critical",
-      reason: `Matched ${tool} audit -> audit-critical.`
-    };
-  }
-
-  if (shellStartsWith(/^terraform\s+plan(?:\s|$)/, trimmed)) {
-    return {
-      matched: true,
-      presetName: "infra-risk",
-      reason: "Matched terraform plan -> infra-risk."
-    };
-  }
-
-  if (shellStartsWith(/^git\s+diff(?:\s|$)/, trimmed)) {
-    return {
-      matched: true,
-      presetName: "diff-summary",
-      reason: "Matched git diff -> diff-summary."
-    };
-  }
-
-  return {
-    matched: false,
-    reason: "No known preset matcher for this command."
-  };
-}
-
 export function matchHookCommand(args: HookMatchArgs): HookMatchResult {
-  const hasArgvCommand = Array.isArray(args.command) && args.command.length > 0;
-  const hasShellCommand =
-    typeof args.shellCommand === "string" && args.shellCommand.trim().length > 0;
-
-  if (hasArgvCommand === hasShellCommand) {
-    throw new Error("Provide either --shell <command> or -- <program> [args...].");
-  }
-
-  if (hasArgvCommand) {
-    return matchArgvCommand(args.command!);
-  }
-
-  return matchShellCommand(args.shellCommand!);
+  return matchKnownCommand(args);
 }
 
 function buildCommandPreview(args: HookMatchArgs): string {
@@ -309,6 +112,31 @@ export async function runHook(
 
   if (!match.matched) {
     emitDecision(`Hook beta passed through. ${match.reason}`, Boolean(args.quiet));
+    if (!args.dryRun && args.config.history.enabled) {
+      try {
+        await recordHistoryEvent({
+          cwd: args.cwd ?? process.cwd(),
+          entrypoint: "hook",
+          operationMode: args.config.runtime.operationMode,
+          commandFamily: match.commandFamily,
+          presetName: null,
+          candidatePresetName: null,
+          providerCalled: false,
+          layer: "none",
+          detail: args.detail ?? null,
+          resultKind: "pass-through",
+          inputChars: 0,
+          outputChars: 0,
+          historyConfig: args.config.history,
+          homeDir: process.env.HOME
+        });
+      } catch (error) {
+        if (args.config.runtime.verbose) {
+          const reason = error instanceof Error ? error.message : "unknown_error";
+          process.stderr.write(`${pc.dim("sift")} history_write=failed reason=${reason}\n`);
+        }
+      }
+    }
     if (args.dryRun) {
       process.stdout.write("No known preset match. Raw command would run unchanged.\n");
       return 0;
@@ -347,7 +175,8 @@ export async function runHook(
       includeTestIds: args.includeTestIds,
       detail: args.detail,
       failOn: args.failOn,
-      quiet: args.quiet
+      quiet: args.quiet,
+      historyEntrypoint: "hook"
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown hook error";

@@ -17,6 +17,7 @@ When working inside the `sift` repo itself:
 - Repo-standard agent model matrix:
   - `gsd-product-visionary` -> `gpt-5.4` with high reasoning for product direction, positioning, onboarding judgment, and final tradeoff calls
   - `gsd-first-user-tester` -> `gpt-5.4-mini` with low reasoning for zero-context consumer friction and "bilinçsiz kullanıcı" review
+  - `gsd-user-profiler` -> `gpt-5.4` with high reasoning when we need to reconstruct the repo owner's actual skepticism, preferences, and rejection patterns from thread history
   - `gsd-phase-researcher` -> `gpt-5.4-mini` with medium reasoning for bounded discovery and artifact gathering
   - `gsd-codebase-mapper` -> `gpt-5.4-mini` with medium reasoning for fast repo mapping and surface discovery
   - `gsd-planner` -> `gpt-5.4-mini` with medium reasoning for routine execution-plan drafting; escalate to `gpt-5.4` high when the phase is cross-cutting or architecture-heavy
@@ -30,6 +31,21 @@ When working inside the `sift` repo itself:
 - In this repo, default to the full GSD working style for meaningful product, planning, onboarding, packaging, and release-adjacent work. That means: use the relevant GSD role lenses or actual sub-agents first, keep local `.planning/` artifacts up to date, and only skip that overhead for truly trivial `gsd-fast`-class tasks.
 - Do not wait for the user to restate "use GSD fully" on each turn. Treat full GSD usage as the standing default here unless the user explicitly asks for a lightweight or one-off path.
 - For Phase 2 and Phase 3 product work in this repo, treat the minimum consensus loop as: `gsd-product-visionary` + `gsd-first-user-tester` + one architecture/planning lens (`gsd-planner` or equivalent) + one critical review lens (`gsd-plan-checker`, `gsd-verifier`, or `gsd-integration-checker`). Final implementation direction should be chosen only after those views are synthesized in the main `gpt-5.4` thread.
+- For Phase 5, Phase 6, and any similarly broad product/distribution/measurement phase, upgrade the consensus loop. Minimum required signoff set:
+  - `gsd-product-visionary`
+  - `gsd-first-user-tester`
+  - one technical architecture lens (`gsd-planner`, `gsd-codebase-mapper`, or equivalent)
+  - one critical checker (`gsd-plan-checker`, `gsd-verifier`, or `gsd-integration-checker`)
+  - one skeptical user proxy derived from the owner's actual conversation history
+- The skeptical user proxy should be stricter than the literal user prompt. Build it by first using `gsd-user-profiler` on the current thread or recent thread set, then either:
+  - spawn a dedicated proxy review agent from that profile, or
+  - emulate the proxy in the main thread if agent limits prevent another spawn
+- The skeptical user proxy should assume:
+  - low patience for conceptual complexity
+  - strong distrust of overengineered UX
+  - preference for small, obvious commands and visible truth over cleverness
+  - strong sensitivity to fake certainty, vanity features, and drift from the product's core identity
+- For big phases, do not mark a plan complete just because product and technical lenses agree. The skeptical user proxy must also reach at least a reluctant pass, and any remaining objections should be written down as explicit residual risk or next-phase work.
 - For first-contact copy surfaces such as README hero copy, installer one-liners, launch hooks, Reddit titles, Hacker News titles, and top-of-page product blurbs, treat the current positioning documents as a hard contract, not soft inspiration. Read `.planning/marketing/messaging/POSITIONING.md` and the relevant `scripts/docs/product/messaging/` notes before proposing final copy.
 - On title-only or first-impression surfaces, do not rely on the body text or later comments to carry the category, core mechanism, or differentiation. Put the essential product truth in the title if reasonably possible.
 - Before offering final first-contact copy, check that it still carries the current product truth: local-first, heuristics-first or fallback-only-when-needed, grouped failures or likely root causes, and the next useful step when space allows. If the copy drops the core product truth in favor of sounding clever, rewrite it.
@@ -42,6 +58,13 @@ When working inside the `sift` repo itself:
 - When verifying new `sift` CLI behavior, prefer the repo-local entrypoint (`node --import tsx src/cli.ts ...` or the built local package) unless you have already confirmed the globally installed `sift` version matches `package.json`.
 - If global and local `sift` versions differ, treat repo-local results as source of truth for development verification.
 - If `sift` is insufficient or says the signal is not enough while developing `sift` itself, append a short timestamped note to `.local/agent-insufficient-log.md` with the command, preset or question, likely cause, and next step, then keep trying to resolve the gap instead of stopping at the first insufficient result.
+- Treat new `sift` insufficient/error incidents as product signal, not just local friction. Default handling order:
+  1. log the incident immediately in `.local/agent-insufficient-log.md`
+  2. try to fix it in the same turn if the gap looks local, bounded, and phase-compatible
+  3. if a real fix lands, verify it and record the resolution in the same incident entry
+  4. if the gap is not safely fixable inline or needs a broader design, testing, or measurement pass, adapt the active or next phase plan explicitly so the incident becomes scheduled work instead of forgotten residue
+- Do not quietly accumulate unresolved `sift` insufficiency cases across phases. Either close them quickly, or promote them into the planning system with a named phase/plan consequence.
+- When a phase uncovers repeated `sift` insufficiency patterns, treat that as evidence for measurement, hardening, or capability work in the next phase rather than leaving it as an informal note.
 - Even if internal planning, GSD artifacts, and implementation reasoning happen in English, explain progress, outcomes, why the work was needed, and the next plan back to the user in simple, detailed Turkish by default.
 
 When debugging test failures, default to `sift` first and treat `standard` as the usual stop point:
