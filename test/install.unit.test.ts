@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import stripAnsi from "strip-ansi";
 import { describe, expect, it } from "vitest";
 import {
   installRuntimeSupport,
@@ -161,14 +162,15 @@ describe("install runtime support", () => {
 
     const configPath = path.join(homeDir, ".config", "sift", "config.yaml");
     const config = await fs.readFile(configPath, "utf8");
+    const rendered = stripAnsi(io.stdout);
 
     expect(status).toBe(0);
     expect(config).toContain("operationMode: provider-assisted");
     expect(config).toContain("model: gpt-5-nano");
-    expect(io.stdout).toContain("Next: provider setup. Press Esc at any step to go back.");
-    expect(io.stdout).toContain("Selected model: gpt-5-nano");
-    expect(io.stdout).toContain("sift config show --show-secrets");
-    expect(io.stdout).not.toContain("sift config setup  # optional");
+    expect(rendered).toContain("Next: provider setup. Press Esc at any step to go back.");
+    expect(rendered).toContain("Selected model: gpt-5-nano");
+    expect(rendered).toContain("sift config show --show-secrets");
+    expect(rendered).not.toContain("sift config setup  # optional");
   });
 
   it("lets the user back out from mode to runtime and cancel before writing files", async () => {

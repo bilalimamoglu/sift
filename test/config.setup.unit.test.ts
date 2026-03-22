@@ -2,6 +2,7 @@ import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import stripAnsi from "strip-ansi";
 import YAML from "yaml";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -76,6 +77,7 @@ describe("config setup", () => {
       runtime: { operationMode: string };
     };
     const mode = fs.statSync(targetPath).mode & 0o777;
+    const rendered = stripAnsi(io.stdout);
 
     expect(status).toBe(0);
     expect(written.provider.provider).toBe("openai");
@@ -84,16 +86,16 @@ describe("config setup", () => {
     expect(written.provider.apiKey).toBe("sk-test-key");
     expect(written.providerProfiles?.openai?.apiKey).toBe("sk-test-key");
     expect(written.runtime.operationMode).toBe("provider-assisted");
-    expect(io.stdout).toContain("Welcome to sift.");
-    expect(io.stdout).toContain("Operating mode: Provider-assisted");
-    expect(io.stdout).toContain("OpenAI fallback it is.");
-    expect(io.stdout).toContain("Default model: gpt-5-nano");
-    expect(io.stdout).toContain("Selected model: gpt-5-nano");
-    expect(io.stdout).toContain("Enter your OpenAI API key (input hidden):");
-    expect(io.stdout).toContain(`Machine-wide config: ${targetPath}`);
-    expect(io.stdout).toContain("Want to switch providers later?");
-    expect(io.stdout).toContain("Want to inspect the active values first?");
-    expect(io.stdout).not.toContain("sk-test-key");
+    expect(rendered).toContain("Welcome to sift.");
+    expect(rendered).toContain("Operating mode: Provider-assisted");
+    expect(rendered).toContain("OpenAI fallback it is.");
+    expect(rendered).toContain("Default model: gpt-5-nano");
+    expect(rendered).toContain("Selected model: gpt-5-nano");
+    expect(rendered).toContain("Enter your OpenAI API key (input hidden):");
+    expect(rendered).toContain(`Machine-wide config: ${targetPath}`);
+    expect(rendered).toContain("Want to switch providers later?");
+    expect(rendered).toContain("Want to inspect the active values first?");
+    expect(rendered).not.toContain("sk-test-key");
     expect(io.closed).toBe(true);
     if (process.platform !== "win32") {
       expect(mode).toBe(0o600);
@@ -135,11 +137,12 @@ describe("config setup", () => {
     const written = YAML.parse(await fsPromises.readFile(targetPath, "utf8")) as {
       provider: { model: string };
     };
+    const rendered = stripAnsi(io.stdout);
 
     expect(status).toBe(0);
     expect(written.provider.model).toBe("gpt-5.4-nano");
-    expect(io.stdout).toContain("Default model: gpt-5-nano");
-    expect(io.stdout).toContain("Selected model: gpt-5.4-nano");
+    expect(rendered).toContain("Default model: gpt-5-nano");
+    expect(rendered).toContain("Selected model: gpt-5.4-nano");
   });
 
   it("writes an OpenRouter config when selected from the interactive selector", async () => {
@@ -161,6 +164,7 @@ describe("config setup", () => {
       providerProfiles?: { openrouter?: { apiKey?: string } };
       runtime: { operationMode: string };
     };
+    const rendered = stripAnsi(io.stdout);
 
     expect(status).toBe(0);
     expect(written.provider.provider).toBe("openrouter");
@@ -169,9 +173,9 @@ describe("config setup", () => {
     expect(written.provider.apiKey).toBe("or-key");
     expect(written.providerProfiles?.openrouter?.apiKey).toBe("or-key");
     expect(written.runtime.operationMode).toBe("provider-assisted");
-    expect(io.stdout).toContain("OpenRouter fallback it is.");
-    expect(io.stdout).toContain("Selected model: openrouter/free");
-    expect(io.stdout).toContain("Enter your OpenRouter API key (input hidden):");
+    expect(rendered).toContain("OpenRouter fallback it is.");
+    expect(rendered).toContain("Selected model: openrouter/free");
+    expect(rendered).toContain("Enter your OpenRouter API key (input hidden):");
   });
 
   it("re-prompts when the API key is empty", async () => {
