@@ -28,6 +28,7 @@ describe("agent installer smoke", () => {
     expect(codex.stdout).not.toContain("<!-- sift:begin codex -->");
     expect(claude.status).toBe(0);
     expect(claude.stdout).toContain("Claude instructions preview");
+    expect(claude.stdout).toContain("command pack target");
     expect(rawCodex.status).toBe(0);
     expect(rawCodex.stdout).toContain("<!-- sift:begin codex -->");
     expect(rawCodex.stdout).toContain("Default operating mode: Agent escalation.");
@@ -67,9 +68,11 @@ describe("agent installer smoke", () => {
     });
     expect(append.status).toBe(0);
     const appended = await fs.readFile(claudePath, "utf8");
+    const claudeHelpPath = path.join(cwd, ".claude", "commands", "sift", "help.md");
     expect(appended).toContain("# Existing instructions");
     expect(appended).toContain("Keep this.");
     expect(appended).toContain("<!-- sift:begin claude -->");
+    expect(await fs.readFile(claudeHelpPath, "utf8")).toContain("/sift:help");
 
     const update = runSourceCli({
       args: ["agent", "install", "claude", "--yes"],
@@ -86,6 +89,7 @@ describe("agent installer smoke", () => {
     expect(status.status).toBe(0);
     expect(status.stdout).toContain("Codex managed block: installed");
     expect(status.stdout).toContain("Claude managed block: installed");
+    expect(status.stdout).toContain("Claude command pack: installed");
 
     const remove = runSourceCli({
       args: ["agent", "remove", "claude", "--yes"],
@@ -93,6 +97,7 @@ describe("agent installer smoke", () => {
     });
     expect(remove.status).toBe(0);
     expect(await fs.readFile(claudePath, "utf8")).toBe("# Existing instructions\n\nKeep this.\n");
+    await expect(fs.stat(claudeHelpPath)).rejects.toThrow();
   });
 
   it("supports global installs under an isolated HOME and keeps dry-run non-mutating", async () => {
@@ -132,6 +137,9 @@ describe("agent installer smoke", () => {
     });
     expect(install.status).toBe(0);
     expect(await fs.readFile(claudeGlobalPath, "utf8")).toContain("<!-- sift:begin claude -->");
+    expect(
+      await fs.readFile(path.join(home, ".claude", "commands", "sift", "help.md"), "utf8")
+    ).toContain("/sift:help");
 
     const status = runSourceCli({
       args: ["agent", "status"],
@@ -143,6 +151,7 @@ describe("agent installer smoke", () => {
     expect(status.status).toBe(0);
     expect(status.stdout).toContain(codexGlobalPath);
     expect(status.stdout).toContain(claudeGlobalPath);
+    expect(status.stdout).toContain("Claude command pack: installed");
   });
 
   it("fails safely for non-interactive writes without --yes and for malformed duplicate blocks", async () => {

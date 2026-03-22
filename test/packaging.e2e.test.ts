@@ -43,11 +43,53 @@ describe("packaging e2e", () => {
       env,
       encoding: "utf8"
     });
+    const doctor = spawnSync("npx", ["--no-install", "sift", "doctor"], {
+      cwd: dir,
+      env,
+      encoding: "utf8"
+    });
+    const agentPreview = spawnSync("npx", ["--no-install", "sift", "agent", "show", "codex"], {
+      cwd: dir,
+      env,
+      encoding: "utf8"
+    });
+    const skillInstall = spawnSync(
+      "npx",
+      ["--no-install", "sift", "skill", "install", "codex", "--scope", "global", "--yes"],
+      {
+        cwd: dir,
+        env,
+        encoding: "utf8"
+      }
+    );
+    const claudeInstall = spawnSync(
+      "npx",
+      ["--no-install", "sift", "agent", "install", "claude", "--scope", "global", "--yes"],
+      {
+        cwd: dir,
+        env,
+        encoding: "utf8"
+      }
+    );
 
     expect(result.status).toBe(0);
+    expect(doctor.status).toBe(0);
+    expect(agentPreview.status).toBe(0);
+    expect(skillInstall.status).toBe(0);
+    expect(claudeInstall.status).toBe(0);
     expect(tarballContents).not.toContain("assets/brand");
     expect(result.stdout).toContain("sift [question]");
     expect(result.stdout).toContain("  \\\\  //");
     expect(result.stdout).toContain("choose agent-escalation, provider-assisted, or local-only");
+    expect(doctor.stdout).toContain("setupStatus: Configured");
+    expect(doctor.stdout).toContain("defaultPath: Default path: use `sift exec`");
+    expect(agentPreview.stdout).toContain("Codex instructions preview");
+    expect(agentPreview.stdout).toContain("Default path: use `sift exec`");
+    expect(
+      await fs.readFile(path.join(home, ".codex", "skills", "sift", "SKILL.md"), "utf8")
+    ).toContain("<!-- sift:generated codex-skill -->");
+    expect(
+      await fs.readFile(path.join(home, ".claude", "commands", "sift", "test-status.md"), "utf8")
+    ).toContain("<!-- sift:generated claude-command test-status -->");
   });
 });

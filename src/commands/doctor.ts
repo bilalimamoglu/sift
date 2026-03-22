@@ -3,6 +3,12 @@ import {
   describeOperationMode,
   getOperationModeLabel
 } from "../config/operation-mode.js";
+import {
+  getDefaultExecPathLine,
+  getDoctorNextStepLine,
+  getExecVsHookDecisionLine,
+  getHookBetaLine
+} from "../content/adoption.js";
 import { resolveEffectiveOperationMode } from "../config/resolve.js";
 import { getProviderApiKeyEnvNames } from "../config/provider-api-key.js";
 import type { SiftConfig } from "../types.js";
@@ -45,6 +51,10 @@ export function runDoctor(config: SiftConfig, configPath?: string | null): numbe
     "sift doctor",
     "A quick check for your local setup.",
     "mode: operation-mode health check",
+    ui.labelValue("setupStatus", "Configured"),
+    ui.labelValue("defaultPath", getDefaultExecPathLine()),
+    ui.labelValue("optionalBeta", getHookBetaLine()),
+    ui.labelValue("nextStep", getDoctorNextStepLine()),
     ui.labelValue("configPath", configPath ?? "(defaults only)"),
     ui.labelValue("configuredMode", getOperationModeLabel(config.runtime.operationMode)),
     ui.labelValue("effectiveMode", getOperationModeLabel(effectiveMode)),
@@ -54,6 +64,7 @@ export function runDoctor(config: SiftConfig, configPath?: string | null): numbe
     ui.labelValue("apiKey", apiKeyStatus),
     ui.labelValue("modeSummary", describeOperationMode(effectiveMode)),
     ui.labelValue("insufficientBehavior", describeInsufficientBehavior(effectiveMode)),
+    ui.labelValue("execVsHook", getExecVsHookDecisionLine()),
     ui.labelValue("maxCaptureChars", String(config.input.maxCaptureChars)),
     ui.labelValue("maxInputChars", String(config.input.maxInputChars)),
     ui.labelValue("rawFallback", String(config.runtime.rawFallback))

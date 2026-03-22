@@ -26,6 +26,12 @@ function createDeps(overrides: Partial<CliDeps> = {}): CliDeps {
     removeAgent: vi.fn().mockResolvedValue(0),
     showAgent: vi.fn(),
     statusAgents: vi.fn(),
+    installSkill: vi.fn().mockResolvedValue(0),
+    removeSkill: vi.fn().mockResolvedValue(0),
+    showSkill: vi.fn(),
+    statusSkills: vi.fn(),
+    runHook: vi.fn().mockResolvedValue(0),
+    showHookMatch: vi.fn(),
     configInit: vi.fn(),
     configSetup: vi.fn().mockResolvedValue(0),
     configShow: vi.fn(),
@@ -210,6 +216,58 @@ describe("cli app unit", () => {
       yes: true,
       version: "0.3.2"
     });
+  });
+
+  it("routes hook match and hook run to the hook command surface", async () => {
+    const deps = createDeps();
+
+    await runMatched(["hook", "match", "--", "pytest", "-q"], deps);
+    expect(deps.showHookMatch).toHaveBeenCalledWith({
+      command: ["pytest", "-q"],
+      shellCommand: undefined
+    });
+
+    await runMatched(["hook", "run", "--", "pytest", "-q"], deps);
+    expect(deps.runHook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: ["pytest", "-q"],
+        config: defaultConfig
+      })
+    );
+  });
+
+  it("routes skill show/install/remove/status to the skill command surface", async () => {
+    const deps = createDeps();
+
+    await runMatched(["skill", "show", "codex", "--raw"], deps);
+    expect(deps.showSkill).toHaveBeenCalledWith({
+      runtime: "codex",
+      scope: undefined,
+      targetPath: undefined,
+      raw: true
+    });
+
+    await runMatched(["skill", "install", "codex", "--scope", "global", "--yes"], deps);
+    expect(deps.installSkill).toHaveBeenCalledWith({
+      runtime: "codex",
+      scope: "global",
+      targetPath: undefined,
+      dryRun: false,
+      raw: false,
+      yes: true
+    });
+
+    await runMatched(["skill", "remove", "codex", "--scope", "repo", "--yes"], deps);
+    expect(deps.removeSkill).toHaveBeenCalledWith({
+      runtime: "codex",
+      scope: "repo",
+      targetPath: undefined,
+      dryRun: false,
+      yes: true
+    });
+
+    await runMatched(["skill", "status"], deps);
+    expect(deps.statusSkills).toHaveBeenCalled();
   });
 
   it("covers detail parsing helpers directly", () => {

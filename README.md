@@ -152,11 +152,37 @@ During install, pick the mode that matches reality:
 - `provider-assisted`: best if you want `sift` itself to ask a cheap fallback model when needed. This is the API-key path.
 - `local-only`: best if `sift` is working alone and you want everything to stay local.
 
+Install writes small runtime-native guidance surfaces too:
+- Codex: managed `AGENTS.md` block plus a generated `SKILL.md`
+- Claude: managed `CLAUDE.md` block plus a generated `.claude/commands/sift/` command pack
+
+The CLI is still the real runtime. These native files are guidance surfaces, not a second execution system.
+
 Then try the normal diagnosis loop:
 
 ```bash
 sift exec --preset test-status -- pytest -q
 ```
+
+Default rule:
+- use `sift exec` for the normal first pass
+- use `sift hook` only as an optional beta shortcut for a tiny known-command set
+
+The hook beta is not a second primary workflow. It is just a lower-ceremony shortcut when `sift` already knows the command shape.
+
+If you want that optional beta path, inspect the matcher first:
+
+```bash
+sift hook match -- pytest -q
+```
+
+If it says the command is a known match, you can then use the optional beta entrypoint for that command shape.
+
+Important boundary:
+- beta only
+- known preset matches only
+- unknown commands pass through untouched
+- if the hook path fails internally, the original raw command path wins
 
 If you choose `provider-assisted` during install, `sift` now continues directly into provider, model, and API-key setup instead of making you run a second command.
 
@@ -202,6 +228,17 @@ sift agent status
 sift agent remove codex
 ```
 
+If you want to preview or manage the generated Codex skill directly, use:
+
+```bash
+sift skill show codex
+sift skill install codex --scope global --yes
+sift skill status
+sift skill remove codex --scope global --yes
+```
+
+`sift` only updates or removes the generated skill when it can clearly prove ownership of that `SKILL.md` file.
+
 Command-first details live in [docs/cli-reference.md](docs/cli-reference.md).
 
 ---
@@ -217,6 +254,8 @@ npm install -g @bilalimamoglu/sift
 Requires Node.js 20+.
 
 ### 2. Get a useful first pass before your agent reads the full log
+
+If you are new, start here and ignore hook beta until you have seen one good `sift exec` result.
 
 ```bash
 sift exec --preset test-status -- pytest -q

@@ -15,6 +15,8 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("  \\\\  //");
     expect(result.stdout).toContain("sift [question]");
     expect(result.stdout).toContain("Trim the noise. Keep the signal.");
+    expect(result.stdout).toContain("Default path: use `sift exec`");
+    expect(result.stdout).toContain("Optional beta shortcut: use `sift hook`");
     expect(result.stdout).toContain("Provider: openai | openai-compatible | openrouter");
     expect(result.stdout).toContain("SIFT_PROVIDER_API_KEY");
     expect(result.stdout).toContain("OPENAI_API_KEY");
@@ -24,6 +26,8 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("escalate");
     expect(result.stdout).toContain("rerun");
     expect(result.stdout).toContain("install [runtime]");
+    expect(result.stdout).toContain("hook <action>");
+    expect(result.stdout).toContain("skill <action> [runtime]");
     expect(result.stdout).toContain("agent <action> [name]");
     expect(result.stdout).toContain("config <action> [provider]");
   });
@@ -112,6 +116,31 @@ describe("CLI smoke", () => {
     expect(result.stdout).toContain("agent install codex --dry-run --raw");
     expect(result.stdout).toContain("--scope <scope>");
     expect(result.stdout).toContain("--raw");
+  });
+
+  it("prints skill help with codex examples", () => {
+    const result = runSourceCli({
+      args: ["skill", "--help"]
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("skill <show|install|remove|status> [runtime] [options]");
+    expect(result.stdout).toContain("skill show codex");
+    expect(result.stdout).toContain("skill install codex --scope global --yes");
+    expect(result.stdout).toContain("--raw");
+  });
+
+  it("prints hook help with match and run examples", () => {
+    const result = runSourceCli({
+      args: ["hook", "--help"]
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("hook <match|run> [options] -- <program> [args...]");
+    expect(result.stdout).toContain("hook match -- pytest -q");
+    expect(result.stdout).toContain('hook run --shell "npm audit --json"');
+    expect(result.stdout).toContain("Optional beta shortcut: use `sift hook`");
+    expect(result.stdout).toContain("--shell <command>");
   });
 
   it("supports config init, show, and validate", async () => {

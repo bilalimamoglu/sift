@@ -9,8 +9,16 @@ export function getDefaultCodexGlobalInstructionsPath(homeDir = os.homedir()): s
   return path.join(homeDir, ".codex", "AGENTS.md");
 }
 
+export function getDefaultCodexGlobalSkillPath(homeDir = os.homedir()): string {
+  return path.join(homeDir, ".codex", "skills", "sift", "SKILL.md");
+}
+
 export function getDefaultClaudeGlobalInstructionsPath(homeDir = os.homedir()): string {
   return path.join(homeDir, ".claude", "CLAUDE.md");
+}
+
+export function getDefaultClaudeGlobalCommandsDir(homeDir = os.homedir()): string {
+  return path.join(homeDir, ".claude", "commands", "sift");
 }
 
 export function getDefaultGlobalConfigPath(homeDir = os.homedir()): string {

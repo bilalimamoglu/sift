@@ -295,6 +295,20 @@ describe("command modules", () => {
     expect(plain).toContain("Resolved config is valid");
   });
 
+  it("doctor prints the hook beta hint", () => {
+    const { stdout } = captureOutput(() => {
+      withPatchedStream(process.stdout, { isTTY: false }, () => {
+        const code = runDoctor(buildConfig(), null);
+        expect(code).toBe(0);
+      });
+    });
+
+    expect(stdout).toContain("defaultPath: Default path: use `sift exec`");
+    expect(stdout).toContain("optionalBeta: Optional beta shortcut: use `sift hook`");
+    expect(stdout).toContain("nextStep: Next step: run `sift exec --preset test-status -- <test command>`");
+    expect(stdout).toContain("execVsHook: `sift exec` is the explicit full-control path");
+  });
+
   it("configValidate reports defaults when no config file is active", () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sift-config-validate-defaults-"));
     const previousCwd = process.cwd();

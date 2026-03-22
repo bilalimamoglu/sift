@@ -16,6 +16,11 @@ import {
   describeOperationMode,
   getOperationModeLabel
 } from "../config/operation-mode.js";
+import {
+  getDefaultExecPathLine,
+  getHookBetaLine,
+  getInstallExplainLine
+} from "../content/adoption.js";
 import { CONFIG_SETUP_BACK, configSetup } from "./config-setup.js";
 import type { OperationMode } from "../types.js";
 import { createPresentation } from "../ui/presentation.js";
@@ -352,21 +357,32 @@ function writeSuccessSummary(args: {
   }
 
   args.io.write(
-    `${ui.note(`sift v${args.version} now manages ${targets.map((target) => INSTALL_TITLES[target]).join(" + ")} in ${scopeLabel} scope.`)}\n`
+    `${ui.note(`Runtime instructions installed for ${targets.map((target) => INSTALL_TITLES[target]).join(" + ")} in ${scopeLabel} scope.`)}\n`
   );
+  args.io.write(`${ui.note(getInstallExplainLine())}\n`);
   args.io.write(`${ui.note(`Operating mode: ${getOperationModeLabel(args.operationMode)}`)}\n`);
   args.io.write(`${ui.note(describeOperationMode(args.operationMode))}\n`);
   args.io.write(`${ui.note(targetLabel)}\n`);
+  if (targets.includes("codex")) {
+    args.io.write(`${ui.note("Codex install also writes a tiny generated SKILL.md so Codex has a native `sift` entry point.")}\n`);
+  }
+  if (targets.includes("claude")) {
+    args.io.write(`${ui.note("Claude install also writes a tiny `.claude/commands/sift/` command pack so Claude has native `sift` entry points.")}\n`);
+  }
+  args.io.write(`${ui.note("The CLI is still the real runtime. The native files are guidance surfaces, not a second execution system.")}\n`);
   args.io.write(`\n${ui.section("Try next")}\n`);
-  args.io.write(`  ${ui.command("sift doctor")}\n`);
+  args.io.write(`  ${ui.command("sift exec --preset test-status -- pytest -q")}${ui.note("  # default first pass")}\n`);
+  args.io.write(`  ${ui.command("sift doctor")}${ui.note("  # verify the setup and see what happens on ambiguous cases")}\n`);
+  args.io.write(`  ${ui.command("sift hook match -- pytest -q")}${ui.note("  # optional beta shortcut for known presets")}\n`);
   if (args.operationMode === "provider-assisted") {
     args.io.write(`  ${ui.command("sift config show --show-secrets")}\n`);
   } else {
     args.io.write(
       `  ${ui.command("sift config setup")}${ui.note("  # optional if you want provider-assisted fallback later")}\n`
     );
-  }
-  args.io.write(`  ${ui.command("sift exec --preset test-status -- npm test")}\n`);
+  } 
+  args.io.write(`${ui.note(getDefaultExecPathLine())}\n`);
+  args.io.write(`${ui.note(getHookBetaLine())}\n`);
 }
 
 export async function installRuntimeSupport(options: {

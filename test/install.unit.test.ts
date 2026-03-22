@@ -105,12 +105,17 @@ describe("install runtime support", () => {
     expect(status).toBe(0);
     expect(written).toContain("<!-- sift:begin codex -->");
     expect(io.stdout).toContain("███████╗██╗███████╗████████╗");
+    expect(io.stdout).toContain("You already installed sift with npm.");
     expect(io.stdout).toContain("Choose your runtime");
     expect(io.stdout).toContain("Choose how sift should work");
     expect(io.stdout).toContain("Choose where to install the runtime support");
     expect(io.stdout).toContain("Installed runtime support.");
     expect(io.stdout).toContain("Operating mode: Agent escalation");
+    expect(io.stdout).toContain("sift exec --preset test-status -- pytest -q");
     expect(io.stdout).toContain("sift doctor");
+    expect(io.stdout).toContain("sift hook match -- pytest -q");
+    expect(io.stdout).toContain("Default path: use `sift exec`");
+    expect(io.stdout).toContain("Optional beta shortcut: use `sift hook`");
     expect(io.stdout).toContain("sift config setup");
     expect(io.closed).toBe(true);
   });
@@ -168,7 +173,9 @@ describe("install runtime support", () => {
     expect(config).toContain("operationMode: provider-assisted");
     expect(config).toContain("model: gpt-5-nano");
     expect(rendered).toContain("Next: provider setup. Press Esc at any step to go back.");
+    expect(rendered).toContain("sift exec --preset test-status -- pytest -q");
     expect(rendered).toContain("Selected model: gpt-5-nano");
+    expect(rendered).toContain("sift hook match -- pytest -q");
     expect(rendered).toContain("sift config show --show-secrets");
     expect(rendered).not.toContain("sift config setup  # optional");
   });

@@ -310,6 +310,13 @@ describe("agent command helpers", () => {
     expect(previewOutput).toContain("target file: CLAUDE.md");
     expect(previewOutput).toContain("narrow long command output before your agent burns time and tokens on the raw log wall");
     expect(previewOutput).toContain("default to sift first, keep raw as the last resort");
+    expect(previewOutput).toContain("Default path: use `sift exec`");
+    expect(previewOutput).toContain("Optional beta shortcut: use `sift hook`");
+    expect(previewOutput).toContain("`sift exec` is the explicit full-control path");
+    expect(previewOutput).toContain("sift hook match -- pytest -q");
+    expect(previewOutput).toContain("Claude also gets a tiny native command pack");
+    expect(previewOutput).toContain("command pack target:");
+    expect(previewOutput).toContain("Installed commands: /sift:help, /sift:test-status, /sift:doctor");
     expect(previewOutput).toContain("standard should usually be enough for first-pass guidance");
     expect(previewOutput).toContain("After a fix, refresh the truth with sift rerun");
     expect(previewOutput).toContain("Only then zoom into what is still broken");
@@ -323,6 +330,8 @@ describe("agent command helpers", () => {
     showAgent({ agent: "claude", raw: true, operationMode: "agent-escalation" }, rawShowIo);
     expect(rawShowIo.stdout).toContain("<!-- sift:begin claude -->");
     expect(rawShowIo.stdout).toContain("Default operating mode: Agent escalation.");
+    expect(rawShowIo.stdout).toContain("Default path: use `sift exec`");
+    expect(rawShowIo.stdout).toContain("Optional beta shortcut: use `sift hook`");
     expect(rawShowIo.stdout).toContain("refresh the truth with `sift rerun`");
     expect(rawShowIo.stdout).toContain("`sift escalate` and `sift rerun` require a cached `sift exec --preset test-status -- <test command>` run first.");
     expect(rawShowIo.stdout).toContain("--include-test-ids");
@@ -386,6 +395,7 @@ describe("agent command helpers", () => {
     expect(statusIo.stdout).toContain("Agent installer status");
     expect(statusIo.stdout).toContain("Codex managed block: installed");
     expect(statusIo.stdout).toContain("Claude managed block: installed");
+    expect(statusIo.stdout).toContain("Claude command pack: not installed");
   });
 
   it("uses stdout when showAgent is called without a custom io", () => {
@@ -492,12 +502,14 @@ describe("agent command helpers", () => {
     expect(fs.readFileSync(targetPath, "utf8")).toContain("<!-- sift:begin codex -->");
 
     const globalInstallPath = path.join(cwd, "GLOBAL.md");
+    const globalHome = fs.mkdtempSync(path.join(os.tmpdir(), "sift-agent-global-home-"));
     const globalInstallIo = createIo({ stdinIsTTY: false, stdoutIsTTY: false });
     await expect(
       installAgent({
         agent: "claude",
         targetPath: globalInstallPath,
         scope: "global",
+        homeDir: globalHome,
         yes: true,
         io: globalInstallIo
       })
@@ -505,6 +517,9 @@ describe("agent command helpers", () => {
     expect(globalInstallIo.stdout).toContain(
       "Global scope writes to your machine-wide agent instructions."
     );
+    expect(
+      fs.readFileSync(path.join(globalHome, ".claude", "commands", "sift", "help.md"), "utf8")
+    ).toContain("/sift:help");
 
     const notFilePath = path.join(cwd, "not-a-file");
     fs.mkdirSync(notFilePath);
@@ -524,11 +539,15 @@ describe("agent command helpers", () => {
       installAgent({
         agent: "claude",
         targetPath: existingPath,
+        cwd,
         io: appendIo
       })
     ).resolves.toBe(0);
     expect(fs.readFileSync(existingPath, "utf8")).toContain("# User content");
     expect(fs.readFileSync(existingPath, "utf8")).toContain("<!-- sift:begin claude -->");
+    expect(
+      fs.readFileSync(path.join(cwd, ".claude", "commands", "sift", "test-status.md"), "utf8")
+    ).toContain("/sift:test-status");
 
     const updatePromptAsk = vi.fn().mockResolvedValue("yes");
     const updatePromptIo = {
@@ -539,6 +558,7 @@ describe("agent command helpers", () => {
       installAgent({
         agent: "claude",
         targetPath: existingPath,
+        cwd,
         io: updatePromptIo
       })
     ).resolves.toBe(0);
@@ -564,11 +584,13 @@ describe("agent command helpers", () => {
       removeAgent({
         agent: "claude",
         targetPath: existingPath,
+        cwd,
         yes: true,
         io: removeIo
       })
     ).resolves.toBe(0);
     expect(fs.readFileSync(existingPath, "utf8")).toBe("# User content\n");
+    expect(fs.existsSync(path.join(cwd, ".claude", "commands", "sift", "help.md"))).toBe(false);
 
     const removeDryRunIo = createIo({ stdinIsTTY: false, stdoutIsTTY: false });
     await expect(
@@ -612,6 +634,29 @@ describe("agent command helpers", () => {
       })
     ).resolves.toBe(0);
     expect(noBlockIo.stdout).toContain("No managed Codex block found");
+  });
+
+  it("refuses to overwrite a custom Claude command file while leaving the managed block untouched", async () => {
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "sift-agent-claude-custom-"));
+    const claudePath = path.join(cwd, "CLAUDE.md");
+    const commandDir = path.join(cwd, ".claude", "commands", "sift");
+    fs.mkdirSync(commandDir, { recursive: true });
+    fs.writeFileSync(claudePath, "# User content\n", "utf8");
+    fs.writeFileSync(path.join(commandDir, "help.md"), "# custom\n", "utf8");
+
+    const io = createIo({ stdinIsTTY: false, stdoutIsTTY: false });
+    await expect(
+      installAgent({
+        agent: "claude",
+        cwd,
+        yes: true,
+        io
+      })
+    ).resolves.toBe(1);
+
+    expect(io.stderr).toContain("Refusing to overwrite a custom Claude command file");
+    expect(fs.readFileSync(claudePath, "utf8")).toBe("# User content\n");
+    expect(fs.readFileSync(path.join(commandDir, "help.md"), "utf8")).toBe("# custom\n");
   });
 
   it("covers default terminal IO branches without touching real user files", async () => {

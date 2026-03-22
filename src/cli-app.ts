@@ -15,6 +15,15 @@ import {
   statusAgents
 } from "./commands/agent.js";
 import {
+  installSkill,
+  normalizeSkillRuntime,
+  normalizeSkillScope,
+  removeSkill,
+  showSkill,
+  statusSkills
+} from "./commands/skill.js";
+import { runHook, showHookMatch } from "./commands/hook.js";
+import {
   installRuntimeSupport,
   normalizeInstallRuntime,
   normalizeInstallScope
@@ -37,6 +46,7 @@ import { emitStatsFooter } from "./core/stats.js";
 import { readStdin } from "./core/stdin.js";
 import { getPreset } from "./prompts/presets.js";
 import { createPresentation } from "./ui/presentation.js";
+import { getDefaultExecPathLine, getHookBetaLine } from "./content/adoption.js";
 import type {
   DetailLevel,
   Goal,
@@ -55,6 +65,12 @@ export interface CliDeps {
   readonly removeAgent: typeof removeAgent;
   readonly showAgent: typeof showAgent;
   readonly statusAgents: typeof statusAgents;
+  readonly installSkill: typeof installSkill;
+  readonly removeSkill: typeof removeSkill;
+  readonly showSkill: typeof showSkill;
+  readonly statusSkills: typeof statusSkills;
+  readonly runHook: typeof runHook;
+  readonly showHookMatch: typeof showHookMatch;
   readonly configInit: typeof configInit;
   readonly configSetup: typeof configSetup;
   readonly configShow: typeof configShow;
@@ -85,6 +101,12 @@ const defaultCliDeps: CliDeps = {
   removeAgent,
   showAgent,
   statusAgents,
+  installSkill,
+  removeSkill,
+  showSkill,
+  statusSkills,
+  runHook,
+  showHookMatch,
   configInit,
   configSetup,
   configShow,
@@ -967,6 +989,47 @@ export function createCliApp(args: {
       });
     });
 
+  applySharedOptions(
+    cli
+      .command("hook <action>", "Hook beta commands: match | run")
+      .usage("hook <match|run> [options] -- <program> [args...]")
+      .example("hook match -- pytest -q")
+      .example('hook match --shell "terraform plan"')
+      .example("hook run -- pytest -q")
+      .example('hook run --shell "npm audit --json"')
+      .option("--shell <command>", "Shell command to inspect or run through the hook beta")
+      .action(async (action: string, options: Record<string, unknown>) => {
+        const commandSpec = extractExecCommand(options);
+
+        if (action === "match") {
+          deps.showHookMatch(commandSpec);
+          return;
+        }
+
+        if (action === "run") {
+          const config = deps.resolveConfig({
+            configPath: options.config as string | undefined,
+            env,
+            cliOverrides: buildCliOverrides(options)
+          });
+
+          process.exitCode = await deps.runHook({
+            ...commandSpec,
+            config,
+            dryRun: Boolean(options.dryRun),
+            showRaw: Boolean(options.showRaw),
+            includeTestIds: Boolean(options.includeTestIds),
+            detail: normalizeDetail(options.detail),
+            failOn: Boolean(options.failOn),
+            quiet: Boolean(options.quiet)
+          });
+          return;
+        }
+
+        throw new Error(`Unknown hook action: ${action}`);
+      })
+  );
+
   cli
     .command("agent <action> [name]", "Agent commands: show | install | remove | status")
     .usage("agent <show|install|remove|status> [name] [options]")
@@ -1037,6 +1100,65 @@ export function createCliApp(args: {
       }
 
       throw new Error(`Unknown agent action: ${action}`);
+    });
+
+  cli
+    .command("skill <action> [runtime]", "Skill commands: show | install | remove | status")
+    .usage("skill <show|install|remove|status> [runtime] [options]")
+    .example("skill show codex")
+    .example("skill show codex --raw")
+    .example("skill install codex --scope global --yes")
+    .example("skill install codex --dry-run")
+    .example("skill status")
+    .example("skill remove codex --scope repo --yes")
+    .option("--scope <scope>", "Install scope: repo | global")
+    .option("--dry-run", "Show a short plan without changing files")
+    .option("--raw", "Print the exact SKILL.md or dry-run file content")
+    .option("--yes", "Skip confirmation prompts when writing")
+    .option("--path <path>", "Explicit target path for install or remove")
+    .action(async (action: string, runtime: string | undefined, options: Record<string, unknown>) => {
+      const normalizedRuntime = normalizeSkillRuntime(runtime ?? "codex");
+      const scope = normalizeSkillScope(options.scope);
+
+      if (action === "show") {
+        deps.showSkill({
+          runtime: normalizedRuntime,
+          scope,
+          targetPath: options.path as string | undefined,
+          raw: Boolean(options.raw)
+        });
+        return;
+      }
+
+      if (action === "install") {
+        process.exitCode = await deps.installSkill({
+          runtime: normalizedRuntime,
+          scope,
+          targetPath: options.path as string | undefined,
+          dryRun: Boolean(options.dryRun),
+          raw: Boolean(options.raw),
+          yes: Boolean(options.yes)
+        });
+        return;
+      }
+
+      if (action === "remove") {
+        process.exitCode = await deps.removeSkill({
+          runtime: normalizedRuntime,
+          scope,
+          targetPath: options.path as string | undefined,
+          dryRun: Boolean(options.dryRun),
+          yes: Boolean(options.yes)
+        });
+        return;
+      }
+
+      if (action === "status") {
+        deps.statusSkills();
+        return;
+      }
+
+      throw new Error(`Unknown skill action: ${action}`);
     });
 
   cli
@@ -1178,8 +1300,11 @@ export function createCliApp(args: {
         title: ui.section("Quick start"),
         body: [
           `  ${ui.command("sift install")}${ui.note("  # choose agent-escalation, provider-assisted, or local-only")}`,
+          `  ${ui.note(getDefaultExecPathLine())}`,
           `  ${ui.command("sift exec --preset test-status -- npm test")}`,
           `  ${ui.command("sift exec --preset test-status -- npm test")}${ui.note("  # stop here if standard already shows the main buckets")}`,
+          `  ${ui.note(getHookBetaLine())}`,
+          `  ${ui.command("sift hook match -- pytest -q")}${ui.note("  # inspect the optional beta shortcut first")}`,
           `  ${ui.command("sift rerun")}${ui.note("  # rerun the cached full suite after a fix")}`,
           `  ${ui.command("sift rerun --remaining --detail focused")}${ui.note("  # zoom into what is still failing")}`,
           `  ${ui.command("sift rerun --remaining --detail verbose --show-raw")}`,

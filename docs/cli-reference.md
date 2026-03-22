@@ -4,11 +4,16 @@ This page covers the useful `sift` commands that do not need to dominate the mai
 
 The main README is product-first. This page is command-first.
 
+If you are new, ignore the lower-level surfaces for now and start with `sift exec --preset test-status -- <test command>`.
+
 ## Core commands
 
 ### `sift exec`
 
 Run a command, capture its output, and turn noisy results into a smaller, more actionable first pass while preserving the child exit code.
+
+This is the default product path.
+Use it when you want explicit control, a freeform question, an exact preset choice, or the cached `rerun` / `escalate` test workflow.
 
 ```bash
 sift exec --preset test-status -- pytest -q
@@ -22,6 +27,38 @@ Useful flags:
 - `--fail-on`
 - `--watch`
 - `--goal diagnose --format json`
+
+### `sift hook match`
+
+Inspect whether the opt-in hook beta would match a command to a known preset.
+
+This is intentionally narrow:
+- known preset categories only
+- unknown commands pass through untouched
+- path-prefixed binaries stay out of scope for the beta matcher
+
+```bash
+sift hook match -- pytest -q
+sift hook match --shell "terraform plan"
+```
+
+### `sift hook run`
+
+Run a command through the opt-in hook beta.
+
+This is an optional shortcut, not the main workflow.
+Use it only when you want less typing for a tiny known command set and you are happy for `sift` to pick the preset.
+
+Current contract:
+- beta only
+- known preset matches only
+- unknown commands run unchanged
+- if the hook path fails internally, `sift` falls back to the raw command
+
+```bash
+sift hook run -- pytest -q
+sift hook run --shell "npm audit --json"
+```
 
 ### `sift rerun`
 
@@ -150,6 +187,10 @@ sift config use openrouter
 
 Check which config is active and how `sift` will behave in the current setup.
 
+`sift doctor` should help you answer two practical questions:
+- what is my default path right now?
+- when, if ever, should I care about the hook beta shortcut?
+
 ```bash
 sift doctor
 ```
@@ -177,6 +218,8 @@ The installer now asks which operating mode matches your actual workflow:
 
 If you pick `provider-assisted`, the installer continues directly into provider/model/API-key setup instead of telling you to run `sift config setup` separately.
 
+The install summary should leave you with one obvious default next step, then mention `sift hook match -- pytest -q` only as an optional beta shortcut for a known preset.
+
 ```bash
 sift install
 sift install codex --scope global --yes
@@ -186,6 +229,11 @@ sift install all --scope local --yes
 ### `sift agent install`
 
 Install a managed instruction block for a supported agent directly. Use this when you want dry runs, raw block output, or a low-level override.
+
+The low-level install also keeps the tiny native packaging honest:
+- Codex installs update `AGENTS.md` and the generated `SKILL.md`
+- Claude installs update `CLAUDE.md` and the generated `.claude/commands/sift/` command pack
+- the CLI stays the real runtime; these files are guidance surfaces only
 
 ```bash
 sift agent install codex
@@ -218,6 +266,49 @@ Remove a previously installed managed block.
 ```bash
 sift agent remove codex
 sift agent remove claude
+```
+
+## Skill commands
+
+### `sift skill show`
+
+Preview the generated Codex-native `sift` skill without writing anything.
+
+```bash
+sift skill show codex
+sift skill show codex --raw
+```
+
+Use this when you want to inspect the tiny native workflow guide for Codex that reinforces the normal `sift exec` path.
+
+### `sift skill install`
+
+Install or update the generated Codex skill directly.
+
+```bash
+sift skill install codex --scope global --yes
+sift skill install codex --dry-run
+```
+
+This complements the CLI and managed block. It does not replace them.
+If a custom `SKILL.md` is already present, `sift` refuses to overwrite it.
+
+### `sift skill status`
+
+Show whether the Codex skill is installed in repo or global scope, or whether a custom `SKILL.md` is blocking ownership-safe updates.
+
+```bash
+sift skill status
+```
+
+### `sift skill remove`
+
+Remove the generated Codex skill file.
+
+If the target `SKILL.md` is not clearly owned by `sift`, removal is refused so custom content is not deleted by mistake.
+
+```bash
+sift skill remove codex --scope global --yes
 ```
 
 ## Diagnose JSON

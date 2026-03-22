@@ -14,8 +14,22 @@ When working inside the `sift` repo itself:
 - For install flow, setup flow, README getting-started, or other first-contact consumer surfaces, also consult the `gsd-first-user-tester` lens if available. If the runtime cannot spawn that exact registered agent, emulate a zero-context first-time user review before implementation.
 - For marketing, launch planning, social posts, content repurposing, competitor analysis, or GitHub traction review, consult `gsd-marketing-strategist` first and save durable notes under `.planning/marketing/`.
 - For auditing the marketing system itself, use `gsd-marketing-auditor` to critique gaps in tracking, platform memory, attribution, and review discipline.
-- Preferred custom agent model defaults in this repo: `gsd-product-visionary` -> `gpt-5.4` with high reasoning, `gsd-first-user-tester` -> `gpt-5.4-mini` with low reasoning, `gsd-marketing-strategist` -> `gpt-5.4-mini` with medium reasoning, `gsd-marketing-auditor` -> `gpt-5.4` with high reasoning.
+- Repo-standard agent model matrix:
+  - `gsd-product-visionary` -> `gpt-5.4` with high reasoning for product direction, positioning, onboarding judgment, and final tradeoff calls
+  - `gsd-first-user-tester` -> `gpt-5.4-mini` with low reasoning for zero-context consumer friction and "bilinçsiz kullanıcı" review
+  - `gsd-phase-researcher` -> `gpt-5.4-mini` with medium reasoning for bounded discovery and artifact gathering
+  - `gsd-codebase-mapper` -> `gpt-5.4-mini` with medium reasoning for fast repo mapping and surface discovery
+  - `gsd-planner` -> `gpt-5.4-mini` with medium reasoning for routine execution-plan drafting; escalate to `gpt-5.4` high when the phase is cross-cutting or architecture-heavy
+  - `gsd-plan-checker` -> `gpt-5.4` with high reasoning for pre-execution goal-backward review
+  - `gsd-verifier` -> `gpt-5.4` with high reasoning for post-implementation goal verification
+  - `gsd-integration-checker` -> `gpt-5.4` with medium-to-high reasoning for end-to-end flow validation across linked surfaces
+  - `gsd-nyquist-auditor` -> `gpt-5.4-mini` with medium reasoning for focused validation-gap discovery; escalate to `gpt-5.4` if the missing coverage is release-critical
+  - `gsd-marketing-strategist` -> `gpt-5.4-mini` with medium reasoning for content, hooks, and platform-native message iteration
+  - `gsd-marketing-auditor` -> `gpt-5.4` with high reasoning for strategic critique and anti-vanity-metric review
 - When the runtime supports sub-agents, lightweight consumer-facing review passes should actually run on mini sub-agents instead of only being simulated as a lens in the main thread. Use the main `gpt-5.4` thread for final synthesis, tradeoff calls, and high-stakes product decisions after the lighter review agents report back.
+- In this repo, default to the full GSD working style for meaningful product, planning, onboarding, packaging, and release-adjacent work. That means: use the relevant GSD role lenses or actual sub-agents first, keep local `.planning/` artifacts up to date, and only skip that overhead for truly trivial `gsd-fast`-class tasks.
+- Do not wait for the user to restate "use GSD fully" on each turn. Treat full GSD usage as the standing default here unless the user explicitly asks for a lightweight or one-off path.
+- For Phase 2 and Phase 3 product work in this repo, treat the minimum consensus loop as: `gsd-product-visionary` + `gsd-first-user-tester` + one architecture/planning lens (`gsd-planner` or equivalent) + one critical review lens (`gsd-plan-checker`, `gsd-verifier`, or `gsd-integration-checker`). Final implementation direction should be chosen only after those views are synthesized in the main `gpt-5.4` thread.
 - For first-contact copy surfaces such as README hero copy, installer one-liners, launch hooks, Reddit titles, Hacker News titles, and top-of-page product blurbs, treat the current positioning documents as a hard contract, not soft inspiration. Read `.planning/marketing/messaging/POSITIONING.md` and the relevant `scripts/docs/product/messaging/` notes before proposing final copy.
 - On title-only or first-impression surfaces, do not rely on the body text or later comments to carry the category, core mechanism, or differentiation. Put the essential product truth in the title if reasonably possible.
 - Before offering final first-contact copy, check that it still carries the current product truth: local-first, heuristics-first or fallback-only-when-needed, grouped failures or likely root causes, and the next useful step when space allows. If the copy drops the core product truth in favor of sounding clever, rewrite it.

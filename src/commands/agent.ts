@@ -5,6 +5,7 @@ import { createInterface } from "node:readline/promises";
 import { stderr as defaultStderr, stdin as defaultStdin, stdout as defaultStdout } from "node:process";
 import {
   getDefaultGlobalConfigPath,
+  getDefaultClaudeGlobalCommandsDir,
   getDefaultClaudeGlobalInstructionsPath,
   getDefaultCodexGlobalInstructionsPath
 } from "../constants.js";
@@ -13,8 +14,27 @@ import {
   describeOperationMode,
   getOperationModeLabel
 } from "../config/operation-mode.js";
+import {
+  getDefaultExecPathLine,
+  getExecVsHookDecisionLine,
+  getHookBetaLine,
+  getHookBetaPlainEnglishLine
+} from "../content/adoption.js";
 import { resolveConfig, resolveEffectiveOperationMode } from "../config/resolve.js";
 import type { OperationMode } from "../types.js";
+import {
+  CLAUDE_COMMAND_NAMES,
+  type ClaudeCommandName,
+  getClaudeCommandMarker,
+  renderClaudeCommandPack
+} from "../runtime-payloads/claude-commands.js";
+import { renderCodexSkill } from "../runtime-payloads/codex-skill.js";
+import {
+  describeSkillStatus,
+  inspectSkillOwnership,
+  resolveSkillTargetPath
+} from "./skill.js";
+import { renderManagedInstructionBody } from "../runtime-payloads/managed-block.js";
 import { createPresentation } from "../ui/presentation.js";
 
 export type AgentName = "codex" | "claude";
@@ -72,6 +92,21 @@ export interface AgentStatusRow {
   readonly targetPath: string;
   readonly fileExists: boolean;
   readonly installed: boolean;
+}
+
+interface ClaudeCommandFilePlan {
+  readonly name: `${ClaudeCommandName}.md`;
+  readonly targetPath: string;
+  readonly content: string;
+  readonly ownership: "managed" | "missing" | "custom";
+  readonly action: "create" | "update" | "conflict";
+}
+
+interface ClaudeCommandPackPlan {
+  readonly targetDir: string;
+  readonly files: ClaudeCommandFilePlan[];
+  readonly action: "create" | "update";
+  readonly hasConflict: boolean;
 }
 
 export interface AgentShowArgs extends ResolveAgentTargetPathArgs {
@@ -173,6 +208,20 @@ export function resolveAgentTargetPath(args: ResolveAgentTargetPathArgs): string
   return path.resolve(args.cwd ?? process.cwd(), AGENT_FILENAMES[args.agent]);
 }
 
+export function resolveClaudeCommandPackTargetDir(args: {
+  scope?: AgentScope;
+  cwd?: string;
+  homeDir?: string;
+}): string {
+  const scope = args.scope ?? "repo";
+
+  if (scope === "global") {
+    return getDefaultClaudeGlobalCommandsDir(args.homeDir ?? os.homedir());
+  }
+
+  return path.resolve(args.cwd ?? process.cwd(), ".claude", "commands", "sift");
+}
+
 export function getManagedBlockMarkers(agent: AgentName): {
   readonly start: string;
   readonly end: string;
@@ -209,64 +258,13 @@ function inferOperationMode(args: {
   }
 }
 
-function renderInstructionBody(mode: OperationMode): string {
-  return [
-    "Use `sift` as the default local-first output guidance layer for long, noisy, non-interactive command output.",
-    "The goal is to turn failure walls into grouped issues, likely root causes, and the next useful step before reading raw logs.",
-    "",
-    `Default operating mode: ${getOperationModeLabel(mode)}.`,
-    describeOperationMode(mode),
-    describeInsufficientBehavior(mode),
-    "",
-    "Start with:",
-    '- `sift exec "question" -- <command> [args...]`',
-    "- `sift exec --preset test-status -- <test command>`",
-    "- `sift exec --preset audit-critical -- npm audit`",
-    "- `sift exec --preset infra-risk -- terraform plan`",
-    "",
-    "When debugging test failures, default to `sift` first and treat `standard` as the usual stop point:",
-    "- Run the full suite first: `sift exec --preset test-status -- <test command>`",
-    "- Think of `standard` as the map, `rerun --remaining` as the zoom lens, and raw traceback as the last resort.",
-    "- If `standard` ends with `Decision: stop and act`, stop there unless you truly need exact traceback lines.",
-    "- If `standard` already shows the main failure buckets, counts, and actionable hints, stop there and go read source or inspect the relevant tests or app code.",
-    "- Use `sift escalate` when you want a deeper render of the same cached output without rerunning the command.",
-    "- `sift escalate` and `sift rerun` require a cached `sift exec --preset test-status -- <test command>` run first.",
-    "- After making or planning a fix, refresh the truth with `sift rerun` so the same full suite runs again at `standard` and shows what is resolved or still remaining.",
-    "- The normal stop budget is `standard` first, then at most one zoom step before raw.",
-    "- Only if more detail is still needed after `sift rerun`, use `sift rerun --remaining --detail focused`, then `sift rerun --remaining --detail verbose`, then `sift rerun --remaining --detail verbose --show-raw`.",
-    "- `sift rerun --remaining` narrows automatically for `pytest` and reruns the full original command for `vitest` and `jest` while keeping the diagnosis focused on what still fails.",
-    "- For other runners, rerun a narrowed command manually with `sift exec --preset test-status -- <narrowed test command>` if you need a smaller surface.",
-    "- Start with `standard` text. Use diagnose JSON only when automation or machine branching truly needs it.",
-    "- If `standard` already shows bucket-level root cause, anchor, and fix lines, trust it and report from it directly.",
-    "- In that case, do not re-verify the same bucket with raw pytest; at most do one targeted source read before you edit.",
-    "- If `standard` still contains an unknown bucket or ends with `Decision: zoom`, do one deeper sift pass before raw traceback.",
-    "- If you need a machine-readable diagnosis, use `sift exec --preset test-status --goal diagnose --format json -- <test command>` or the same shape with `sift rerun` / `sift watch --preset test-status`.",
-    "- Diagnose JSON is summary-first by default. Add `--include-test-ids` only when you truly need the raw failing test IDs.",
-    "- If diagnose JSON returns `read_targets.context_hint.start_line/end_line`, read only that small line range first.",
-    "- If diagnose JSON returns only `read_targets.context_hint.search_hint`, search for that string in the target file before reading the whole file.",
-    "- If output redraws or repeats across cycles, use `sift watch ...` or `sift exec --watch ...` before manually diffing raw logs.",
-    "- Run the raw test command only if you still need exact traceback lines after the sift pass is still insufficient.",
-    "",
-    "Use pipe mode only when output already exists.",
-    "",
-    "Do not use `sift` when:",
-    "- exact raw output is already known to be required",
-    "- the command is interactive or TUI-based",
-    "- the output is already short and clear",
-    "- shell control flow depends on raw output semantics",
-    "",
-    "Assume credentials come from shell environment or `sift.config.yaml`.",
-    "Do not pass API keys inline."
-  ].join("\n");
-}
-
 export function renderManagedBlock(
   agent: AgentName,
   eol = "\n",
   mode: OperationMode = "agent-escalation"
 ): string {
   const markers = getManagedBlockMarkers(agent);
-  return [markers.start, renderInstructionBody(mode), markers.end].join(eol);
+  return [markers.start, renderManagedInstructionBody(mode), markers.end].join(eol);
 }
 
 export function inspectManagedBlock(content: string, agent: AgentName): ManagedBlockInfo {
@@ -518,10 +516,14 @@ export function showAgent(
   );
   io.write(`${ui.note(describeOperationMode(operationMode))}\n`);
   io.write(`${ui.note(describeInsufficientBehavior(operationMode))}\n`);
+  io.write(`${ui.note(getDefaultExecPathLine())}\n`);
+  io.write(`${ui.note(getHookBetaLine())}\n`);
+  io.write(`${ui.note(getExecVsHookDecisionLine())}\n`);
   io.write(`  ${ui.command('sift exec "question" -- <command> [args...]')}\n`);
   io.write(`  ${ui.command("sift exec --preset test-status -- <test command>")}\n`);
   io.write(`  ${ui.command("sift exec --preset audit-critical -- npm audit")}\n`);
   io.write(`  ${ui.command("sift exec --preset infra-risk -- terraform plan")}\n`);
+  io.write(`  ${ui.command("sift hook match -- pytest -q")}${ui.note("  # optional beta shortcut for a known preset")}\n`);
   io.write(
     `${ui.info("For test debugging, standard should usually be enough for first-pass guidance.")}\n`
   );
@@ -549,6 +551,42 @@ export function showAgent(
   io.write(
     `${ui.note("Only fall back to the raw test command if exact traceback lines are still needed for the remaining failing subset.")}\n`
   );
+  if (agent === "codex") {
+    const skillTargetPath = resolveSkillTargetPath({
+      runtime: "codex",
+      scope: params.scope,
+      cwd: params.cwd,
+      homeDir: params.homeDir
+    });
+    io.write(
+      `${ui.info("Codex also gets a tiny native skill so the runtime has a real `sift` entry point beyond `AGENTS.md`.")}\n`
+    );
+    io.write(`${ui.labelValue("skill target", skillTargetPath)}\n`);
+    io.write(
+      `${ui.labelValue(
+        "skill status",
+        describeSkillStatus(readOptionalFile(skillTargetPath), skillTargetPath)
+      )}\n`
+    );
+  }
+  if (agent === "claude") {
+    const commandPack = planClaudeCommandPack({
+      scope: params.scope,
+      cwd: params.cwd,
+      homeDir: params.homeDir,
+      operationMode
+    });
+    io.write(
+      `${ui.info("Claude also gets a tiny native command pack so the runtime has real `sift` entry points beyond `CLAUDE.md`.")}\n`
+    );
+    io.write(`${ui.labelValue("command pack target", commandPack.targetDir)}\n`);
+    io.write(`${ui.note("Installed commands: /sift:help, /sift:test-status, /sift:doctor")}\n`);
+    if (commandPack.hasConflict) {
+      io.write(
+        `${ui.warning("A custom Claude command file is already present at the target path. sift would refuse to overwrite it.")}\n`
+      );
+    }
+  }
   io.write(`${ui.note("Use --raw to print the exact managed block.")}\n`);
 }
 
@@ -583,6 +621,28 @@ export async function installAgent(args: AgentInstallArgs): Promise<number> {
       existingContent,
       operationMode
     });
+    const codexSkillTargetPath =
+      agent === "codex"
+        ? resolveSkillTargetPath({
+            runtime: "codex",
+            scope,
+            cwd: args.cwd,
+            homeDir: args.homeDir
+          })
+        : undefined;
+    const codexSkillOwnership =
+      codexSkillTargetPath !== undefined
+        ? inspectSkillOwnership(readOptionalFile(codexSkillTargetPath))
+        : undefined;
+    const claudeCommandPack =
+      agent === "claude"
+        ? planClaudeCommandPack({
+            scope,
+            cwd: args.cwd,
+            homeDir: args.homeDir,
+            operationMode
+          })
+        : undefined;
 
     if (args.dryRun) {
       if (args.raw) {
@@ -615,6 +675,32 @@ export async function installAgent(args: AgentInstallArgs): Promise<number> {
       io.write(
         `${ui.warning("Only the managed sift block would be written or updated.")}\n`
       );
+      if (codexSkillTargetPath) {
+        io.write(
+          `${ui.labelValue(
+            "codex skill",
+            codexSkillOwnership === "missing"
+              ? "create a generated SKILL.md"
+              : codexSkillOwnership === "custom"
+                ? "custom SKILL.md present; install would stop before overwriting it"
+                : "update the generated SKILL.md"
+          )}\n`
+        );
+        io.write(`${ui.labelValue("skill target", codexSkillTargetPath)}\n`);
+      }
+      if (claudeCommandPack) {
+        io.write(
+          `${ui.labelValue(
+            "claude command pack",
+            claudeCommandPack.hasConflict
+              ? "custom command file present; install would stop before overwriting it"
+              : claudeCommandPack.action === "create"
+                ? `create ${claudeCommandPack.files.length} generated command files`
+                : `update ${claudeCommandPack.files.length} generated command files`
+          )}\n`
+        );
+        io.write(`${ui.labelValue("command pack target", claudeCommandPack.targetDir)}\n`);
+      }
       io.write(
         `${ui.note(
           scope === "repo"
@@ -664,9 +750,36 @@ export async function installAgent(args: AgentInstallArgs): Promise<number> {
       }
     }
 
+    if (codexSkillOwnership === "custom") {
+      io.error(
+        `Refusing to overwrite a custom Codex SKILL.md at ${codexSkillTargetPath}. Clean it up manually or choose a different target.\n`
+      );
+      return 1;
+    }
+
+    if (claudeCommandPack?.hasConflict) {
+      const conflict = claudeCommandPack.files.find((file) => file.action === "conflict");
+      io.error(
+        `Refusing to overwrite a custom Claude command file at ${conflict?.targetPath ?? claudeCommandPack.targetDir}. Clean it up manually or choose a different target.\n`
+      );
+      return 1;
+    }
+
     writeTextFileAtomic(targetPath, plan.content);
+    if (codexSkillTargetPath) {
+      writeTextFileAtomic(codexSkillTargetPath, `${renderCodexSkill(operationMode)}\n`);
+    }
+    if (claudeCommandPack) {
+      writeClaudeCommandPack(claudeCommandPack);
+    }
     io.write(`${ui.success(`${AGENT_TITLES[agent]} managed block updated.`)}\n`);
     io.write(`${ui.note(`${targetPath}`)}\n`);
+    if (codexSkillTargetPath) {
+      io.write(`${ui.note(`Codex skill updated in ${codexSkillTargetPath}`)}\n`);
+    }
+    if (claudeCommandPack) {
+      io.write(`${ui.note(`Claude command pack updated in ${claudeCommandPack.targetDir}`)}\n`);
+    }
     return 0;
   } finally {
     io.close?.();
@@ -693,10 +806,42 @@ export async function removeAgent(args: AgentRemoveArgs): Promise<number> {
       targetPath,
       existingContent
     });
+    const claudeCommandPackTarget =
+      agent === "claude"
+        ? resolveClaudeCommandPackTargetDir({
+            scope,
+            cwd: args.cwd,
+            homeDir: args.homeDir
+          })
+        : undefined;
+    const codexSkillTargetPath =
+      agent === "codex"
+        ? resolveSkillTargetPath({
+            runtime: "codex",
+            scope,
+            cwd: args.cwd,
+            homeDir: args.homeDir
+          })
+        : undefined;
+    const codexSkillOwnership =
+      codexSkillTargetPath !== undefined
+        ? inspectSkillOwnership(readOptionalFile(codexSkillTargetPath))
+        : undefined;
+
+    const claudeCommandRemoval =
+      claudeCommandPackTarget !== undefined
+        ? inspectClaudeCommandPackRemoval(claudeCommandPackTarget)
+        : undefined;
 
     if (!plan.changed) {
       io.write(`${ui.note(`No managed ${AGENT_TITLES[agent]} block found at ${targetPath}.`)}\n`);
-      return 0;
+      if (
+        (!claudeCommandRemoval || claudeCommandRemoval.removableFiles.length === 0) &&
+        codexSkillOwnership !== "managed" &&
+        codexSkillOwnership !== "legacy-managed"
+      ) {
+        return 0;
+      }
     }
 
     if (args.dryRun) {
@@ -734,9 +879,31 @@ export async function removeAgent(args: AgentRemoveArgs): Promise<number> {
       }
     }
 
-    writeTextFileAtomic(targetPath, plan.content);
-    io.write(`${ui.success(`${AGENT_TITLES[agent]} managed block removed.`)}\n`);
-    io.write(`${ui.note(`${targetPath}`)}\n`);
+    if (plan.changed) {
+      writeTextFileAtomic(targetPath, plan.content);
+      io.write(`${ui.success(`${AGENT_TITLES[agent]} managed block removed.`)}\n`);
+      io.write(`${ui.note(`${targetPath}`)}\n`);
+    }
+    if (codexSkillTargetPath) {
+      if (codexSkillOwnership === "managed" || codexSkillOwnership === "legacy-managed") {
+        fs.unlinkSync(codexSkillTargetPath);
+        cleanupEmptyDirectories(path.dirname(codexSkillTargetPath), path.resolve(path.dirname(codexSkillTargetPath), "..", ".."));
+        io.write(`${ui.note(`Removed the generated Codex skill at ${codexSkillTargetPath}`)}\n`);
+      } else if (codexSkillOwnership === "custom") {
+        io.write(`${ui.warning(`Left custom Codex SKILL.md untouched at ${codexSkillTargetPath}.`)}\n`);
+      }
+    }
+    if (claudeCommandPackTarget) {
+      const commandRemoval = removeClaudeCommandPack(claudeCommandRemoval ?? inspectClaudeCommandPackRemoval(claudeCommandPackTarget));
+      if (commandRemoval.removedFiles.length > 0) {
+        io.write(`${ui.note(`Removed ${commandRemoval.removedFiles.length} generated Claude command file(s) from ${claudeCommandPackTarget}`)}\n`);
+      } else {
+        io.write(`${ui.note(`No sift-owned Claude command files found in ${claudeCommandPackTarget}.`)}\n`);
+      }
+      if (commandRemoval.customFiles.length > 0) {
+        io.write(`${ui.warning(`Left ${commandRemoval.customFiles.length} custom Claude command file(s) untouched.`)}\n`);
+      }
+    }
     return 0;
   } finally {
     io.close?.();
@@ -768,6 +935,38 @@ export function statusAgents(args: {
       const status = `${AGENT_TITLES[row.agent]} managed block: ${row.installed ? "installed" : "not installed"} (${row.fileExists ? "file exists" : "file missing"})`;
       io.write(`  ${row.installed ? ui.success(status) : ui.warning(status)}\n`);
       io.write(`    ${row.targetPath}\n`);
+      if (row.agent === "codex") {
+        const skillPath = resolveSkillTargetPath({
+          runtime: "codex",
+          scope,
+          cwd: args.cwd,
+          homeDir: args.homeDir
+        });
+        const skillStatus = describeSkillStatus(readOptionalFile(skillPath), skillPath);
+        const styled =
+          skillStatus.startsWith("installed")
+            ? ui.success(`Codex skill: ${skillStatus}`)
+            : skillStatus.startsWith("custom")
+              ? ui.warning(`Codex skill: ${skillStatus}`)
+              : ui.warning(`Codex skill: ${skillStatus}`);
+        io.write(`  ${styled}\n`);
+      }
+      if (row.agent === "claude") {
+        const packStatus = describeClaudeCommandPackStatus(
+          resolveClaudeCommandPackTargetDir({
+            scope,
+            cwd: args.cwd,
+            homeDir: args.homeDir
+          })
+        );
+        const styled =
+          packStatus.startsWith("installed") || packStatus.startsWith("partial")
+            ? ui.success(`Claude command pack: ${packStatus}`)
+            : packStatus.startsWith("custom")
+              ? ui.warning(`Claude command pack: ${packStatus}`)
+              : ui.warning(`Claude command pack: ${packStatus}`);
+        io.write(`  ${styled}\n`);
+      }
     }
   }
 }
@@ -846,6 +1045,148 @@ function writeTextFileAtomic(targetPath: string, content: string): void {
   const tempPath = `${targetPath}.tmp-${process.pid}-${Date.now()}`;
   fs.writeFileSync(tempPath, content, "utf8");
   fs.renameSync(tempPath, targetPath);
+}
+
+function planClaudeCommandPack(args: {
+  scope: AgentScope;
+  cwd?: string;
+  homeDir?: string;
+  operationMode: OperationMode;
+}): ClaudeCommandPackPlan {
+  const targetDir = resolveClaudeCommandPackTargetDir(args);
+  const rendered = renderClaudeCommandPack(args.operationMode);
+  const files: ClaudeCommandFilePlan[] = Object.entries(rendered).map(([name, content]) => {
+    const targetPath = path.join(targetDir, name);
+    const ownership = inspectClaudeCommandOwnership(readOptionalFile(targetPath), name as `${ClaudeCommandName}.md`);
+    const action: ClaudeCommandFilePlan["action"] =
+      ownership === "missing"
+        ? "create"
+        : ownership === "custom"
+          ? "conflict"
+          : "update";
+    return {
+      name: name as `${ClaudeCommandName}.md`,
+      targetPath,
+      content: `${content}\n`,
+      ownership,
+      action
+    };
+  });
+
+  return {
+    targetDir,
+    files,
+    hasConflict: files.some((file) => file.action === "conflict"),
+    action: files.every((file) => file.action === "create") ? "create" : "update"
+  };
+}
+
+function inspectClaudeCommandOwnership(
+  content: string | undefined,
+  name: `${ClaudeCommandName}.md`
+): "managed" | "missing" | "custom" {
+  if (content === undefined) {
+    return "missing";
+  }
+
+  const commandName = name.replace(/\.md$/, "") as ClaudeCommandName;
+  return content.includes(getClaudeCommandMarker(commandName)) ? "managed" : "custom";
+}
+
+function writeClaudeCommandPack(plan: ClaudeCommandPackPlan): void {
+  for (const file of plan.files) {
+    writeTextFileAtomic(file.targetPath, file.content);
+  }
+}
+
+function inspectClaudeCommandPackRemoval(targetDir: string): {
+  targetDir: string;
+  removableFiles: string[];
+  customFiles: string[];
+} {
+  const removableFiles: string[] = [];
+  const customFiles: string[] = [];
+
+  for (const name of CLAUDE_COMMAND_NAMES) {
+    const targetPath = path.join(targetDir, `${name}.md`);
+    const ownership = inspectClaudeCommandOwnership(readOptionalFile(targetPath), `${name}.md`);
+
+    if (ownership === "managed") {
+      removableFiles.push(targetPath);
+    } else if (ownership === "custom") {
+      customFiles.push(targetPath);
+    }
+  }
+
+  return {
+    targetDir,
+    removableFiles,
+    customFiles
+  };
+}
+
+function removeClaudeCommandPack(plan: {
+  targetDir: string;
+  removableFiles: string[];
+  customFiles: string[];
+}): {
+  removedFiles: string[];
+  customFiles: string[];
+} {
+  const removedFiles: string[] = [];
+
+  for (const targetPath of plan.removableFiles) {
+    fs.unlinkSync(targetPath);
+    removedFiles.push(targetPath);
+  }
+
+  cleanupEmptyDirectories(plan.targetDir, path.dirname(path.dirname(plan.targetDir)));
+  return { removedFiles, customFiles: plan.customFiles };
+}
+
+function describeClaudeCommandPackStatus(targetDir: string): string {
+  let managed = 0;
+  let custom = 0;
+
+  for (const name of CLAUDE_COMMAND_NAMES) {
+    const ownership = inspectClaudeCommandOwnership(
+      readOptionalFile(path.join(targetDir, `${name}.md`)),
+      `${name}.md`
+    );
+
+    if (ownership === "managed") {
+      managed += 1;
+    } else if (ownership === "custom") {
+      custom += 1;
+    }
+  }
+
+  if (custom > 0) {
+    return `custom files present (${targetDir})`;
+  }
+
+  if (managed === 0) {
+    return `not installed (${targetDir})`;
+  }
+
+  if (managed < CLAUDE_COMMAND_NAMES.length) {
+    return `partial (${targetDir})`;
+  }
+
+  return `installed (${targetDir})`;
+}
+
+function cleanupEmptyDirectories(startDir: string, stopDir: string): void {
+  let current = startDir;
+
+  while (current.startsWith(stopDir) && current !== stopDir) {
+    try {
+      fs.rmdirSync(current);
+      current = path.dirname(current);
+    } catch {
+      break;
+    }
+  }
 }
 
 function escapeRegExp(value: string): string {

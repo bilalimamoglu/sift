@@ -16,12 +16,20 @@ describe("README quick start e2e", () => {
     expect(readme).toContain("local-only");
     expect(readme).toContain("gpt-5-nano");
     expect(readme).toContain("gpt-5.4-nano");
+    expect(readme).toContain("sift hook match -- pytest -q");
+    expect(readme).toContain("unknown commands pass through untouched");
+    expect(readme).toContain("use `sift exec` for the normal first pass");
+    expect(readme).not.toContain("sift hook run -- pytest -q");
 
     expect(cliReference).toContain("agent-escalation");
     expect(cliReference).toContain("provider-assisted");
     expect(cliReference).toContain("local-only");
     expect(cliReference).toContain("gpt-5-nano");
     expect(cliReference).toContain("gpt-5.4-nano");
+    expect(cliReference).toContain("sift hook match -- pytest -q");
+    expect(cliReference).toContain("unknown commands run unchanged");
+    expect(cliReference).toContain("This is the default product path.");
+    expect(cliReference).toContain("This is an optional shortcut, not the main workflow.");
   });
 
   it("supports the documented quick-start commands", async () => {
@@ -30,6 +38,10 @@ describe("README quick start e2e", () => {
       const payload = (() => {
         if (serializedBody.includes("what changed?")) {
           return "Changed one file.";
+        }
+
+        if (serializedBody.includes("typecheck-summary") && serializedBody.includes("npm run typecheck")) {
+          return "No type errors.";
         }
 
         if (serializedBody.includes("typecheck-summary")) {
@@ -200,6 +212,22 @@ describe("README quick start e2e", () => {
           ]
         },
         {
+          args: ["hook", "match", "--", "pytest", "-q"]
+        },
+        {
+          args: ["hook", "run", "--shell", "npm audit --json"]
+        },
+        {
+          args: [
+            "hook",
+            "run",
+            "--",
+            "node",
+            "-e",
+            "console.log('hello from raw pass through')"
+          ]
+        },
+        {
           args: ["agent", "show", "codex"]
         },
         {
@@ -210,10 +238,16 @@ describe("README quick start e2e", () => {
         },
         {
           args: ["agent", "install", "codex", "--dry-run", "--raw"]
+        },
+        {
+          args: ["skill", "show", "codex"]
+        },
+        {
+          args: ["skill", "show", "codex", "--raw"]
         }
       ];
 
-      const expectedStatuses = [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0];
+      const expectedStatuses = [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0];
       const outputs: string[] = [];
 
       for (const [index, command] of commands.entries()) {
@@ -248,11 +282,21 @@ describe("README quick start e2e", () => {
       expect(JSON.parse(outputs[10]!).vulnerabilities).toHaveLength(1);
       expect(outputs[11]).toBeDefined();
       expect(JSON.parse(outputs[11] as string).verdict).toBe("fail");
-      expect(outputs[12]).toContain("Codex instructions preview");
-      expect(outputs[13]).toContain("<!-- sift:begin codex -->");
-      expect(outputs[14]).toContain("Dry run:");
-      expect(outputs[14]).toContain("Codex managed block");
-      expect(outputs[15]).toContain("<!-- sift:begin codex -->");
+      expect(outputs[12]).toContain("decision: matched");
+      expect(outputs[12]).toContain("preset: test-status");
+      expect(JSON.parse(outputs[13]!)).toEqual({
+        status: "ok",
+        vulnerabilities: [],
+        summary: "No high or critical vulnerabilities found in the provided input."
+      });
+      expect(outputs[14]).toContain("hello from raw pass through");
+      expect(outputs[15]).toContain("Codex instructions preview");
+      expect(outputs[16]).toContain("<!-- sift:begin codex -->");
+      expect(outputs[17]).toContain("Dry run:");
+      expect(outputs[17]).toContain("Codex managed block");
+      expect(outputs[18]).toContain("<!-- sift:begin codex -->");
+      expect(outputs[19]).toContain("Codex skill preview");
+      expect(outputs[20]).toContain("name: sift");
     } finally {
       await server.close();
     }
