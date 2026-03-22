@@ -48,5 +48,6 @@ describe("packaging e2e", () => {
     expect(tarballContents).not.toContain("assets/brand");
     expect(result.stdout).toContain("sift [question]");
     expect(result.stdout).toContain("  \\\\  //");
+    expect(result.stdout).toContain("choose agent-escalation, provider-assisted, or local-only");
   });
 });

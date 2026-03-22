@@ -8,11 +8,18 @@ import {
   stdout as defaultStdout
 } from "node:process";
 import {
+  getDefaultGlobalConfigPath,
   getDefaultClaudeGlobalInstructionsPath,
   getDefaultCodexGlobalInstructionsPath
 } from "../constants.js";
+import {
+  describeOperationMode,
+  getOperationModeLabel
+} from "../config/operation-mode.js";
+import { CONFIG_SETUP_BACK, configSetup } from "./config-setup.js";
+import type { OperationMode } from "../types.js";
 import { createPresentation } from "../ui/presentation.js";
-import { promptSelect } from "../ui/terminal.js";
+import { PROMPT_BACK, promptSelect } from "../ui/terminal.js";
 import {
   installAgent,
   type AgentCommandIO,
@@ -23,7 +30,12 @@ import {
 export type InstallRuntime = AgentName | "all";
 
 export interface InstallRuntimeIO extends AgentCommandIO {
-  select?(prompt: string, options: string[], selectedLabel?: string): Promise<string>;
+  select?(
+    prompt: string,
+    options: string[],
+    selectedLabel?: string,
+    allowBack?: boolean
+  ): Promise<string>;
 }
 
 interface MenuChoice<T> {
@@ -51,14 +63,20 @@ export function createInstallTerminalIO(): InstallRuntimeIO {
     return rl;
   }
 
-  async function select(prompt: string, options: string[], selectedLabel?: string): Promise<string> {
+  async function select(
+    prompt: string,
+    options: string[],
+    selectedLabel?: string,
+    allowBack?: boolean
+  ): Promise<string> {
     emitKeypressEvents(defaultStdin);
     return await promptSelect({
       input: defaultStdin,
       output: defaultStdout,
       prompt,
       options,
-      selectedLabel
+      selectedLabel,
+      allowBack
     });
   }
 
@@ -110,17 +128,20 @@ export function normalizeInstallScope(value: unknown): AgentScope | undefined {
 }
 
 function renderInstallBanner(version: string): string {
+  const teal = (text: string) =>
+    `\u001B[38;2;34;173;169m${text}\u001B[0m`;
+
   return [
-    "  ███████╗██╗███████╗████████╗",
-    "  ██╔════╝██║██╔════╝╚══██╔══╝",
-    "  ███████╗██║█████╗     ██║   ",
-    "  ╚════██║██║██╔══╝     ██║   ",
-    "  ███████║██║██║        ██║   ",
-    "  ╚══════╝╚═╝╚═╝        ╚═╝   ",
+    teal("  ███████╗██╗███████╗████████╗"),
+    teal("  ██╔════╝██║██╔════╝╚══██╔══╝"),
+    teal("  ███████╗██║█████╗     ██║   "),
+    teal("  ╚════██║██║██╔══╝     ██║   "),
+    teal("  ███████║██║██║        ██║   "),
+    teal("  ╚══════╝╚═╝╚═╝        ╚═╝   "),
     "",
     `  sift v${version}`,
-    "  Trim the noise. Keep the signal.",
-    "  Local-first output guidance for your coding runtime."
+    "  Small, sharp, and mildly sarcastic output guidance.",
+    '  "Loading the loading screen..." energy, minus the loading screen.'
   ].join("\n");
 }
 
@@ -166,12 +187,16 @@ async function promptWithMenu<T>(args: {
   choices: MenuChoice<T>[];
   defaultIndex?: number;
   selectedLabel: string;
-}): Promise<T> {
+  allowBack?: boolean;
+}): Promise<T | typeof PROMPT_BACK> {
   const defaultIndex = args.defaultIndex ?? 0;
 
   if (args.io.select) {
     const labels = args.choices.map((choice) => choice.label);
-    const selected = await args.io.select(args.prompt, labels, args.selectedLabel);
+    const selected = await args.io.select(args.prompt, labels, args.selectedLabel, args.allowBack);
+    if (selected === PROMPT_BACK) {
+      return PROMPT_BACK;
+    }
     const match = args.choices.find((choice) => choice.label === selected);
     if (match) {
       return match.value;
@@ -182,10 +207,16 @@ async function promptWithMenu<T>(args: {
   args.choices.forEach((choice, index) => {
     args.io.write(`  ${index + 1}) ${choice.label}\n`);
   });
+  if (args.allowBack) {
+    args.io.write(`  ${args.choices.length + 1}) Back\n`);
+  }
   args.io.write("\n");
 
   while (true) {
     const answer = (await args.io.ask(`Choice [${defaultIndex + 1}]: `)).trim();
+    if (args.allowBack && (answer.toLowerCase() === "back" || answer.toLowerCase() === "b")) {
+      return PROMPT_BACK;
+    }
     if (answer === "") {
       return args.choices[defaultIndex]?.value ?? args.choices[0]!.value;
     }
@@ -194,27 +225,32 @@ async function promptWithMenu<T>(args: {
     if (Number.isInteger(choiceIndex) && choiceIndex >= 1 && choiceIndex <= args.choices.length) {
       return args.choices[choiceIndex - 1]!.value;
     }
+    if (args.allowBack && Number.isInteger(choiceIndex) && choiceIndex === args.choices.length + 1) {
+      return PROMPT_BACK;
+    }
 
-    args.io.error(`Please enter a number between 1 and ${args.choices.length}.\n`);
+    const max = args.allowBack ? args.choices.length + 1 : args.choices.length;
+    args.io.error(`Please enter a number between 1 and ${max}.\n`);
   }
 }
 
-async function promptForRuntime(io: InstallRuntimeIO): Promise<InstallRuntime> {
+async function promptForRuntime(io: InstallRuntimeIO): Promise<InstallRuntime | typeof PROMPT_BACK> {
   return await promptWithMenu({
     io,
-    prompt: "Which runtime(s) would you like to install for?",
+    prompt: "Choose your runtime",
     selectedLabel: "Runtime",
+    allowBack: true,
     choices: [
       {
-        label: "Codex   (AGENTS.md / ~/.codex/AGENTS.md)",
+        label: "Codex   (AGENTS.md / ~/.codex/AGENTS.md) - first-class if you live in Codex",
         value: "codex"
       },
       {
-        label: "Claude  (CLAUDE.md / ~/.claude/CLAUDE.md)",
+        label: "Claude  (CLAUDE.md / ~/.claude/CLAUDE.md) - same good manners, Claude-flavored",
         value: "claude"
       },
       {
-        label: "All",
+        label: "All      - if you refuse to pick favorites today",
         value: "all"
       }
     ]
@@ -226,11 +262,12 @@ async function promptForScope(args: {
   runtime: InstallRuntime;
   cwd?: string;
   homeDir?: string;
-}): Promise<AgentScope> {
+}): Promise<AgentScope | typeof PROMPT_BACK> {
   return await promptWithMenu({
     io: args.io,
-    prompt: "Where would you like to install?",
+    prompt: "Choose where to install the runtime support",
     selectedLabel: "Location",
+    allowBack: true,
     choices: [
       {
         label: `Global (${describeScopeChoice({
@@ -238,7 +275,7 @@ async function promptForScope(args: {
           scope: "global",
           cwd: args.cwd,
           homeDir: args.homeDir
-        })}) - available in all projects`,
+        })}) - use this if you want sift ready everywhere`,
         value: "global"
       },
       {
@@ -247,8 +284,31 @@ async function promptForScope(args: {
           scope: "repo",
           cwd: args.cwd,
           homeDir: args.homeDir
-        })}) - this project only`,
+        })}) - keep it here if this repo is the only one that matters`,
         value: "repo"
+      }
+    ]
+  });
+}
+
+async function promptForOperationMode(io: InstallRuntimeIO): Promise<OperationMode | typeof PROMPT_BACK> {
+  return await promptWithMenu({
+    io,
+    prompt: "Choose how sift should work",
+    selectedLabel: "Mode",
+    allowBack: true,
+    choices: [
+      {
+        label: "With an agent - recommended if Codex or Claude is already with you; sift does the fast local first pass, the agent only steps in when repo context is truly needed",
+        value: "agent-escalation"
+      },
+      {
+        label: "With provider fallback - recommended if you want sift to finish more ambiguous cases on its own before handing them back to you or your agent; needs an API key, cheap model only when needed",
+        value: "provider-assisted"
+      },
+      {
+        label: "Solo, local-only - recommended if you want zero model calls; great for supported presets, ambiguous cases stay with you",
+        value: "local-only"
       }
     ]
   });
@@ -271,6 +331,7 @@ function writeSuccessSummary(args: {
   version: string;
   runtime: InstallRuntime;
   scope: AgentScope;
+  operationMode: OperationMode;
   cwd?: string;
   homeDir?: string;
 }): void {
@@ -293,20 +354,25 @@ function writeSuccessSummary(args: {
   args.io.write(
     `${ui.note(`sift v${args.version} now manages ${targets.map((target) => INSTALL_TITLES[target]).join(" + ")} in ${scopeLabel} scope.`)}\n`
   );
-  args.io.write(`${ui.note("Local-first output guidance is now available in your coding workflow.")}\n`);
+  args.io.write(`${ui.note(`Operating mode: ${getOperationModeLabel(args.operationMode)}`)}\n`);
+  args.io.write(`${ui.note(describeOperationMode(args.operationMode))}\n`);
   args.io.write(`${ui.note(targetLabel)}\n`);
   args.io.write(`\n${ui.section("Try next")}\n`);
   args.io.write(`  ${ui.command("sift doctor")}\n`);
-  args.io.write(`  ${ui.command("sift config setup")}\n`);
+  if (args.operationMode === "provider-assisted") {
+    args.io.write(`  ${ui.command("sift config show --show-secrets")}\n`);
+  } else {
+    args.io.write(
+      `  ${ui.command("sift config setup")}${ui.note("  # optional if you want provider-assisted fallback later")}\n`
+    );
+  }
   args.io.write(`  ${ui.command("sift exec --preset test-status -- npm test")}\n`);
-  args.io.write(
-    `${ui.note("Advanced previews and raw block output are still available under `sift agent install ...`.")}\n`
-  );
 }
 
 export async function installRuntimeSupport(options: {
   runtime?: InstallRuntime;
   scope?: AgentScope;
+  operationMode?: OperationMode;
   yes?: boolean;
   io?: InstallRuntimeIO;
   cwd?: string;
@@ -314,6 +380,42 @@ export async function installRuntimeSupport(options: {
   version: string;
 }): Promise<number> {
   const io = options.io ?? createInstallTerminalIO();
+  type InstallStep = "runtime" | "mode" | "scope" | "provider";
+
+  const getPreviousEditableStep = (step: InstallStep): InstallStep | undefined => {
+    if (step === "runtime") {
+      return undefined;
+    }
+
+    if (step === "mode") {
+      return options.runtime ? undefined : "runtime";
+    }
+
+    if (step === "scope") {
+      if (!options.operationMode) {
+        return "mode";
+      }
+      if (!options.runtime) {
+        return "runtime";
+      }
+      return undefined;
+    }
+
+    if (step === "provider") {
+      if (!options.scope) {
+        return "scope";
+      }
+      if (!options.operationMode) {
+        return "mode";
+      }
+      if (!options.runtime) {
+        return "runtime";
+      }
+      return undefined;
+    }
+
+    return undefined;
+  };
 
   try {
     if ((!io.stdinIsTTY || !io.stdoutIsTTY) && (!options.runtime || !options.scope || !options.yes)) {
@@ -327,23 +429,117 @@ export async function installRuntimeSupport(options: {
       io.write(`${renderInstallBanner(options.version)}\n`);
     }
 
-    const runtime = options.runtime ?? (await promptForRuntime(io));
-    const scope =
-      options.scope ??
-      (await promptForScope({
+    let runtime = options.runtime;
+    let operationMode: OperationMode | undefined = options.operationMode;
+    let scope: AgentScope | undefined = options.scope;
+    let step: InstallStep | undefined;
+
+    if (!io.stdinIsTTY || !io.stdoutIsTTY) {
+      runtime ??= options.runtime;
+      operationMode ??= "agent-escalation";
+      step = undefined;
+    } else if (!runtime) {
+      step = "runtime";
+    } else if (!operationMode) {
+      step = "mode";
+    } else if (!scope) {
+      step = "scope";
+    } else if (operationMode === "provider-assisted") {
+      step = "provider";
+    }
+
+    while (step) {
+      if (step === "runtime") {
+      const runtimeChoice = await promptForRuntime(io);
+        if (runtimeChoice === PROMPT_BACK) {
+          io.write(`\n${createPresentation(io.stdoutIsTTY).note("Install canceled before we touched anything.")}\n`);
+          return 0;
+        }
+        runtime = runtimeChoice;
+        step = !operationMode ? "mode" : !scope ? "scope" : operationMode === "provider-assisted" ? "provider" : undefined;
+        continue;
+      }
+
+      if (step === "mode") {
+        const modeChoice = await promptForOperationMode(io);
+        if (modeChoice === PROMPT_BACK) {
+          const previous = getPreviousEditableStep("mode");
+          if (!previous) {
+            io.write(`\n${createPresentation(io.stdoutIsTTY).note("Install canceled before we touched anything.")}\n`);
+            return 0;
+          }
+          step = previous;
+          continue;
+        }
+
+        operationMode = modeChoice;
+        step = !scope ? "scope" : operationMode === "provider-assisted" ? "provider" : undefined;
+        continue;
+      }
+
+      if (step === "scope") {
+        const scopeChoice = await promptForScope({
+          io,
+          runtime: runtime!,
+          cwd: options.cwd,
+          homeDir: options.homeDir
+        });
+
+        if (scopeChoice === PROMPT_BACK) {
+          const previous = getPreviousEditableStep("scope");
+          if (!previous) {
+            io.write(`\n${createPresentation(io.stdoutIsTTY).note("Install canceled before we touched anything.")}\n`);
+            return 0;
+          }
+          step = previous;
+          continue;
+        }
+
+        scope = scopeChoice;
+        step = operationMode === "provider-assisted" ? "provider" : undefined;
+        continue;
+      }
+
+      if (scope === "repo") {
+        io.write(
+          `\n${createPresentation(io.stdoutIsTTY).note("Local only applies to the runtime instructions in this repo. Provider fallback config is still machine-wide so sift can reuse it anywhere.")}\n`
+        );
+      }
+      io.write(`\n${createPresentation(io.stdoutIsTTY).info("Next: provider setup. Press Esc at any step to go back.")}\n`);
+      const setupStatus = await configSetup({
         io,
-        runtime,
-        cwd: options.cwd,
-        homeDir: options.homeDir
-      }));
+        env: process.env,
+        embedded: true,
+        forcedMode: "provider-assisted",
+        targetPath: getDefaultGlobalConfigPath(options.homeDir)
+      });
+
+      if (setupStatus === CONFIG_SETUP_BACK) {
+        const previous = getPreviousEditableStep("provider");
+        if (!previous) {
+          io.write(`\n${createPresentation(io.stdoutIsTTY).note("Install canceled before we touched anything.")}\n`);
+          return 0;
+        }
+        step = previous;
+        continue;
+      }
+
+      if (setupStatus !== 0) {
+        return setupStatus;
+      }
+
+      step = undefined;
+    }
+
     const nestedIo = createNestedInstallIO(io);
 
-    for (const agent of getInstallTargets(runtime)) {
+    for (const agent of getInstallTargets(runtime!)) {
       const status = await installAgent({
         agent,
-        scope,
+        scope: scope!,
         yes: true,
         io: nestedIo,
+        operationMode: operationMode!,
         cwd: options.cwd,
         homeDir: options.homeDir
       });
@@ -355,8 +551,9 @@ export async function installRuntimeSupport(options: {
     writeSuccessSummary({
       io,
       version: options.version,
-      runtime,
-      scope,
+      runtime: runtime!,
+      scope: scope!,
+      operationMode: operationMode!,
       cwd: options.cwd,
       homeDir: options.homeDir
     });

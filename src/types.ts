@@ -17,6 +17,7 @@ export type TestStatusRemainingMode = "none" | "subset_rerun" | "full_rerun_diff
 
 export type ResponseMode = "text" | "json";
 export type JsonResponseFormatMode = "auto" | "on" | "off";
+export type OperationMode = "agent-escalation" | "provider-assisted" | "local-only";
 
 export type PromptPolicyName =
   | "test-status"
@@ -50,6 +51,7 @@ export interface InputConfig {
 }
 
 export interface RuntimeConfig {
+  operationMode: OperationMode;
   rawFallback: boolean;
   verbose: boolean;
 }

@@ -2,10 +2,28 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { runDistCliAsync } from "./helpers/cli.js";
+import { repoRoot, runDistCliAsync } from "./helpers/cli.js";
 import { createFakeOpenAIServer } from "./helpers/fake-openai.js";
 
 describe("README quick start e2e", () => {
+  it("documents the mode-first setup story in tracked docs", async () => {
+    const root = repoRoot();
+    const readme = await fs.readFile(path.join(root, "README.md"), "utf8");
+    const cliReference = await fs.readFile(path.join(root, "docs", "cli-reference.md"), "utf8");
+
+    expect(readme).toContain("agent-escalation");
+    expect(readme).toContain("provider-assisted");
+    expect(readme).toContain("local-only");
+    expect(readme).toContain("gpt-5-nano");
+    expect(readme).toContain("gpt-5.4-nano");
+
+    expect(cliReference).toContain("agent-escalation");
+    expect(cliReference).toContain("provider-assisted");
+    expect(cliReference).toContain("local-only");
+    expect(cliReference).toContain("gpt-5-nano");
+    expect(cliReference).toContain("gpt-5.4-nano");
+  });
+
   it("supports the documented quick-start commands", async () => {
     const server = await createFakeOpenAIServer((body, _index, request) => {
       const serializedBody = JSON.stringify(body);

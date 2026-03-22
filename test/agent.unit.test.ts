@@ -116,6 +116,7 @@ describe("agent command helpers", () => {
     expect(markers.start).toBe("<!-- sift:begin codex -->");
     expect(markers.end).toBe("<!-- sift:end codex -->");
     expect(block).toContain(markers.start);
+    expect(block).toContain("Default operating mode: Agent escalation.");
     expect(block).toContain("sift exec --preset test-status -- <test command>");
     expect(block).toContain("default to `sift` first and treat `standard` as the usual stop point");
     expect(block).toContain("Use `sift escalate` when you want a deeper render of the same cached output");
@@ -294,20 +295,22 @@ describe("agent command helpers", () => {
       {
         agent: "claude",
         cwd,
-        homeDir: home
+        homeDir: home,
+        operationMode: "agent-escalation"
       },
       showIo
     );
     const previewOutput = stripAnsi(showIo.stdout);
     expect(previewOutput).toContain("Claude instructions preview");
     expect(previewOutput).toContain("status: managed block already installed here");
+    expect(previewOutput).toContain("operation mode: Agent escalation");
     expect(previewOutput).toContain("Also installed in global scope");
     expect(previewOutput).toContain("This is only a preview. Nothing will be changed.");
     expect(previewOutput).toContain("Use --raw to print the exact managed block.");
     expect(previewOutput).toContain("target file: CLAUDE.md");
-    expect(previewOutput).toContain("context-window and token budget");
+    expect(previewOutput).toContain("narrow long command output before your agent burns time and tokens on the raw log wall");
     expect(previewOutput).toContain("default to sift first, keep raw as the last resort");
-    expect(previewOutput).toContain("standard should usually be enough for first-pass triage");
+    expect(previewOutput).toContain("standard should usually be enough for first-pass guidance");
     expect(previewOutput).toContain("After a fix, refresh the truth with sift rerun");
     expect(previewOutput).toContain("Only then zoom into what is still broken");
     expect(previewOutput).toContain("Use diagnose JSON only for automation or machine branching");
@@ -317,8 +320,9 @@ describe("agent command helpers", () => {
     expect(previewOutput).toContain("avoid re-verifying the same bucket with raw pytest");
 
     const rawShowIo = createIo({ stdoutIsTTY: false });
-    showAgent({ agent: "claude", raw: true }, rawShowIo);
+    showAgent({ agent: "claude", raw: true, operationMode: "agent-escalation" }, rawShowIo);
     expect(rawShowIo.stdout).toContain("<!-- sift:begin claude -->");
+    expect(rawShowIo.stdout).toContain("Default operating mode: Agent escalation.");
     expect(rawShowIo.stdout).toContain("refresh the truth with `sift rerun`");
     expect(rawShowIo.stdout).toContain("`sift escalate` and `sift rerun` require a cached `sift exec --preset test-status -- <test command>` run first.");
     expect(rawShowIo.stdout).toContain("--include-test-ids");

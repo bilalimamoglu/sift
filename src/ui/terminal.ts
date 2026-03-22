@@ -2,6 +2,9 @@ import { execFileSync } from "node:child_process";
 import { clearScreenDown, cursorTo, moveCursor } from "node:readline";
 import { stdin as defaultStdin } from "node:process";
 
+export const PROMPT_BACK = "__sift_back__";
+export const PROMPT_BACK_LABEL = "← Back";
+
 export interface KeypressInput {
   isRaw?: boolean;
   pause?(): void;
@@ -13,6 +16,123 @@ export interface KeypressInput {
 
 export interface TerminalOutput {
   write(message: string): void;
+}
+
+function color(text: string, rgb: [number, number, number], args: {
+  bold?: boolean;
+  dim?: boolean;
+} = {}): string {
+  const codes: string[] = [];
+  if (args.bold) {
+    codes.push("1");
+  }
+  if (args.dim) {
+    codes.push("2");
+  }
+  codes.push(`38;2;${rgb[0]};${rgb[1]};${rgb[2]}`);
+  return `\u001B[${codes.join(";")}m${text}\u001B[0m`;
+}
+
+function splitOptionLeading(option: string): { leading: string; trailing: string } {
+  const boundaries = [" - ", ": ", ":", " ("]
+    .map((token) => {
+      const index = option.indexOf(token);
+      return index >= 0 ? { index, token } : undefined;
+    })
+    .filter((entry): entry is { index: number; token: string } => Boolean(entry))
+    .sort((left, right) => left.index - right.index);
+
+  const boundary = boundaries[0];
+  if (!boundary) {
+    return { leading: option, trailing: "" };
+  }
+
+  return {
+    leading: option.slice(0, boundary.index),
+    trailing: option.slice(boundary.index)
+  };
+}
+
+function getOptionPalette(leading: string): {
+  rgb: [number, number, number];
+  dimWhenIdle?: boolean;
+} | undefined {
+  const normalized = leading.trim();
+
+  if (normalized.startsWith("With an agent")) {
+    return { rgb: [214, 168, 76] };
+  }
+
+  if (normalized.startsWith("With provider fallback")) {
+    return { rgb: [100, 141, 214] };
+  }
+
+  if (normalized.startsWith("Solo, local-only")) {
+    return { rgb: [122, 142, 116], dimWhenIdle: true };
+  }
+
+  if (normalized.startsWith("Codex")) {
+    return { rgb: [233, 183, 78] };
+  }
+
+  if (normalized.startsWith("Claude")) {
+    return { rgb: [171, 138, 224] };
+  }
+
+  if (normalized === "All") {
+    return { rgb: [95, 181, 201] };
+  }
+
+  if (normalized.startsWith("Global")) {
+    return { rgb: [205, 168, 83] };
+  }
+
+  if (normalized.startsWith("Local")) {
+    return { rgb: [138, 144, 150], dimWhenIdle: true };
+  }
+
+  if (normalized.startsWith("OpenAI")) {
+    return { rgb: [82, 177, 124] };
+  }
+
+  if (normalized.startsWith("OpenRouter")) {
+    return { rgb: [106, 144, 221] };
+  }
+
+  if (normalized.startsWith("Use saved key") || normalized.startsWith("Use existing key")) {
+    return { rgb: [111, 181, 123] };
+  }
+
+  if (normalized.startsWith("Use environment key")) {
+    return { rgb: [102, 146, 219] };
+  }
+
+  if (normalized.startsWith("Enter a different key") || normalized.startsWith("Custom model")) {
+    return { rgb: [191, 157, 92], dimWhenIdle: true };
+  }
+
+  return undefined;
+}
+
+function styleOption(option: string, selected: boolean, colorize: boolean): string {
+  if (!colorize) {
+    return option;
+  }
+
+  if (option === PROMPT_BACK_LABEL) {
+    return color(option, [164, 169, 178], { bold: selected, dim: !selected });
+  }
+
+  const { leading, trailing } = splitOptionLeading(option);
+  const palette = getOptionPalette(leading);
+  if (!palette) {
+    return option;
+  }
+
+  return `${color(leading, palette.rgb, {
+    bold: selected,
+    dim: !selected && Boolean(palette.dimWhenIdle)
+  })}${trailing}`;
 }
 
 function setPosixEcho(enabled: boolean): void {
@@ -40,11 +160,22 @@ export function renderSelectionBlock(args: {
   prompt: string;
   options: string[];
   selectedIndex: number;
+  allowBack?: boolean;
+  backLabel?: string;
+  colorize?: boolean;
 }): string[] {
+  const options = args.allowBack
+    ? [...args.options, args.backLabel ?? PROMPT_BACK_LABEL]
+    : args.options;
+
   return [
-    `${args.prompt} (use ↑/↓ and Enter)`,
-    ...args.options.map((option, index) =>
-      `${index === args.selectedIndex ? "›" : " "} ${option}${index === args.selectedIndex ? " (selected)" : ""}`
+    `${args.prompt}${args.allowBack ? " (use ↑/↓ to move, Enter to select, Esc to go back)" : " (use ↑/↓ and Enter)"}`,
+    ...options.map((option, index) =>
+      `${index === args.selectedIndex ? "›" : " "} ${styleOption(
+        option,
+        index === args.selectedIndex,
+        Boolean(args.colorize)
+      )}${index === args.selectedIndex ? " (selected)" : ""}`
     )
   ];
 }
@@ -55,10 +186,14 @@ export async function promptSelect(args: {
   prompt: string;
   options: string[];
   selectedLabel?: string;
+  allowBack?: boolean;
+  backLabel?: string;
 }): Promise<string> {
   const { input, output, prompt, options } = args;
   const stream = output as unknown as NodeJS.WriteStream;
   const selectedLabel = args.selectedLabel ?? prompt;
+  const backLabel = args.backLabel ?? PROMPT_BACK_LABEL;
+  const allOptions = args.allowBack ? [...options, backLabel] : options;
   let index = 0;
   let previousLineCount = 0;
 
@@ -72,7 +207,10 @@ export async function promptSelect(args: {
     const lines = renderSelectionBlock({
       prompt,
       options,
-      selectedIndex: index
+      selectedIndex: index,
+      allowBack: args.allowBack,
+      backLabel,
+      colorize: Boolean(stream?.isTTY)
     });
 
     output.write(`${lines.join("\n")}\n`);
@@ -108,24 +246,33 @@ export async function promptSelect(args: {
       }
 
       if (key.name === "up") {
-        index = index === 0 ? options.length - 1 : index - 1;
+        index = index === 0 ? allOptions.length - 1 : index - 1;
         render();
         return;
       }
 
       if (key.name === "down") {
-        index = (index + 1) % options.length;
+        index = (index + 1) % allOptions.length;
         render();
         return;
       }
 
-      if (key.name === "return" || key.name === "enter") {
-        const selected = options[index] ?? options[0] ?? "";
+      if (args.allowBack && key.name === "escape") {
         input.off("keypress", onKeypress);
-        cleanup(selected);
+        cleanup();
         input.setRawMode?.(wasRaw);
         input.pause?.();
-        resolve(selected);
+        resolve(PROMPT_BACK);
+        return;
+      }
+
+      if (key.name === "return" || key.name === "enter") {
+        const selected = allOptions[index] ?? allOptions[0] ?? "";
+        input.off("keypress", onKeypress);
+        cleanup(selected === backLabel ? undefined : selected);
+        input.setRawMode?.(wasRaw);
+        input.pause?.();
+        resolve(selected === backLabel ? PROMPT_BACK : selected);
       }
     };
 
@@ -137,6 +284,7 @@ export async function promptSecret(args: {
   input: KeypressInput;
   output: TerminalOutput;
   prompt: string;
+  allowBack?: boolean;
 }): Promise<string> {
   const { input, output, prompt } = args;
   let value = "";
@@ -168,6 +316,14 @@ export async function promptSecret(args: {
         restoreInputState();
         output.write("\n");
         reject(new Error("Aborted."));
+        return;
+      }
+
+      if (args.allowBack && key.name === "escape") {
+        input.off("keypress", onKeypress);
+        restoreInputState();
+        output.write("\n");
+        resolve(PROMPT_BACK);
         return;
       }
 

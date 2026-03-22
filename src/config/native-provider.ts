@@ -1,4 +1,5 @@
 import { defaultConfig } from "./defaults.js";
+import { getDefaultProviderModel } from "./provider-models.js";
 import type {
   NativeProviderName,
   ProviderConfig,
@@ -13,7 +14,7 @@ export function getNativeProviderDefaults(
   if (provider === "openrouter") {
     return {
       provider,
-      model: "openrouter/free",
+      model: getDefaultProviderModel("openrouter"),
       baseUrl: "https://openrouter.ai/api/v1"
     };
   }

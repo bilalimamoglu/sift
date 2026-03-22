@@ -4,9 +4,17 @@ import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stderr as defaultStderr, stdin as defaultStdin, stdout as defaultStdout } from "node:process";
 import {
+  getDefaultGlobalConfigPath,
   getDefaultClaudeGlobalInstructionsPath,
   getDefaultCodexGlobalInstructionsPath
 } from "../constants.js";
+import {
+  describeInsufficientBehavior,
+  describeOperationMode,
+  getOperationModeLabel
+} from "../config/operation-mode.js";
+import { resolveConfig, resolveEffectiveOperationMode } from "../config/resolve.js";
+import type { OperationMode } from "../types.js";
 import { createPresentation } from "../ui/presentation.js";
 
 export type AgentName = "codex" | "claude";
@@ -67,11 +75,13 @@ export interface AgentStatusRow {
 }
 
 export interface AgentShowArgs extends ResolveAgentTargetPathArgs {
+  operationMode?: OperationMode;
   raw?: boolean;
   io?: Pick<AgentCommandIO, "write" | "stdoutIsTTY">;
 }
 
 export interface AgentInstallArgs extends ResolveAgentTargetPathArgs {
+  operationMode?: OperationMode;
   dryRun?: boolean;
   raw?: boolean;
   yes?: boolean;
@@ -173,10 +183,40 @@ export function getManagedBlockMarkers(agent: AgentName): {
   };
 }
 
-function renderInstructionBody(): string {
+function inferOperationMode(args: {
+  cwd?: string;
+  homeDir?: string;
+  operationMode?: OperationMode;
+}): OperationMode {
+  if (args.operationMode) {
+    return args.operationMode;
+  }
+
+  try {
+    const cwd = args.cwd ?? process.cwd();
+    const homeDir = args.homeDir ?? os.homedir();
+    const repoConfigPath = path.resolve(cwd, "sift.config.yaml");
+    const globalConfigPath = getDefaultGlobalConfigPath(homeDir);
+    const configPath = fs.existsSync(repoConfigPath)
+      ? repoConfigPath
+      : fs.existsSync(globalConfigPath)
+        ? globalConfigPath
+        : undefined;
+    const config = resolveConfig(configPath ? { configPath } : {});
+    return resolveEffectiveOperationMode(config);
+  } catch {
+    return "agent-escalation";
+  }
+}
+
+function renderInstructionBody(mode: OperationMode): string {
   return [
     "Use `sift` as the default local-first output guidance layer for long, noisy, non-interactive command output.",
     "The goal is to turn failure walls into grouped issues, likely root causes, and the next useful step before reading raw logs.",
+    "",
+    `Default operating mode: ${getOperationModeLabel(mode)}.`,
+    describeOperationMode(mode),
+    describeInsufficientBehavior(mode),
     "",
     "Start with:",
     '- `sift exec "question" -- <command> [args...]`',
@@ -220,9 +260,13 @@ function renderInstructionBody(): string {
   ].join("\n");
 }
 
-export function renderManagedBlock(agent: AgentName, eol = "\n"): string {
+export function renderManagedBlock(
+  agent: AgentName,
+  eol = "\n",
+  mode: OperationMode = "agent-escalation"
+): string {
   const markers = getManagedBlockMarkers(agent);
-  return [markers.start, renderInstructionBody(), markers.end].join(eol);
+  return [markers.start, renderInstructionBody(mode), markers.end].join(eol);
 }
 
 export function inspectManagedBlock(content: string, agent: AgentName): ManagedBlockInfo {
@@ -256,9 +300,10 @@ export function planManagedInstall(args: {
   agent: AgentName;
   targetPath: string;
   existingContent?: string;
+  operationMode?: OperationMode;
 }): AgentInstallPlan {
   const eol = args.existingContent?.includes("\r\n") ? "\r\n" : "\n";
-  const block = renderManagedBlock(args.agent, eol);
+  const block = renderManagedBlock(args.agent, eol, args.operationMode ?? "agent-escalation");
 
   if (args.existingContent === undefined) {
     return {
@@ -377,7 +422,8 @@ export function showAgent(
   ioArg: Pick<AgentCommandIO, "write" | "stdoutIsTTY"> = createStdoutOnlyIO()
 ): void {
   const params: Required<Pick<AgentShowArgs, "scope" | "raw">> &
-    Pick<ResolveAgentTargetPathArgs, "targetPath" | "cwd" | "homeDir"> & {
+    Pick<ResolveAgentTargetPathArgs, "targetPath" | "cwd" | "homeDir"> &
+    Pick<AgentShowArgs, "operationMode"> & {
       agent: string;
       io: Pick<AgentCommandIO, "write" | "stdoutIsTTY">;
     } =
@@ -385,6 +431,7 @@ export function showAgent(
       ? {
           agent: args,
           scope: "repo" as const,
+          operationMode: undefined,
           raw: false,
           targetPath: undefined,
           cwd: undefined,
@@ -394,6 +441,7 @@ export function showAgent(
       : {
           agent: args.agent,
           scope: args.scope ?? "repo",
+          operationMode: args.operationMode,
           raw: args.raw ?? false,
           targetPath: args.targetPath,
           cwd: args.cwd,
@@ -403,8 +451,14 @@ export function showAgent(
   const agent = normalizeAgentName(params.agent);
   const io = params.io;
 
+  const operationMode = inferOperationMode({
+    cwd: params.cwd,
+    homeDir: params.homeDir,
+    operationMode: params.operationMode
+  });
+
   if (params.raw) {
-    io.write(`${renderManagedBlock(agent)}\n`);
+    io.write(`${renderManagedBlock(agent, "\n", operationMode)}\n`);
     return;
   }
 
@@ -443,6 +497,7 @@ export function showAgent(
       currentInstalled ? "managed block already installed here" : "not installed in this target yet"
     )}\n`
   );
+  io.write(`${ui.labelValue("operation mode", getOperationModeLabel(operationMode))}\n`);
   if (currentInstalled) {
     io.write(`${ui.warning(`Already installed in ${params.scope} scope.`)}\n`);
   }
@@ -461,6 +516,8 @@ export function showAgent(
   io.write(
     `${ui.info("The managed block teaches the agent to default to sift first, keep raw as the last resort, and treat standard as the usual stop point.")}\n`
   );
+  io.write(`${ui.note(describeOperationMode(operationMode))}\n`);
+  io.write(`${ui.note(describeInsufficientBehavior(operationMode))}\n`);
   io.write(`  ${ui.command('sift exec "question" -- <command> [args...]')}\n`);
   io.write(`  ${ui.command("sift exec --preset test-status -- <test command>")}\n`);
   io.write(`  ${ui.command("sift exec --preset audit-critical -- npm audit")}\n`);
@@ -507,6 +564,11 @@ export async function installAgent(args: AgentInstallArgs): Promise<number> {
     homeDir: args.homeDir
   });
   const ui = createPresentation(io.stdoutIsTTY);
+  const operationMode = inferOperationMode({
+    cwd: args.cwd,
+    homeDir: args.homeDir,
+    operationMode: args.operationMode
+  });
 
   try {
     const existingContent = readOptionalFile(targetPath);
@@ -518,7 +580,8 @@ export async function installAgent(args: AgentInstallArgs): Promise<number> {
     const plan = planManagedInstall({
       agent,
       targetPath,
-      existingContent
+      existingContent,
+      operationMode
     });
 
     if (args.dryRun) {
@@ -572,6 +635,7 @@ export async function installAgent(args: AgentInstallArgs): Promise<number> {
       io.write(`${ui.section(`${AGENT_TITLES[agent]} instructions`)}\n`);
       io.write(`${ui.labelValue("scope", scope)}\n`);
       io.write(`${ui.labelValue("target", targetPath)}\n`);
+      io.write(`${ui.labelValue("operation mode", getOperationModeLabel(operationMode))}\n`);
       io.write(`${ui.info("This will only manage the sift block.")}\n`);
       io.write(
         `${ui.warning("Your other notes in this file will stay untouched.")}\n`

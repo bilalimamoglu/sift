@@ -326,12 +326,20 @@ describe("command modules", () => {
     });
 
     expect(stdout).toContain("configPath: /tmp/example.yaml");
+    expect(stdout).toContain("configuredMode: Agent escalation");
+    expect(stdout).toContain("effectiveMode: Agent escalation");
     expect(stdout).toContain("apiKey: set");
     expect(stderr).toBe("");
   });
 
-  it("runDoctor treats placeholder API keys as incomplete setup", () => {
-    const config = buildConfig({ apiKey: "YOUR_API_KEY" });
+  it("runDoctor treats placeholder API keys as incomplete setup only for provider-assisted mode", () => {
+    const config = {
+      ...buildConfig({ apiKey: "YOUR_API_KEY" }),
+      runtime: {
+        ...defaultConfig.runtime,
+        operationMode: "provider-assisted" as const
+      }
+    };
 
     const { stdout, stderr } = captureOutput(() => {
       withPatchedStream(process.stderr, { isTTY: false }, () => {
@@ -341,13 +349,20 @@ describe("command modules", () => {
     });
 
     expect(stdout).toContain("configPath: /tmp/example.yaml");
+    expect(stdout).toContain("configuredMode: Provider-assisted");
     expect(stdout).toContain("apiKey: placeholder (not a real key)");
     expect(stderr).toContain('provider.apiKey looks like a placeholder: "YOUR_API_KEY"');
     expect(stderr).toContain("OPENAI_API_KEY");
   });
 
-  it("runDoctor reports missing provider fields to stderr", () => {
-    const config = buildConfig({ apiKey: "" });
+  it("runDoctor reports missing provider fields to stderr for provider-assisted mode", () => {
+    const config = {
+      ...buildConfig({ apiKey: "" }),
+      runtime: {
+        ...defaultConfig.runtime,
+        operationMode: "provider-assisted" as const
+      }
+    };
 
     const { stdout, stderr } = captureOutput(() => {
       withPatchedStream(process.stderr, { isTTY: false }, () => {
@@ -361,6 +376,20 @@ describe("command modules", () => {
     expect(stderr).toContain("OPENAI_API_KEY");
   });
 
+  it("runDoctor succeeds for agent-escalation without provider credentials", () => {
+    const config = buildConfig({ apiKey: "" });
+
+    const { stdout, stderr } = captureOutput(() => {
+      const code = runDoctor(config, null);
+      expect(code).toBe(0);
+    });
+
+    expect(stdout).toContain("configuredMode: Agent escalation");
+    expect(stdout).toContain("effectiveMode: Agent escalation");
+    expect(stdout).toContain("insufficientBehavior:");
+    expect(stderr).toBe("");
+  });
+
   it("runDoctor covers tty error formatting for missing fields", () => {
     const config = {
       ...defaultConfig,
@@ -370,6 +399,10 @@ describe("command modules", () => {
         baseUrl: "",
         model: "",
         apiKey: ""
+      },
+      runtime: {
+        ...defaultConfig.runtime,
+        operationMode: "provider-assisted" as const
       }
     };
 

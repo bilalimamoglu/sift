@@ -166,7 +166,7 @@ describe("runExec unit", () => {
     expect(
       normalizeScriptWrapperOutput({
         commandPreview: "npm run typecheck",
-        capturedOutput: "\n> sift@0.4.4 typecheck\n> tsc --noEmit\n\n"
+        capturedOutput: "\n> sift@0.4.5 typecheck\n> tsc --noEmit\n\n"
       })
     ).toBe("");
     expect(
@@ -536,7 +536,7 @@ describe("runExec unit", () => {
       })
     );
 
-    child.stdout.emit("data", "\n> sift@0.4.4 typecheck\n> tsc --noEmit\n\n");
+    child.stdout.emit("data", "\n> sift@0.4.5 typecheck\n> tsc --noEmit\n\n");
     child.emit("close", 0, null);
 
     await expect(pending).resolves.toBe(0);
@@ -558,7 +558,7 @@ describe("runExec unit", () => {
       })
     );
 
-    child.stdout.emit("data", "\n> sift@0.4.4 lint\n> eslint .\n\n");
+    child.stdout.emit("data", "\n> sift@0.4.5 lint\n> eslint .\n\n");
     child.emit("close", 0, null);
 
     await expect(pending).resolves.toBe(0);

@@ -19,8 +19,9 @@ describe("agent installer smoke", () => {
     expect(codex.status).toBe(0);
     expect(codex.stdout).toContain("Codex instructions preview");
     expect(codex.stdout).toContain("Use --raw to print the exact managed block.");
+    expect(codex.stdout).toContain("operation mode: Agent escalation");
     expect(codex.stdout).toContain("default to sift first, keep raw as the last resort");
-    expect(codex.stdout).toContain("standard should usually be enough for first-pass triage");
+    expect(codex.stdout).toContain("standard should usually be enough for first-pass guidance");
     expect(codex.stdout).toContain("Only then zoom into what is still broken");
     expect(codex.stdout).toContain("Use diagnose JSON only for automation or machine branching");
     expect(codex.stdout).toContain("If standard already shows bucket-level root cause, anchor, and fix lines");
@@ -29,6 +30,7 @@ describe("agent installer smoke", () => {
     expect(claude.stdout).toContain("Claude instructions preview");
     expect(rawCodex.status).toBe(0);
     expect(rawCodex.stdout).toContain("<!-- sift:begin codex -->");
+    expect(rawCodex.stdout).toContain("Default operating mode: Agent escalation.");
     expect(rawCodex.stdout).toContain("refresh the truth with `sift rerun`");
     expect(rawCodex.stdout).toContain(
       "`sift rerun --remaining` narrows automatically for `pytest` and reruns the full original command for `vitest` and `jest` while keeping the diagnosis focused on what still fails."

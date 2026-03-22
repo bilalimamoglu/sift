@@ -11,6 +11,7 @@ import {
   type ConfigSetupIO
 } from "../src/commands/config-setup.js";
 import { getDefaultGlobalConfigPath } from "../src/constants.js";
+import { PROMPT_BACK } from "../src/ui/terminal.js";
 
 function createFakeIO(answers: string[]): ConfigSetupIO & {
   stdout: string;
@@ -62,7 +63,7 @@ describe("config setup", () => {
   it("writes an OpenAI config to an explicit path", async () => {
     const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "sift-setup-"));
     const targetPath = path.join(dir, "custom-config.yaml");
-    const io = createFakeIO(["", "sk-test-key"]);
+    const io = createFakeIO(["provider", "", "", "sk-test-key"]);
 
     const status = await configSetup({
       targetPath,
@@ -72,6 +73,7 @@ describe("config setup", () => {
     const written = YAML.parse(await fsPromises.readFile(targetPath, "utf8")) as {
       provider: { provider: string; model: string; baseUrl: string; apiKey: string };
       providerProfiles?: { openai?: { apiKey?: string } };
+      runtime: { operationMode: string };
     };
     const mode = fs.statSync(targetPath).mode & 0o777;
 
@@ -81,8 +83,12 @@ describe("config setup", () => {
     expect(written.provider.baseUrl).toBe("https://api.openai.com/v1");
     expect(written.provider.apiKey).toBe("sk-test-key");
     expect(written.providerProfiles?.openai?.apiKey).toBe("sk-test-key");
+    expect(written.runtime.operationMode).toBe("provider-assisted");
     expect(io.stdout).toContain("Welcome to sift.");
-    expect(io.stdout).toContain("Using OpenAI defaults for your first run.");
+    expect(io.stdout).toContain("Operating mode: Provider-assisted");
+    expect(io.stdout).toContain("OpenAI fallback it is.");
+    expect(io.stdout).toContain("Default model: gpt-5-nano");
+    expect(io.stdout).toContain("Selected model: gpt-5-nano");
     expect(io.stdout).toContain("Enter your OpenAI API key (input hidden):");
     expect(io.stdout).toContain(`Machine-wide config: ${targetPath}`);
     expect(io.stdout).toContain("Want to switch providers later?");
@@ -98,7 +104,10 @@ describe("config setup", () => {
     const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "sift-setup-select-openai-"));
     const targetPath = path.join(dir, "config.yaml");
     const io = createFakeIO(["sk-test-key"]);
-    io.select = async () => "OpenAI";
+    io.select = vi.fn()
+      .mockResolvedValueOnce("With provider fallback: recommended if you want sift to finish more ambiguous cases on its own before handing them back to you or your agent; requires an API key, cheap model only when needed")
+      .mockResolvedValueOnce("OpenAI")
+      .mockResolvedValueOnce("gpt-5-nano - default, cheapest, fast enough for most fallback passes");
 
     const status = await configSetup({
       targetPath,
@@ -109,11 +118,38 @@ describe("config setup", () => {
     expect(io.stdout).not.toContain("Provider [OpenAI/OpenRouter]: ");
   });
 
+  it("lets the user pick gpt-5.4-nano as the OpenAI fallback model", async () => {
+    const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "sift-setup-select-openai-alt-"));
+    const targetPath = path.join(dir, "config.yaml");
+    const io = createFakeIO(["sk-test-key"]);
+    io.select = vi.fn()
+      .mockResolvedValueOnce("With provider fallback: recommended if you want sift to finish more ambiguous cases on its own before handing them back to you or your agent; requires an API key, cheap model only when needed")
+      .mockResolvedValueOnce("OpenAI")
+      .mockResolvedValueOnce("gpt-5.4-nano - newer nano backup, a touch smarter, a touch pricier");
+
+    const status = await configSetup({
+      targetPath,
+      io
+    });
+
+    const written = YAML.parse(await fsPromises.readFile(targetPath, "utf8")) as {
+      provider: { model: string };
+    };
+
+    expect(status).toBe(0);
+    expect(written.provider.model).toBe("gpt-5.4-nano");
+    expect(io.stdout).toContain("Default model: gpt-5-nano");
+    expect(io.stdout).toContain("Selected model: gpt-5.4-nano");
+  });
+
   it("writes an OpenRouter config when selected from the interactive selector", async () => {
     const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "sift-setup-select-openrouter-"));
     const targetPath = path.join(dir, "config.yaml");
     const io = createFakeIO(["or-key"]);
-    io.select = async () => "OpenRouter";
+    io.select = vi.fn()
+      .mockResolvedValueOnce("With provider fallback: recommended if you want sift to finish more ambiguous cases on its own before handing them back to you or your agent; requires an API key, cheap model only when needed")
+      .mockResolvedValueOnce("OpenRouter")
+      .mockResolvedValueOnce("openrouter/free - default, free, a little slower sometimes, still hard to argue with free");
 
     const status = await configSetup({
       targetPath,
@@ -123,6 +159,7 @@ describe("config setup", () => {
     const written = YAML.parse(await fsPromises.readFile(targetPath, "utf8")) as {
       provider: { provider: string; model: string; baseUrl: string; apiKey: string };
       providerProfiles?: { openrouter?: { apiKey?: string } };
+      runtime: { operationMode: string };
     };
 
     expect(status).toBe(0);
@@ -131,14 +168,16 @@ describe("config setup", () => {
     expect(written.provider.baseUrl).toBe("https://openrouter.ai/api/v1");
     expect(written.provider.apiKey).toBe("or-key");
     expect(written.providerProfiles?.openrouter?.apiKey).toBe("or-key");
-    expect(io.stdout).toContain("Using OpenRouter defaults for your first run.");
+    expect(written.runtime.operationMode).toBe("provider-assisted");
+    expect(io.stdout).toContain("OpenRouter fallback it is.");
+    expect(io.stdout).toContain("Selected model: openrouter/free");
     expect(io.stdout).toContain("Enter your OpenRouter API key (input hidden):");
   });
 
   it("re-prompts when the API key is empty", async () => {
     const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "sift-setup-"));
     const targetPath = path.join(dir, "config.yaml");
-    const io = createFakeIO(["", "", "sk-real-key"]);
+    const io = createFakeIO(["provider", "", "", "", "sk-real-key"]);
 
     const status = await configSetup({
       targetPath,
@@ -159,7 +198,7 @@ describe("config setup", () => {
   it("falls back to typed provider input and re-prompts on invalid provider answers", async () => {
     const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "sift-setup-provider-"));
     const targetPath = path.join(dir, "config.yaml");
-    const io = createFakeIO(["not-openai", "", "sk-test-key"]);
+    const io = createFakeIO(["provider", "not-openai", "", "", "sk-test-key"]);
     delete io.select;
 
     const status = await configSetup({
@@ -177,8 +216,12 @@ describe("config setup", () => {
   it("falls back to typed provider input when the selector returns an unexpected value", async () => {
     const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "sift-setup-select-"));
     const targetPath = path.join(dir, "config.yaml");
-    const io = createFakeIO(["openai", "sk-test-key"]);
-    io.select = async () => "unexpected-provider";
+    const io = createFakeIO(["provider", "openai", "", "sk-test-key"]);
+    io.select = vi
+      .fn()
+      .mockResolvedValueOnce("unexpected-provider")
+      .mockResolvedValueOnce("unexpected-provider")
+      .mockResolvedValueOnce("gpt-5-nano - default, cheapest, fast enough for most fallback passes");
 
     const status = await configSetup({
       targetPath,
@@ -192,7 +235,7 @@ describe("config setup", () => {
   it("accepts typed OpenRouter input when the selector is unavailable", async () => {
     const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "sift-setup-typed-openrouter-"));
     const targetPath = path.join(dir, "config.yaml");
-    const io = createFakeIO(["openrouter", "or-test-key"]);
+    const io = createFakeIO(["provider", "openrouter", "", "or-test-key"]);
     delete io.select;
 
     const status = await configSetup({
@@ -235,13 +278,14 @@ describe("config setup", () => {
         "  headChars: 100",
         "  tailChars: 100",
         "runtime:",
+        "  operationMode: agent-escalation",
         "  rawFallback: false",
         "  verbose: true",
         "presets: {}"
       ].join("\n"),
       "utf8"
     );
-    const io = createFakeIO(["openrouter", "or-new-key"]);
+    const io = createFakeIO(["provider", "openrouter", "", "or-new-key"]);
     delete io.select;
 
     const status = await configSetup({
@@ -252,7 +296,7 @@ describe("config setup", () => {
     const updated = YAML.parse(await fsPromises.readFile(targetPath, "utf8")) as {
       provider: { provider: string; apiKey: string; timeoutMs: number };
       input: { redact: boolean; maxCaptureChars: number };
-      runtime: { rawFallback: boolean; verbose: boolean };
+      runtime: { rawFallback: boolean; verbose: boolean; operationMode: string };
       providerProfiles: {
         openai?: { apiKey?: string };
         openrouter?: { apiKey?: string };
@@ -269,6 +313,7 @@ describe("config setup", () => {
     expect(updated.input.maxCaptureChars).toBe(1234);
     expect(updated.runtime.rawFallback).toBe(false);
     expect(updated.runtime.verbose).toBe(true);
+    expect(updated.runtime.operationMode).toBe("provider-assisted");
     expect(updated.providerProfiles.openai?.apiKey).toBe("old-openai-key");
     expect(updated.providerProfiles.openrouter?.apiKey).toBe("or-new-key");
   });
@@ -296,8 +341,10 @@ describe("config setup", () => {
     const io = createFakeIO([]);
     io.select = vi
       .fn()
+      .mockResolvedValueOnce("With provider fallback: recommended if you want sift to finish more ambiguous cases on its own before handing them back to you or your agent; requires an API key, cheap model only when needed")
       .mockResolvedValueOnce("OpenRouter")
-      .mockResolvedValueOnce("Use existing key");
+      .mockResolvedValueOnce("openrouter/free - default, free, a little slower sometimes, still hard to argue with free")
+      .mockResolvedValueOnce("Use saved key");
 
     const status = await configSetup({
       targetPath,
@@ -320,8 +367,10 @@ describe("config setup", () => {
     const io = createFakeIO([]);
     io.select = vi
       .fn()
+      .mockResolvedValueOnce("With provider fallback: recommended if you want sift to finish more ambiguous cases on its own before handing them back to you or your agent; requires an API key, cheap model only when needed")
       .mockResolvedValueOnce("OpenRouter")
-      .mockResolvedValueOnce("Use existing key");
+      .mockResolvedValueOnce("openrouter/free - default, free, a little slower sometimes, still hard to argue with free")
+      .mockResolvedValueOnce("Use saved key");
 
     const status = await configSetup({
       targetPath,
@@ -366,8 +415,10 @@ describe("config setup", () => {
     const io = createFakeIO([]);
     io.select = vi
       .fn()
+      .mockResolvedValueOnce("With provider fallback: recommended if you want sift to finish more ambiguous cases on its own before handing them back to you or your agent; requires an API key, cheap model only when needed")
       .mockResolvedValueOnce("OpenRouter")
-      .mockResolvedValueOnce("Use env key");
+      .mockResolvedValueOnce("openrouter/free - default, free, a little slower sometimes, still hard to argue with free")
+      .mockResolvedValueOnce("Use environment key");
 
     const status = await configSetup({
       targetPath,
@@ -389,10 +440,56 @@ describe("config setup", () => {
     expect(io.stdout).toContain("No API key was written to config");
   });
 
+  it("backs from api key choice to model without dumping the user back to provider", async () => {
+    const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "sift-setup-back-to-model-"));
+    const targetPath = path.join(dir, "config.yaml");
+    await fsPromises.writeFile(
+      targetPath,
+      [
+        "provider:",
+        "  provider: openai",
+        "  model: gpt-5-nano",
+        "  baseUrl: https://api.openai.com/v1",
+        "  apiKey: old-openai-key",
+        "providerProfiles:",
+        "  openai:",
+        "    model: gpt-5-nano",
+        "    baseUrl: https://api.openai.com/v1",
+        "    apiKey: saved-openai-key",
+        "presets: {}"
+      ].join("\n"),
+      "utf8"
+    );
+    const io = createFakeIO(["sk-final-key"]);
+    io.select = vi
+      .fn()
+      .mockResolvedValueOnce("With provider fallback: recommended if you want sift to finish more ambiguous cases on its own before handing them back to you or your agent; requires an API key, cheap model only when needed")
+      .mockResolvedValueOnce("OpenAI")
+      .mockResolvedValueOnce("gpt-5.4-nano - newer nano backup, a touch smarter, a touch pricier")
+      .mockResolvedValueOnce(PROMPT_BACK)
+      .mockResolvedValueOnce("gpt-5-nano - default, cheapest, fast enough for most fallback passes")
+      .mockResolvedValueOnce("Enter a different key");
+
+    const status = await configSetup({
+      targetPath,
+      io
+    });
+
+    const written = YAML.parse(await fsPromises.readFile(targetPath, "utf8")) as {
+      provider: { provider: string; model: string; apiKey: string };
+    };
+
+    expect(status).toBe(0);
+    expect(written.provider.provider).toBe("openai");
+    expect(written.provider.model).toBe("gpt-5-nano");
+    expect(written.provider.apiKey).toBe("sk-final-key");
+    expect(io.select).toHaveBeenCalledTimes(6);
+  });
+
   it("falls back to visible input when no secret prompt helper is available", async () => {
     const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "sift-setup-visible-secret-"));
     const targetPath = path.join(dir, "config.yaml");
-    const io = createFakeIO(["", "sk-from-ask"]);
+    const io = createFakeIO(["provider", "", "", "sk-from-ask"]);
     delete io.secret;
 
     const status = await configSetup({
@@ -412,7 +509,7 @@ describe("config setup", () => {
   it("uses an OpenRouter-specific visible prompt when no secret helper is available", async () => {
     const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "sift-setup-visible-openrouter-"));
     const targetPath = path.join(dir, "config.yaml");
-    const io = createFakeIO(["openrouter", "or-from-ask"]);
+    const io = createFakeIO(["provider", "openrouter", "", "or-from-ask"]);
     delete io.select;
     delete io.secret;
 
@@ -434,7 +531,7 @@ describe("config setup", () => {
   it("re-prompts on invalid api key choice answers", async () => {
     const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "sift-setup-key-choice-"));
     const targetPath = path.join(dir, "config.yaml");
-    const io = createFakeIO(["openrouter", "maybe", "", "or-key"]);
+    const io = createFakeIO(["provider", "openrouter", "", "maybe", "", "or-key"]);
     delete io.select;
 
     const status = await configSetup({
@@ -568,7 +665,7 @@ describe("config setup", () => {
       "utf8"
     );
     const targetPath = path.join(dir, ".config", "sift", "config.yaml");
-    const io = createFakeIO(["", "sk-test-key"]);
+    const io = createFakeIO(["provider", "", "", "sk-test-key"]);
     const previousCwd = process.cwd();
 
     process.chdir(repoDir);
@@ -589,5 +686,52 @@ describe("config setup", () => {
     } finally {
       process.chdir(previousCwd);
     }
+  });
+
+  it("completes agent-escalation setup without asking for provider credentials", async () => {
+    const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "sift-setup-agent-mode-"));
+    const targetPath = path.join(dir, "config.yaml");
+    const io = createFakeIO([""]);
+    delete io.select;
+
+    const status = await configSetup({
+      targetPath,
+      io
+    });
+
+    const written = YAML.parse(await fsPromises.readFile(targetPath, "utf8")) as {
+      runtime: { operationMode: string };
+      provider: { apiKey: string };
+    };
+
+    expect(status).toBe(0);
+    expect(written.runtime.operationMode).toBe("agent-escalation");
+    expect(written.provider.apiKey).toBe("");
+    expect(io.stdout).toContain("Operating mode: Agent escalation");
+    expect(io.stdout).toContain("No provider credentials are required for this mode.");
+    expect(io.stdout).not.toContain("Enter your OpenAI API key");
+    expect(io.stdout).not.toContain("borrowing for fallback duty");
+  });
+
+  it("completes local-only setup without asking for provider credentials", async () => {
+    const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "sift-setup-local-mode-"));
+    const targetPath = path.join(dir, "config.yaml");
+    const io = createFakeIO(["local"]);
+    delete io.select;
+
+    const status = await configSetup({
+      targetPath,
+      io
+    });
+
+    const written = YAML.parse(await fsPromises.readFile(targetPath, "utf8")) as {
+      runtime: { operationMode: string };
+    };
+
+    expect(status).toBe(0);
+    expect(written.runtime.operationMode).toBe("local-only");
+    expect(io.stdout).toContain("Operating mode: Local-only");
+    expect(io.stdout).not.toContain("Enter your OpenAI API key");
+    expect(io.stdout).not.toContain("borrowing for fallback duty");
   });
 });

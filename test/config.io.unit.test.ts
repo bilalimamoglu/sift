@@ -77,6 +77,7 @@ describe("config filesystem helpers", () => {
 
     expect(writtenPath).toBe(targetPath);
     expect(fs.readFileSync(targetPath, "utf8")).toContain("provider:");
+    expect(fs.readFileSync(targetPath, "utf8")).toContain("operationMode: agent-escalation");
     if (process.platform !== "win32") {
       expect(mode).toBe(0o600);
     }
@@ -143,6 +144,7 @@ describe("config filesystem helpers", () => {
 
     expect(writtenPath).toBe(targetPath);
     expect(fs.readFileSync(targetPath, "utf8")).toContain("gpt-5-nano");
+    expect(fs.readFileSync(targetPath, "utf8")).toContain("operationMode: agent-escalation");
     expect(chmodSpy).toHaveBeenCalled();
   });
 });

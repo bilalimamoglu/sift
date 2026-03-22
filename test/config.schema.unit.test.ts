@@ -60,4 +60,38 @@ describe("siftConfigSchema", () => {
     expect(parsed.presets.custom?.outputContract).toContain("issues");
     expect(parsed.providerProfiles?.openrouter?.apiKey).toBe("or-key");
   });
+
+  it("accepts all supported runtime operation modes", () => {
+    expect(
+      siftConfigSchema.parse({
+        ...defaultConfig,
+        runtime: {
+          ...defaultConfig.runtime,
+          operationMode: "provider-assisted"
+        }
+      }).runtime.operationMode
+    ).toBe("provider-assisted");
+
+    expect(
+      siftConfigSchema.parse({
+        ...defaultConfig,
+        runtime: {
+          ...defaultConfig.runtime,
+          operationMode: "local-only"
+        }
+      }).runtime.operationMode
+    ).toBe("local-only");
+  });
+
+  it("rejects unsupported runtime operation modes", () => {
+    expect(() =>
+      siftConfigSchema.parse({
+        ...defaultConfig,
+        runtime: {
+          ...defaultConfig.runtime,
+          operationMode: "something-else"
+        }
+      })
+    ).toThrow();
+  });
 });

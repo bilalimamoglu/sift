@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+export const operationModeSchema = z.enum([
+  "agent-escalation",
+  "provider-assisted",
+  "local-only"
+]);
 export const providerNameSchema = z.enum([
   "openai",
   "openai-compatible",
@@ -59,6 +64,7 @@ export const inputConfigSchema = z.object({
 });
 
 export const runtimeConfigSchema = z.object({
+  operationMode: operationModeSchema,
   rawFallback: z.boolean(),
   verbose: z.boolean()
 });

@@ -141,19 +141,33 @@ Use `sift` in Codex, Claude, CI, hooks, or shell scripts so downstream tooling g
 
 Most built-in presets run entirely on local heuristics with no API key required. If you want deeper fallback for ambiguous cases, `sift` also supports OpenAI-compatible and OpenRouter-compatible endpoints.
 
-Start with local-first output guidance for your coding runtime:
+Start with the guided installer:
 
 ```bash
 sift install
+```
+
+During install, pick the mode that matches reality:
+- `agent-escalation`: best if Codex or Claude is already open. `sift` gives the first answer, then your agent keeps going.
+- `provider-assisted`: best if you want `sift` itself to ask a cheap fallback model when needed. This is the API-key path.
+- `local-only`: best if `sift` is working alone and you want everything to stay local.
+
+Then try the normal diagnosis loop:
+
+```bash
 sift exec --preset test-status -- pytest -q
 ```
 
-Then, if you want provider-assisted fallback as a parallel first-class path:
+If you choose `provider-assisted` during install, `sift` now continues directly into provider, model, and API-key setup instead of making you run a second command.
+
+Use `sift config setup` later when you want to revisit or change those choices:
 
 ```bash
 sift config setup
 sift doctor
 ```
+
+OpenAI setup defaults to `gpt-5-nano`, with `gpt-5.4-nano` and `gpt-5-mini` offered as backup choices during setup.
 
 If you want the older low-level controls, you can still preview, inspect, or remove the managed blocks directly:
 

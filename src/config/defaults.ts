@@ -21,6 +21,7 @@ export const defaultConfig: SiftConfig = {
     tailChars: 20_000
   },
   runtime: {
+    operationMode: "agent-escalation",
     rawFallback: true,
     verbose: false
   },

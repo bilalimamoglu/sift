@@ -1177,7 +1177,7 @@ export function createCliApp(args: {
       {
         title: ui.section("Quick start"),
         body: [
-          `  ${ui.command("sift install")}`,
+          `  ${ui.command("sift install")}${ui.note("  # choose agent-escalation, provider-assisted, or local-only")}`,
           `  ${ui.command("sift exec --preset test-status -- npm test")}`,
           `  ${ui.command("sift exec --preset test-status -- npm test")}${ui.note("  # stop here if standard already shows the main buckets")}`,
           `  ${ui.command("sift rerun")}${ui.note("  # rerun the cached full suite after a fix")}`,

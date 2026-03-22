@@ -8,6 +8,24 @@ Start with:
 - `sift exec --preset audit-critical -- npm audit`
 - `sift exec --preset infra-risk -- terraform plan`
 
+When working inside the `sift` repo itself:
+- For product-facing changes, read the relevant notes under `scripts/docs/product/` if they exist and the task touches product direction, onboarding, install flow, docs, or messaging.
+- For install flow, onboarding, product copy, terminal interaction polish, or positioning work, consult the `gsd-product-visionary` lens first if available. If the runtime cannot spawn that exact registered agent, emulate the same skeptical, taste-driven product review before implementation.
+- For install flow, setup flow, README getting-started, or other first-contact consumer surfaces, also consult the `gsd-first-user-tester` lens if available. If the runtime cannot spawn that exact registered agent, emulate a zero-context first-time user review before implementation.
+- For marketing, launch planning, social posts, content repurposing, competitor analysis, or GitHub traction review, consult `gsd-marketing-strategist` first and save durable notes under `.planning/marketing/`.
+- For auditing the marketing system itself, use `gsd-marketing-auditor` to critique gaps in tracking, platform memory, attribution, and review discipline.
+- Preferred custom agent model defaults in this repo: `gsd-product-visionary` -> `gpt-5.4` with high reasoning, `gsd-first-user-tester` -> `gpt-5.4-mini` with low reasoning, `gsd-marketing-strategist` -> `gpt-5.4-mini` with medium reasoning, `gsd-marketing-auditor` -> `gpt-5.4` with high reasoning.
+- When the runtime supports sub-agents, lightweight consumer-facing review passes should actually run on mini sub-agents instead of only being simulated as a lens in the main thread. Use the main `gpt-5.4` thread for final synthesis, tradeoff calls, and high-stakes product decisions after the lighter review agents report back.
+- For first-contact copy surfaces such as README hero copy, installer one-liners, launch hooks, Reddit titles, Hacker News titles, and top-of-page product blurbs, treat the current positioning documents as a hard contract, not soft inspiration. Read `.planning/marketing/messaging/POSITIONING.md` and the relevant `scripts/docs/product/messaging/` notes before proposing final copy.
+- On title-only or first-impression surfaces, do not rely on the body text or later comments to carry the category, core mechanism, or differentiation. Put the essential product truth in the title if reasonably possible.
+- Before offering final first-contact copy, check that it still carries the current product truth: local-first, heuristics-first or fallback-only-when-needed, grouped failures or likely root causes, and the next useful step when space allows. If the copy drops the core product truth in favor of sounding clever, rewrite it.
+- Do not bump `sift`'s version number unless the user explicitly asks for a release/version change. Release notes or changelog updates can be prepared when release-oriented work is requested, but version bumps are not automatic after large changes.
+- Before pushing code from this repo, make sure the full expected verification surface is in good shape, not just the narrow local fix. That means being confident the relevant CI checks and release-facing pipelines would pass, or explicitly calling out what was not verified yet.
+- When verifying new `sift` CLI behavior, prefer the repo-local entrypoint (`node --import tsx src/cli.ts ...` or the built local package) unless you have already confirmed the globally installed `sift` version matches `package.json`.
+- If global and local `sift` versions differ, treat repo-local results as source of truth for development verification.
+- If `sift` is insufficient or says the signal is not enough while developing `sift` itself, append a short timestamped note to `.local/agent-insufficient-log.md` with the command, preset or question, likely cause, and next step, then keep trying to resolve the gap instead of stopping at the first insufficient result.
+- Even if internal planning, GSD artifacts, and implementation reasoning happen in English, explain progress, outcomes, why the work was needed, and the next plan back to the user in simple, detailed Turkish by default.
+
 When debugging test failures, default to `sift` first and treat `standard` as the usual stop point:
 - Run the full suite first: `sift exec --preset test-status -- <test command>`
 - Think of `standard` as the map, `rerun --remaining` as the zoom lens, and raw traceback as the last resort.

@@ -3,7 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { defaultConfig } from "../src/config/defaults.js";
-import { mergeDefined, resolveConfig } from "../src/config/resolve.js";
+import {
+  mergeDefined,
+  resolveConfig,
+  resolveEffectiveOperationMode
+} from "../src/config/resolve.js";
 
 async function createEmptyConfigFile(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-empty-config-"));
@@ -35,6 +39,7 @@ describe("resolveConfig", () => {
         "  headChars: 100",
         "  tailChars: 100",
         "runtime:",
+        "  operationMode: local-only",
         "  rawFallback: false",
         "  verbose: false",
         "presets: {}"
@@ -66,7 +71,29 @@ describe("resolveConfig", () => {
     expect(config.provider.timeoutMs).toBe(22222);
     expect(config.input.maxCaptureChars).toBe(4444);
     expect(config.input.maxInputChars).toBe(3333);
+    expect(config.runtime.operationMode).toBe("local-only");
     expect(config.runtime.rawFallback).toBe(false);
+  });
+
+  it("defaults runtime.operationMode to agent-escalation", async () => {
+    const configPath = await createEmptyConfigFile();
+    const config = resolveConfig({ configPath });
+
+    expect(config.runtime.operationMode).toBe("agent-escalation");
+    expect(resolveEffectiveOperationMode(config)).toBe("agent-escalation");
+  });
+
+  it("supports SIFT_OPERATION_MODE env override", async () => {
+    const configPath = await createEmptyConfigFile();
+    const config = resolveConfig({
+      configPath,
+      env: {
+        SIFT_OPERATION_MODE: "local-only"
+      }
+    });
+
+    expect(config.runtime.operationMode).toBe("local-only");
+    expect(resolveEffectiveOperationMode(config)).toBe("local-only");
   });
 
   it("uses OPENAI_API_KEY for the default OpenAI-compatible base URL", async () => {
@@ -121,6 +148,7 @@ describe("resolveConfig", () => {
 
     expect(config.provider.provider).toBe("openai");
     expect(config.provider.apiKey).toBe("openai-key");
+    expect(resolveEffectiveOperationMode(config)).toBe("agent-escalation");
   });
 
   it("applies OpenRouter defaults when provider is openrouter", async () => {
@@ -137,6 +165,34 @@ describe("resolveConfig", () => {
     expect(config.provider.baseUrl).toBe("https://openrouter.ai/api/v1");
     expect(config.provider.model).toBe("openrouter/free");
     expect(config.provider.apiKey).toBe("openrouter-key");
+    expect(resolveEffectiveOperationMode(config)).toBe("agent-escalation");
+  });
+
+  it("downgrades provider-assisted to agent-escalation when no usable provider is configured", async () => {
+    const configPath = await createEmptyConfigFile();
+    const config = resolveConfig({
+      configPath,
+      env: {
+        SIFT_OPERATION_MODE: "provider-assisted"
+      }
+    });
+
+    expect(config.runtime.operationMode).toBe("provider-assisted");
+    expect(resolveEffectiveOperationMode(config)).toBe("agent-escalation");
+  });
+
+  it("keeps provider-assisted when api credentials are configured", async () => {
+    const configPath = await createEmptyConfigFile();
+    const config = resolveConfig({
+      configPath,
+      env: {
+        SIFT_OPERATION_MODE: "provider-assisted",
+        OPENAI_API_KEY: "openai-key"
+      }
+    });
+
+    expect(config.runtime.operationMode).toBe("provider-assisted");
+    expect(resolveEffectiveOperationMode(config)).toBe("provider-assisted");
   });
 
   it("preserves explicit OpenRouter model and base URL overrides", async () => {
@@ -174,6 +230,7 @@ describe("resolveConfig", () => {
 
     expect(config.provider.apiKey).toBe("cli-key");
     expect(config.provider.model).toBe("gpt-5-nano");
+    expect(config.runtime.operationMode).toBe("agent-escalation");
   });
 
   it("handles partial input env overrides independently", async () => {

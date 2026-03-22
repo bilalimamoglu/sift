@@ -1,15 +1,16 @@
 import { defaultConfig } from "./defaults.js";
 import { loadRawConfig } from "./load.js";
+import { getDefaultProviderModel } from "./provider-models.js";
 import { resolveProviderApiKey } from "./provider-api-key.js";
 import { siftConfigSchema } from "./schema.js";
-import type { PartialSiftConfig, SiftConfig } from "../types.js";
+import type { OperationMode, PartialSiftConfig, SiftConfig } from "../types.js";
 
 const PROVIDER_DEFAULT_OVERRIDES: Partial<
   Record<SiftConfig["provider"]["provider"], PartialSiftConfig>
 > = {
   openrouter: {
     provider: {
-      model: "openrouter/free",
+      model: getDefaultProviderModel("openrouter"),
       baseUrl: "https://openrouter.ai/api/v1"
     }
   }
@@ -67,13 +68,17 @@ function buildNonCredentialEnvOverrides(env: NodeJS.ProcessEnv): PartialSiftConf
     env.SIFT_PROVIDER ||
     env.SIFT_MODEL ||
     env.SIFT_BASE_URL ||
-    env.SIFT_TIMEOUT_MS
+    env.SIFT_TIMEOUT_MS ||
+    env.SIFT_OPERATION_MODE
   ) {
     overrides.provider = {
       provider: env.SIFT_PROVIDER as SiftConfig["provider"]["provider"] | undefined,
       model: env.SIFT_MODEL,
       baseUrl: env.SIFT_BASE_URL,
       timeoutMs: env.SIFT_TIMEOUT_MS ? Number(env.SIFT_TIMEOUT_MS) : undefined
+    };
+    overrides.runtime = {
+      operationMode: env.SIFT_OPERATION_MODE as OperationMode | undefined
     };
   }
 
@@ -168,4 +173,16 @@ export function resolveConfig(options: ResolveOptions = {}): SiftConfig {
   );
 
   return siftConfigSchema.parse(merged);
+}
+
+function hasUsableProvider(config: SiftConfig): boolean {
+  return config.provider.apiKey !== undefined && config.provider.apiKey.trim().length > 0;
+}
+
+export function resolveEffectiveOperationMode(config: SiftConfig): OperationMode {
+  if (config.runtime.operationMode === "provider-assisted") {
+    return hasUsableProvider(config) ? "provider-assisted" : "agent-escalation";
+  }
+
+  return config.runtime.operationMode;
 }

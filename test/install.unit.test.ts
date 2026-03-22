@@ -8,6 +8,7 @@ import {
   normalizeInstallScope,
   type InstallRuntimeIO
 } from "../src/commands/install.js";
+import { PROMPT_BACK } from "../src/ui/terminal.js";
 
 function createFakeIO(args: {
   answers?: string[];
@@ -85,8 +86,9 @@ describe("install runtime support", () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-install-cwd-"));
     const io = createFakeIO({
       selections: [
-        "Codex   (AGENTS.md / ~/.codex/AGENTS.md)",
-        `Global (${path.join(homeDir, ".codex", "AGENTS.md")}) - available in all projects`
+        "Codex   (AGENTS.md / ~/.codex/AGENTS.md) - first-class if you live in Codex",
+        "With an agent - best if Codex or Claude is already with you; sift goes first, the agent handles the weird leftovers",
+        `Global (${path.join(homeDir, ".codex", "AGENTS.md")}) - use this if you want sift ready everywhere`
       ]
     });
 
@@ -94,7 +96,7 @@ describe("install runtime support", () => {
       io,
       cwd,
       homeDir,
-      version: "0.4.4"
+      version: "0.4.5"
     });
 
     const written = await fs.readFile(path.join(homeDir, ".codex", "AGENTS.md"), "utf8");
@@ -102,9 +104,11 @@ describe("install runtime support", () => {
     expect(status).toBe(0);
     expect(written).toContain("<!-- sift:begin codex -->");
     expect(io.stdout).toContain("███████╗██╗███████╗████████╗");
-    expect(io.stdout).toContain("Which runtime(s) would you like to install for?");
-    expect(io.stdout).toContain("Where would you like to install?");
+    expect(io.stdout).toContain("Choose your runtime");
+    expect(io.stdout).toContain("Choose how sift should work");
+    expect(io.stdout).toContain("Choose where to install the runtime support");
     expect(io.stdout).toContain("Installed runtime support.");
+    expect(io.stdout).toContain("Operating mode: Agent escalation");
     expect(io.stdout).toContain("sift doctor");
     expect(io.stdout).toContain("sift config setup");
     expect(io.closed).toBe(true);
@@ -120,7 +124,7 @@ describe("install runtime support", () => {
       yes: true,
       io,
       cwd,
-      version: "0.4.4"
+      version: "0.4.5"
     });
 
     expect(status).toBe(0);
@@ -131,6 +135,63 @@ describe("install runtime support", () => {
       "<!-- sift:begin claude -->"
     );
     expect(io.stdout).toContain("Codex + Claude");
+    expect(io.stdout).toContain("Operating mode: Agent escalation");
+  });
+
+  it("continues straight into provider setup when provider-assisted is selected", async () => {
+    const homeDir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-install-provider-home-"));
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-install-provider-cwd-"));
+    const io = createFakeIO({
+      answers: ["sk-install-key"],
+      selections: [
+        "Codex   (AGENTS.md / ~/.codex/AGENTS.md) - first-class if you live in Codex",
+        "With provider fallback - recommended if you want sift to finish more ambiguous cases on its own before handing them back to you or your agent; needs an API key, cheap model only when needed",
+        `Global (${path.join(homeDir, ".codex", "AGENTS.md")}) - use this if you want sift ready everywhere`,
+        "OpenAI",
+        "gpt-5-nano - default, cheapest, fast enough for most fallback passes"
+      ]
+    });
+
+    const status = await installRuntimeSupport({
+      io,
+      cwd,
+      homeDir,
+      version: "0.4.5"
+    });
+
+    const configPath = path.join(homeDir, ".config", "sift", "config.yaml");
+    const config = await fs.readFile(configPath, "utf8");
+
+    expect(status).toBe(0);
+    expect(config).toContain("operationMode: provider-assisted");
+    expect(config).toContain("model: gpt-5-nano");
+    expect(io.stdout).toContain("Next: provider setup. Press Esc at any step to go back.");
+    expect(io.stdout).toContain("Selected model: gpt-5-nano");
+    expect(io.stdout).toContain("sift config show --show-secrets");
+    expect(io.stdout).not.toContain("sift config setup  # optional");
+  });
+
+  it("lets the user back out from mode to runtime and cancel before writing files", async () => {
+    const homeDir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-install-back-home-"));
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-install-back-cwd-"));
+    const io = createFakeIO({
+      selections: [
+        "Codex   (AGENTS.md / ~/.codex/AGENTS.md) - first-class if you live in Codex",
+        PROMPT_BACK,
+        PROMPT_BACK
+      ]
+    });
+
+    const status = await installRuntimeSupport({
+      io,
+      cwd,
+      homeDir,
+      version: "0.4.5"
+    });
+
+    await expect(fs.access(path.join(homeDir, ".codex", "AGENTS.md"))).rejects.toThrow();
+    expect(status).toBe(0);
+    expect(io.stdout).toContain("Install canceled before we touched anything.");
   });
 
   it("fails clearly in non-interactive mode without enough inputs", async () => {
@@ -143,7 +204,7 @@ describe("install runtime support", () => {
     const status = await installRuntimeSupport({
       io,
       cwd,
-      version: "0.4.4"
+      version: "0.4.5"
     });
 
     expect(status).toBe(1);

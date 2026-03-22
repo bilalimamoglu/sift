@@ -1,3 +1,9 @@
+import {
+  describeInsufficientBehavior,
+  describeOperationMode,
+  getOperationModeLabel
+} from "../config/operation-mode.js";
+import { resolveEffectiveOperationMode } from "../config/resolve.js";
 import { getProviderApiKeyEnvNames } from "../config/provider-api-key.js";
 import type { SiftConfig } from "../types.js";
 import { createPresentation } from "../ui/presentation.js";
@@ -27,6 +33,7 @@ function isRealApiKey(key: string | undefined): boolean {
 
 export function runDoctor(config: SiftConfig, configPath?: string | null): number {
   const ui = createPresentation(Boolean(process.stdout.isTTY));
+  const effectiveMode = resolveEffectiveOperationMode(config);
 
   const apiKeyStatus = isRealApiKey(config.provider.apiKey)
     ? "set"
@@ -37,12 +44,16 @@ export function runDoctor(config: SiftConfig, configPath?: string | null): numbe
   const lines = [
     "sift doctor",
     "A quick check for your local setup.",
-    "mode: local config completeness check",
+    "mode: operation-mode health check",
     ui.labelValue("configPath", configPath ?? "(defaults only)"),
+    ui.labelValue("configuredMode", getOperationModeLabel(config.runtime.operationMode)),
+    ui.labelValue("effectiveMode", getOperationModeLabel(effectiveMode)),
     ui.labelValue("provider", config.provider.provider),
     ui.labelValue("model", config.provider.model),
     ui.labelValue("baseUrl", config.provider.baseUrl),
     ui.labelValue("apiKey", apiKeyStatus),
+    ui.labelValue("modeSummary", describeOperationMode(effectiveMode)),
+    ui.labelValue("insufficientBehavior", describeInsufficientBehavior(effectiveMode)),
     ui.labelValue("maxCaptureChars", String(config.input.maxCaptureChars)),
     ui.labelValue("maxInputChars", String(config.input.maxInputChars)),
     ui.labelValue("rawFallback", String(config.runtime.rawFallback))
@@ -52,31 +63,39 @@ export function runDoctor(config: SiftConfig, configPath?: string | null): numbe
 
   const problems: string[] = [];
 
-  if (!config.provider.baseUrl) {
-    problems.push("Missing provider.baseUrl");
-  }
-
-  if (!config.provider.model) {
-    problems.push("Missing provider.model");
-  }
-
-  if (
-    (config.provider.provider === "openai" ||
-      config.provider.provider === "openai-compatible" ||
-      config.provider.provider === "openrouter") &&
-    !isRealApiKey(config.provider.apiKey)
-  ) {
-    if (isPlaceholderApiKey(config.provider.apiKey)) {
-      problems.push(`provider.apiKey looks like a placeholder: "${config.provider.apiKey}"`);
-    } else {
-      problems.push("Missing provider.apiKey");
+  if (config.runtime.operationMode === "provider-assisted") {
+    if (!config.provider.baseUrl) {
+      problems.push("Missing provider.baseUrl");
     }
-    problems.push(
-      `Set one of: ${getProviderApiKeyEnvNames(
-        config.provider.provider,
-        config.provider.baseUrl
-      ).join(", ")}`
-    );
+
+    if (!config.provider.model) {
+      problems.push("Missing provider.model");
+    }
+
+    if (
+      (config.provider.provider === "openai" ||
+        config.provider.provider === "openai-compatible" ||
+        config.provider.provider === "openrouter") &&
+      !isRealApiKey(config.provider.apiKey)
+    ) {
+      if (isPlaceholderApiKey(config.provider.apiKey)) {
+        problems.push(`provider.apiKey looks like a placeholder: "${config.provider.apiKey}"`);
+      } else {
+        problems.push("Missing provider.apiKey");
+      }
+      problems.push(
+        `Set one of: ${getProviderApiKeyEnvNames(
+          config.provider.provider,
+          config.provider.baseUrl
+        ).join(", ")}`
+      );
+    }
+
+    if (effectiveMode !== "provider-assisted") {
+      problems.push(
+        "Configured provider-assisted mode cannot activate yet, so sift will fall back to agent-escalation until provider credentials are usable."
+      );
+    }
   }
 
   if (problems.length > 0) {

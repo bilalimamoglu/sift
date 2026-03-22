@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  PROMPT_BACK,
   promptSecret,
   promptSelect,
   renderSelectionBlock
@@ -47,6 +48,34 @@ describe("terminal ui helpers", () => {
 
     expect(lines[0]).toContain("Select provider");
     expect(lines[1]).toBe("› OpenAI (selected)");
+  });
+
+  it("colorizes runtime and scope options when asked", () => {
+    const runtimeLines = renderSelectionBlock({
+      prompt: "Choose your runtime",
+      options: [
+        "Codex   (AGENTS.md / ~/.codex/AGENTS.md) - first-class if you live in Codex",
+        "Claude  (CLAUDE.md / ~/.claude/CLAUDE.md) - same good manners, Claude-flavored",
+        "All      - if you refuse to pick favorites today"
+      ],
+      selectedIndex: 0,
+      colorize: true
+    });
+
+    const scopeLines = renderSelectionBlock({
+      prompt: "Choose where to install the runtime support",
+      options: [
+        "Global (/tmp/example) - use this if you want sift ready everywhere",
+        "Local  (/tmp/example) - keep it here if this repo is the only one that matters"
+      ],
+      selectedIndex: 1,
+      colorize: true
+    });
+
+    expect(runtimeLines[1]).toContain("\u001B[");
+    expect(runtimeLines[2]).toContain("\u001B[");
+    expect(scopeLines[1]).toContain("\u001B[");
+    expect(scopeLines[2]).toContain("\u001B[");
   });
 
   it("captures secret input without echoing typed characters", async () => {
@@ -174,6 +203,55 @@ describe("terminal ui helpers", () => {
     await expect(emptySelection).resolves.toBe("");
     expect(emptyOutput.buffer).toContain("Select provider for this machine");
     expect(emptyOutput.buffer).not.toContain("Provider:");
+  });
+
+  it("supports a visible back option and escape-to-back for secrets", async () => {
+    const selectInput = new FakeKeypressInput();
+    const selectOutput = new FakeOutput();
+    const pendingSelect = promptSelect({
+      input: selectInput,
+      output: selectOutput,
+      prompt: "Pick a mode",
+      options: ["With an agent", "With provider fallback"],
+      selectedLabel: "Mode",
+      allowBack: true
+    });
+
+    selectInput.emit("keypress", "", { name: "up" });
+    selectInput.emit("keypress", "", { name: "return" });
+    await expect(pendingSelect).resolves.toBe(PROMPT_BACK);
+    expect(selectOutput.buffer).toContain("← Back");
+
+    const secretInput = new FakeKeypressInput();
+    const secretOutput = new FakeOutput();
+    const pendingSecret = promptSecret({
+      input: secretInput,
+      output: secretOutput,
+      prompt: "Enter your API key: ",
+      allowBack: true
+    });
+
+    secretInput.emit("keypress", "", { name: "escape" });
+    await expect(pendingSecret).resolves.toBe(PROMPT_BACK);
+  });
+
+  it("uses escape to go back from select prompts without printing a fake selection summary", async () => {
+    const input = new FakeKeypressInput();
+    const output = new FakeOutput();
+
+    const pending = promptSelect({
+      input,
+      output,
+      prompt: "Choose how sift should work",
+      options: ["With an agent", "With provider fallback"],
+      selectedLabel: "Mode",
+      allowBack: true
+    });
+
+    input.emit("keypress", "", { name: "escape" });
+    await expect(pending).resolves.toBe(PROMPT_BACK);
+    expect(output.buffer).toContain("Esc to go back");
+    expect(output.buffer).not.toContain("Mode: ← Back");
   });
 
   it("aborts select and secret prompts on Ctrl+C", async () => {

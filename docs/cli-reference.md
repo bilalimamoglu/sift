@@ -95,6 +95,15 @@ Use this when output already exists in a pipeline and you do not want `sift exec
 
 Interactive guided setup for choosing how you want to use `sift`, including provider-assisted fallback.
 
+Mode summary:
+- `agent-escalation`: use this if you already have Codex or Claude open. `sift` does the first pass, then the agent handles the weird leftovers.
+- `provider-assisted`: use this if you want `sift` itself to ask a cheap fallback model when needed. This requires an API key.
+- `local-only`: use this if `sift` is working alone and you want everything to stay local.
+
+OpenAI setup defaults to `gpt-5-nano`. Guided setup also offers `gpt-5.4-nano` and `gpt-5-mini` as popular backup choices. OpenRouter setup defaults to `openrouter/free` and shows a few named free alternatives.
+
+This command is still the main reconfiguration surface even though `sift install` now continues directly into provider setup when you pick `provider-assisted`.
+
 ```bash
 sift config setup
 ```
@@ -160,6 +169,13 @@ sift presets show infra-risk --internal
 ### `sift install`
 
 Run the guided runtime installer. This is the recommended entry point for first-time setup.
+
+The installer now asks which operating mode matches your actual workflow:
+- `agent-escalation`: best if a coding agent is already in the loop
+- `provider-assisted`: best if you want API-backed cheap fallback inside `sift`
+- `local-only`: best if you want `sift` by itself with no provider credentials
+
+If you pick `provider-assisted`, the installer continues directly into provider/model/API-key setup instead of telling you to run `sift config setup` separately.
 
 ```bash
 sift install

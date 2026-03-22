@@ -401,7 +401,7 @@ describe("CLI smoke", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("mode: local config completeness check");
+    expect(result.stdout).toContain("mode: operation-mode health check");
     expect(result.stdout).toContain("apiKey: set");
     expect(result.stdout).toContain("model: env-model");
     expect(result.stdout).toContain("baseUrl: https://example.test/v1");
@@ -425,7 +425,7 @@ describe("CLI smoke", () => {
         }
       });
 
-      expect(result.status).toBe(1);
+      expect(result.status).toBe(0);
       expect(result.stdout).toContain("configPath: (defaults only)");
       expect(result.stdout).toContain("provider: openai");
       expect(result.stdout).toContain("apiKey: not set");
@@ -475,7 +475,7 @@ describe("CLI smoke", () => {
         cwd
       });
 
-      expect(result.status).toBe(1);
+      expect(result.status).toBe(0);
       expect(result.stdout).toContain("configPath: (defaults only)");
       expect(result.stdout).toContain("provider: openai");
       expect(result.stdout).toContain("model: gpt-5-nano");
@@ -552,6 +552,7 @@ describe("CLI smoke", () => {
       cwd,
       env: {
         HOME: home,
+        SIFT_OPERATION_MODE: "provider-assisted",
         SIFT_BASE_URL: "https://example.test/v1",
         SIFT_MODEL: "env-model"
       }
@@ -572,6 +573,7 @@ describe("CLI smoke", () => {
       cwd,
       env: {
         HOME: home,
+        SIFT_OPERATION_MODE: "provider-assisted",
         SIFT_PROVIDER: "openrouter"
       }
     });
