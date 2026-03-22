@@ -2,6 +2,15 @@
 Use `sift` as the default local-first output guidance layer for long, noisy, non-interactive command output.
 The goal is to turn failure walls into grouped issues, likely root causes, and the next useful step before reading raw logs.
 
+Default operating mode: Agent escalation.
+Best when you already have an agent open. sift does the quick first pass, then the agent can read code, tests, or logs and keep going.
+If sift is still not enough, that is the handoff point: log it, narrow the problem, and let the agent keep digging.
+
+Default path: use `sift exec` when you want the first useful diagnosis on a noisy command.
+Optional beta shortcut: use `sift hook` only for a tiny known-command set when you want less typing, and keep in mind that unknown commands stay raw.
+`sift exec` is the explicit full-control path; `sift hook` is only a known-preset convenience wrapper.
+Experimental shortcut: if sift recognizes the command, it picks a preset for you. If not, it just runs the original command.
+
 Start with:
 - `sift exec "question" -- <command> [args...]`
 - `sift exec --preset test-status -- <test command>`

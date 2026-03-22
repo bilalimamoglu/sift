@@ -49,7 +49,7 @@ describe("misc core and UI helpers", () => {
       maxInputChars: 10,
       headChars: 4,
       tailChars: 4
-    });
+    }, defaultConfig.safety);
 
     expect(prepared.meta.redactionApplied).toBe(true);
     expect(prepared.meta.truncatedApplied).toBe(true);

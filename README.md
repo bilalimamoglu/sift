@@ -184,7 +184,26 @@ Important boundary:
 - unknown commands pass through untouched
 - if the hook path fails internally, the original raw command path wins
 
+Safety boundary:
+- `sift` now suppresses obvious instruction-like or hostile-looking output lines before they get treated like trustworthy guidance
+- this is a narrow safety assist, not a security guarantee or a full prompt-injection solution
+- the goal is to keep logs in the “evidence” lane, not silently turn `sift` into a filtering platform
+
 If you choose `provider-assisted` during install, `sift` now continues directly into provider, model, and API-key setup instead of making you run a second command.
+
+### What Sift Will Touch
+
+First-use trust matters, so here is the blunt version:
+
+| Surface | Default path | When written | Ownership rule | Undo |
+| --- | --- | --- | --- | --- |
+| Codex instructions | `AGENTS.md` or `~/.codex/AGENTS.md` | `sift install codex` / `sift agent install codex` | only inside managed `sift` markers | `sift agent remove codex` |
+| Codex skill | repo or global `SKILL.md` | Codex install when `sift` owns the generated skill | custom `SKILL.md` is never overwritten | `sift skill remove codex` |
+| Claude instructions | `CLAUDE.md` or `~/.claude/CLAUDE.md` | `sift install claude` / `sift agent install claude` | only inside managed `sift` markers | `sift agent remove claude` |
+| Claude command pack | `.claude/commands/sift/` | Claude install when `sift` owns the generated command files | custom command files are never overwritten | `sift agent remove claude` |
+| Provider config | `~/.config/sift/config.yaml` | `provider-assisted` setup unless you later create repo-local config | repo-local `sift.config.yaml` can override machine config for that repo | `sift config setup` / edit config / remove file |
+
+Sift does **not** write shell rc files, PATH entries, git hooks, or arbitrary repo files during install.
 
 Use `sift config setup` later when you want to revisit or change those choices:
 
@@ -194,6 +213,19 @@ sift doctor
 ```
 
 OpenAI setup defaults to `gpt-5-nano`, with `gpt-5.4-nano` and `gpt-5-mini` offered as backup choices during setup.
+
+If a workspace needs extra hardening without turning `sift` into a rules engine, use the tiny `safety` block in `sift.config.yaml`:
+
+```yaml
+safety:
+  enabled: true
+  extraRiskPatterns:
+    - internal build note
+  ignoredRiskPatterns:
+    - ignore previous instructions
+```
+
+Keep it small. These are substring hints for the hardening pass, not a custom filtering DSL.
 
 Before pushing release-sensitive changes, run the same shared gate used by CI and the release workflow:
 

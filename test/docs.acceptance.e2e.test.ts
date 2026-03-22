@@ -19,6 +19,9 @@ describe("README quick start e2e", () => {
     expect(readme).toContain("sift hook match -- pytest -q");
     expect(readme).toContain("unknown commands pass through untouched");
     expect(readme).toContain("use `sift exec` for the normal first pass");
+    expect(readme).toContain("What Sift Will Touch");
+    expect(readme).toContain("narrow safety assist");
+    expect(readme).toContain("extraRiskPatterns");
     expect(readme).not.toContain("sift hook run -- pytest -q");
 
     expect(cliReference).toContain("agent-escalation");
@@ -28,6 +31,8 @@ describe("README quick start e2e", () => {
     expect(cliReference).toContain("gpt-5.4-nano");
     expect(cliReference).toContain("sift hook match -- pytest -q");
     expect(cliReference).toContain("unknown commands run unchanged");
+    expect(cliReference).toContain("suspicious instruction-like log lines");
+    expect(cliReference).toContain("extraRiskPatterns");
     expect(cliReference).toContain("This is the default product path.");
     expect(cliReference).toContain("This is an optional shortcut, not the main workflow.");
   });

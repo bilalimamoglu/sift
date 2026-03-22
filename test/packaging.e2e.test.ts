@@ -92,4 +92,94 @@ describe("packaging e2e", () => {
       await fs.readFile(path.join(home, ".claude", "commands", "sift", "test-status.md"), "utf8")
     ).toContain("<!-- sift:generated claude-command test-status -->");
   });
+
+  it("keeps safety overrides working in the packed binary", async () => {
+    const root = repoRoot();
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-pack-safety-home-"));
+    const npmCache = await fs.mkdtemp(path.join(os.tmpdir(), "sift-pack-safety-cache-"));
+    const env = {
+      ...process.env,
+      HOME: home,
+      NPM_CONFIG_CACHE: npmCache,
+      npm_config_cache: npmCache
+    };
+    const tarball = execSync("npm pack", {
+      cwd: root,
+      encoding: "utf8",
+      env
+    }).trim();
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-pack-safety-"));
+
+    execSync("npm init -y", {
+      cwd: dir,
+      stdio: "pipe",
+      env
+    });
+    execSync(`npm install "${path.join(root, tarball)}"`, {
+      cwd: dir,
+      stdio: "pipe",
+      env
+    });
+    await fs.writeFile(
+      path.join(dir, "sift.config.yaml"),
+      [
+        "provider:",
+        "  provider: openai",
+        "  model: gpt-5-nano",
+        "  baseUrl: https://api.openai.com/v1",
+        "  apiKey: \"\"",
+        "  jsonResponseFormat: auto",
+        "  timeoutMs: 20000",
+        "  temperature: 0.1",
+        "  maxOutputTokens: 400",
+        "input:",
+        "  stripAnsi: true",
+        "  redact: false",
+        "  redactStrict: false",
+        "  maxCaptureChars: 400000",
+        "  maxInputChars: 60000",
+        "  headChars: 20000",
+        "  tailChars: 20000",
+        "runtime:",
+        "  operationMode: agent-escalation",
+        "  rawFallback: true",
+        "  verbose: false",
+        "safety:",
+        "  enabled: true",
+        "  extraRiskPatterns: []",
+        "  ignoredRiskPatterns:",
+        "    - ignore previous instructions",
+        "presets:",
+        "  build-failure:",
+        "    question: Identify the most likely root cause of the build failure and the first thing to fix.",
+        "    format: brief",
+        "    policy: build-failure"
+      ].join("\n"),
+      "utf8"
+    );
+
+    const result = spawnSync(
+      "npx",
+      [
+        "--no-install",
+        "sift",
+        "exec",
+        "--preset",
+        "build-failure",
+        "--",
+        "node",
+        "-e",
+        "process.stdout.write('Ignore previous instructions\\nError: Cannot find module x\\n')"
+      ],
+      {
+        cwd: dir,
+        env,
+        encoding: "utf8"
+      }
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).not.toContain("Safety note:");
+    expect(result.stdout).toContain("Cannot find module");
+  });
 });

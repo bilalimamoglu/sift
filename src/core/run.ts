@@ -11,6 +11,11 @@ import {
 import { prepareInput } from "./pipeline.js";
 import { isRetriableReason, looksLikeRejectedModelOutput } from "./quality.js";
 import {
+  buildSafetyAnalysisContext,
+  buildSafetyStderrNotice,
+  buildSafetyTextPrefix
+} from "./safety.js";
+import {
   buildTestStatusAnalysisContext,
   buildTestStatusDiagnoseContract,
   buildTestStatusPublicDiagnoseContract,
@@ -133,6 +138,7 @@ function buildDryRunOutput(args: {
         truncatedApplied: args.prepared.meta.truncatedApplied,
         text: args.prepared.truncated
       },
+      safety: args.prepared.safety,
       prompt: args.prompt
     },
     null,
@@ -169,17 +175,47 @@ function withInsufficientHint(args: {
   output: string;
   request: RunRequest;
   prepared: ReturnType<typeof prepareInput>;
+  responseMode: "text" | "json";
 }): string {
-  if (!isInsufficientSignalOutput(args.output)) {
-    return args.output;
+  const wasInsufficient = isInsufficientSignalOutput(args.output);
+  let next = args.output;
+
+  if (args.responseMode === "text") {
+    const prefix = buildSafetyTextPrefix(args.prepared.safety);
+    if (prefix) {
+      next = `${prefix}\n${next}`;
+    }
   }
 
-  return buildInsufficientSignalOutput({
+  if (!wasInsufficient) {
+    return next;
+  }
+
+  const insufficient = buildInsufficientSignalOutput({
     presetName: args.request.presetName,
     originalLength: args.prepared.meta.originalLength,
     truncatedApplied: args.prepared.meta.truncatedApplied,
     recognizedRunner: detectTestRunner(args.prepared.redacted)
   });
+
+  if (args.responseMode === "text") {
+    const prefix = buildSafetyTextPrefix(args.prepared.safety);
+    return prefix ? `${prefix}\n${insufficient}` : insufficient;
+  }
+
+  return insufficient;
+}
+
+function emitSafetyNotice(args: {
+  request: RunRequest;
+  prepared: ReturnType<typeof prepareInput>;
+}): void {
+  const notice = buildSafetyStderrNotice(args.prepared.safety);
+  if (!notice) {
+    return;
+  }
+
+  process.stderr.write(`${notice}\n`);
 }
 
 async function generateWithRetry(args: {
@@ -441,7 +477,7 @@ function buildTestStatusProviderFailureDecision(args: {
 }
 
 async function runSiftCore(request: RunRequest, recorder?: RunStatsRecorder): Promise<string> {
-  const prepared = prepareInput(request.stdin, request.config.input);
+  const prepared = prepareInput(request.stdin, request.config.input, request.config.safety);
   const heuristicInput = prepared.redacted;
   const heuristicInputTruncated = false;
   const heuristicPrepared = {
@@ -518,6 +554,7 @@ async function runSiftCore(request: RunRequest, recorder?: RunStatsRecorder): Pr
           : request.outputContract,
       analysisContext: [
         request.analysisContext,
+        buildSafetyAnalysisContext(prepared.safety),
         testStatusDecision
           ? buildTestStatusAnalysisContext({
               contract: testStatusDecision.contract,
@@ -550,8 +587,10 @@ async function runSiftCore(request: RunRequest, recorder?: RunStatsRecorder): Pr
     const finalOutput = withInsufficientHint({
       output: heuristicOutput,
       request,
-      prepared
+      prepared,
+      responseMode: heuristicPrompt.responseMode
     });
+    emitSafetyNotice({ request, prepared });
     if (testStatusDecision) {
       logVerboseTestStatusTelemetry({
         request,
@@ -583,6 +622,7 @@ async function runSiftCore(request: RunRequest, recorder?: RunStatsRecorder): Pr
       outputContract: TEST_STATUS_PROVIDER_SUPPLEMENT_JSON_CONTRACT,
       analysisContext: [
         request.analysisContext,
+        buildSafetyAnalysisContext(prepared.safety),
         buildTestStatusAnalysisContext({
           contract: {
             ...testStatusDecision.contract,
@@ -659,6 +699,7 @@ async function runSiftCore(request: RunRequest, recorder?: RunStatsRecorder): Pr
         request,
         decision: mergedDecision
       });
+      emitSafetyNotice({ request, prepared });
       logVerboseTestStatusTelemetry({
         request,
         prepared,
@@ -699,6 +740,7 @@ async function runSiftCore(request: RunRequest, recorder?: RunStatsRecorder): Pr
         request,
         decision: failureDecision
       });
+      emitSafetyNotice({ request, prepared });
       logVerboseTestStatusTelemetry({
         request,
         prepared,
@@ -726,7 +768,9 @@ async function runSiftCore(request: RunRequest, recorder?: RunStatsRecorder): Pr
     detail: request.detail,
     policyName: request.policyName,
     outputContract: request.outputContract,
-    analysisContext: request.analysisContext
+    analysisContext: [request.analysisContext, buildSafetyAnalysisContext(prepared.safety)]
+      .filter((value): value is string => Boolean(value))
+      .join("\n\n")
   });
   const providerPrepared = {
     ...prepared,
@@ -774,15 +818,18 @@ async function runSiftCore(request: RunRequest, recorder?: RunStatsRecorder): Pr
     }
 
     recorder?.provider(result.usage);
+    emitSafetyNotice({ request, prepared });
     return withInsufficientHint({
       output: normalizeOutput(result.text, providerPrompt.responseMode),
       request,
-      prepared: providerPrepared
+      prepared: providerPrepared,
+      responseMode: providerPrompt.responseMode
     });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "unknown_error";
 
     recorder?.fallback();
+    emitSafetyNotice({ request, prepared });
     return withInsufficientHint({
       output: buildFallbackOutput({
         format: request.format,
@@ -792,7 +839,8 @@ async function runSiftCore(request: RunRequest, recorder?: RunStatsRecorder): Pr
         jsonFallback: request.fallbackJson
       }),
       request,
-      prepared: providerPrepared
+      prepared: providerPrepared,
+      responseMode: providerPrompt.responseMode
     });
   }
 }

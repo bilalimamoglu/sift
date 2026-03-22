@@ -307,6 +307,7 @@ describe("command modules", () => {
     expect(stdout).toContain("optionalBeta: Optional beta shortcut: use `sift hook`");
     expect(stdout).toContain("nextStep: Next step: run `sift exec --preset test-status -- <test command>`");
     expect(stdout).toContain("execVsHook: `sift exec` is the explicit full-control path");
+    expect(stdout).toContain("truthfulnessHardening: Enabled (0 extra, 0 ignored patterns)");
   });
 
   it("configValidate reports defaults when no config file is active", () => {

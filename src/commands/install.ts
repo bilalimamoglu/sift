@@ -9,6 +9,7 @@ import {
 } from "node:process";
 import {
   getDefaultGlobalConfigPath,
+  getDefaultClaudeGlobalCommandsDir,
   getDefaultClaudeGlobalInstructionsPath,
   getDefaultCodexGlobalInstructionsPath
 } from "../constants.js";
@@ -31,6 +32,7 @@ import {
   type AgentName,
   type AgentScope
 } from "./agent.js";
+import { CLAUDE_COMMAND_NAMES } from "../runtime-payloads/claude-commands.js";
 
 export type InstallRuntime = AgentName | "all";
 
@@ -385,6 +387,54 @@ function writeSuccessSummary(args: {
   args.io.write(`${ui.note(getHookBetaLine())}\n`);
 }
 
+function writePreflightSummary(args: {
+  io: InstallRuntimeIO;
+  runtime: InstallRuntime;
+  scope: AgentScope;
+  operationMode: OperationMode;
+  cwd?: string;
+  homeDir?: string;
+}): void {
+  const ui = createPresentation(args.io.stdoutIsTTY);
+  const runtimeTargets = getInstallTargets(args.runtime);
+  const writeTargets = runtimeTargets.flatMap((agent) => {
+    if (agent === "codex") {
+      return [
+        args.scope === "global"
+          ? getDefaultCodexGlobalInstructionsPath(args.homeDir)
+          : getLocalTargetLabel("codex", args.cwd),
+        args.scope === "global"
+          ? path.join(args.homeDir ?? os.homedir(), ".codex", "skills", "sift", "SKILL.md")
+          : path.join(args.cwd ?? process.cwd(), ".codex", "skills", "sift", "SKILL.md")
+      ];
+    }
+
+    return [
+      args.scope === "global"
+        ? getDefaultClaudeGlobalInstructionsPath(args.homeDir)
+        : getLocalTargetLabel("claude", args.cwd),
+      ...CLAUDE_COMMAND_NAMES.map((name) =>
+        args.scope === "global"
+          ? path.join(getDefaultClaudeGlobalCommandsDir(args.homeDir), `${name}.md`)
+          : path.join(args.cwd ?? process.cwd(), ".claude", "commands", "sift", `${name}.md`)
+      )
+    ];
+  });
+
+  args.io.write(`\n${ui.section("Install preflight")}\n`);
+  args.io.write(`${ui.note(`Will write guidance files for ${runtimeTargets.map((target) => INSTALL_TITLES[target]).join(" + ")} in ${args.scope === "global" ? "machine-wide" : "repo"} scope:`)}\n`);
+  for (const target of writeTargets) {
+    args.io.write(`  ${ui.command(target)}\n`);
+  }
+  if (args.operationMode === "provider-assisted") {
+    args.io.write(
+      `${ui.note(`Provider config stays machine-wide at ${getDefaultGlobalConfigPath(args.homeDir)} unless you later create a repo-local sift.config.yaml.`)}\n`
+    );
+  }
+  args.io.write(`${ui.note("Will not write shell rc files, PATH entries, git hooks, or arbitrary repo files.")}\n`);
+  args.io.write(`${ui.note("Managed blocks update only inside sift markers. Generated skill/command files update only when sift can prove ownership.")}\n`);
+}
+
 export async function installRuntimeSupport(options: {
   runtime?: InstallRuntime;
   scope?: AgentScope;
@@ -512,6 +562,14 @@ export async function installRuntimeSupport(options: {
         }
 
         scope = scopeChoice;
+        writePreflightSummary({
+          io,
+          runtime: runtime!,
+          scope,
+          operationMode: operationMode!,
+          cwd: options.cwd,
+          homeDir: options.homeDir
+        });
         step = operationMode === "provider-assisted" ? "provider" : undefined;
         continue;
       }

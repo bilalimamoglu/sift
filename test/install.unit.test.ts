@@ -109,6 +109,8 @@ describe("install runtime support", () => {
     expect(io.stdout).toContain("Choose your runtime");
     expect(io.stdout).toContain("Choose how sift should work");
     expect(io.stdout).toContain("Choose where to install the runtime support");
+    expect(io.stdout).toContain("Install preflight");
+    expect(io.stdout).toContain("Will not write shell rc files, PATH entries, git hooks, or arbitrary repo files.");
     expect(io.stdout).toContain("Installed runtime support.");
     expect(io.stdout).toContain("Operating mode: Agent escalation");
     expect(io.stdout).toContain("sift exec --preset test-status -- pytest -q");
@@ -172,6 +174,8 @@ describe("install runtime support", () => {
     expect(status).toBe(0);
     expect(config).toContain("operationMode: provider-assisted");
     expect(config).toContain("model: gpt-5-nano");
+    expect(rendered).toContain("Install preflight");
+    expect(rendered).toContain("Provider config stays machine-wide");
     expect(rendered).toContain("Next: provider setup. Press Esc at any step to go back.");
     expect(rendered).toContain("sift exec --preset test-status -- pytest -q");
     expect(rendered).toContain("Selected model: gpt-5-nano");

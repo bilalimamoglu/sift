@@ -65,6 +65,12 @@ export function runDoctor(config: SiftConfig, configPath?: string | null): numbe
     ui.labelValue("modeSummary", describeOperationMode(effectiveMode)),
     ui.labelValue("insufficientBehavior", describeInsufficientBehavior(effectiveMode)),
     ui.labelValue("execVsHook", getExecVsHookDecisionLine()),
+    ui.labelValue(
+      "truthfulnessHardening",
+      config.safety.enabled
+        ? `Enabled (${config.safety.extraRiskPatterns.length} extra, ${config.safety.ignoredRiskPatterns.length} ignored patterns)`
+        : "Disabled"
+    ),
     ui.labelValue("maxCaptureChars", String(config.input.maxCaptureChars)),
     ui.labelValue("maxInputChars", String(config.input.maxInputChars)),
     ui.labelValue("rawFallback", String(config.runtime.rawFallback))

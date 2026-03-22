@@ -25,6 +25,11 @@ export const defaultConfig: SiftConfig = {
     rawFallback: true,
     verbose: false
   },
+  safety: {
+    enabled: true,
+    extraRiskPatterns: [],
+    ignoredRiskPatterns: []
+  },
   presets: {
     "test-status": {
       question: "Did the tests pass? If not, list only the failing tests or suites.",

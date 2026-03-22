@@ -7,6 +7,20 @@ describe("siftConfigSchema", () => {
     expect(siftConfigSchema.parse(defaultConfig)).toEqual(defaultConfig);
   });
 
+  it("accepts lightweight safety override lists", () => {
+    const parsed = siftConfigSchema.parse({
+      ...defaultConfig,
+      safety: {
+        enabled: true,
+        extraRiskPatterns: ["internal build note"],
+        ignoredRiskPatterns: ["ignore previous instructions"]
+      }
+    });
+
+    expect(parsed.safety.extraRiskPatterns).toContain("internal build note");
+    expect(parsed.safety.ignoredRiskPatterns).toContain("ignore previous instructions");
+  });
+
   it("accepts the native openai provider", () => {
     const parsed = siftConfigSchema.parse({
       ...defaultConfig,

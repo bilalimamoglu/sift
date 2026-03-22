@@ -1,15 +1,21 @@
-import type { InputConfig, PreparedInput } from "../types.js";
+import type { InputConfig, PreparedInput, SafetyConfig } from "../types.js";
 import { redactInput } from "./redact.js";
+import { applySafetyHardening } from "./safety.js";
 import { sanitizeInput } from "./sanitize.js";
 import { truncateInput } from "./truncate.js";
 
-export function prepareInput(raw: string, config: InputConfig): PreparedInput {
+export function prepareInput(
+  raw: string,
+  config: InputConfig,
+  safetyConfig: SafetyConfig
+): PreparedInput {
   const sanitized = sanitizeInput(raw, config.stripAnsi);
   const redacted =
     config.redact || config.redactStrict
       ? redactInput(sanitized, { strict: config.redactStrict })
       : sanitized;
-  const truncated = truncateInput(redacted, {
+  const hardened = applySafetyHardening(redacted, safetyConfig);
+  const truncated = truncateInput(hardened.text, {
     maxInputChars: config.maxInputChars,
     headChars: config.headChars,
     tailChars: config.tailChars
@@ -18,8 +24,9 @@ export function prepareInput(raw: string, config: InputConfig): PreparedInput {
   return {
     raw,
     sanitized,
-    redacted,
+    redacted: hardened.text,
     truncated: truncated.text,
+    safety: hardened.report,
     meta: {
       originalLength: raw.length,
       finalLength: truncated.text.length,

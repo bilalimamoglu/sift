@@ -56,6 +56,12 @@ export interface RuntimeConfig {
   verbose: boolean;
 }
 
+export interface SafetyConfig {
+  enabled: boolean;
+  extraRiskPatterns: string[];
+  ignoredRiskPatterns: string[];
+}
+
 export interface PresetDefinition {
   question: string;
   format: OutputFormat;
@@ -68,6 +74,7 @@ export interface SiftConfig {
   provider: ProviderConfig;
   input: InputConfig;
   runtime: RuntimeConfig;
+  safety: SafetyConfig;
   presets: Record<string, PresetDefinition>;
   providerProfiles?: ProviderProfiles;
 }
@@ -76,6 +83,7 @@ export interface PartialSiftConfig {
   provider?: Partial<ProviderConfig>;
   input?: Partial<InputConfig>;
   runtime?: Partial<RuntimeConfig>;
+  safety?: Partial<SafetyConfig>;
   presets?: Record<string, PresetDefinition>;
   providerProfiles?: ProviderProfiles;
 }
@@ -130,10 +138,22 @@ export interface PreparedInput {
   sanitized: string;
   redacted: string;
   truncated: string;
+  safety: SafetyReport | null;
   meta: {
     originalLength: number;
     finalLength: number;
     redactionApplied: boolean;
     truncatedApplied: boolean;
   };
+}
+
+export interface SafetySignal {
+  category: "instruction-like" | "shell-like" | "exfiltration-like" | "unicode-control";
+  snippet: string;
+  source: "builtin" | "override";
+}
+
+export interface SafetyReport {
+  suppressedLineCount: number;
+  signals: SafetySignal[];
 }

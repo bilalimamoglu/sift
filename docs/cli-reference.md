@@ -54,6 +54,7 @@ Current contract:
 - known preset matches only
 - unknown commands run unchanged
 - if the hook path fails internally, `sift` falls back to the raw command
+- if suspicious instruction-like log lines appear, `sift` de-emphasizes them before reduction instead of treating them as trusted next-step guidance
 
 ```bash
 sift hook run -- pytest -q
@@ -163,6 +164,13 @@ sift config show
 sift config show --show-secrets
 ```
 
+The config now includes a tiny `safety` section:
+- `enabled`
+- `extraRiskPatterns`
+- `ignoredRiskPatterns`
+
+These are substring hints for the hostile-output hardening pass. They are intentionally not a rules engine.
+
 ### `sift config validate`
 
 Validate the current config or a specific config file.
@@ -219,6 +227,12 @@ The installer now asks which operating mode matches your actual workflow:
 If you pick `provider-assisted`, the installer continues directly into provider/model/API-key setup instead of telling you to run `sift config setup` separately.
 
 The install summary should leave you with one obvious default next step, then mention `sift hook match -- pytest -q` only as an optional beta shortcut for a known preset.
+
+The installer also shows an explicit preflight:
+- which guidance files it will write
+- whether provider config is still machine-wide
+- what it will not touch
+- that custom skill/command files are not overwritten unless `sift` can prove ownership
 
 ```bash
 sift install
