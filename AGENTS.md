@@ -24,6 +24,7 @@ When working inside the `sift` repo itself:
 - Treat `npm run verify:release` as the default shared gate before pushing release-sensitive changes. It is the source-of-truth verification chain for CI parity and intentionally runs with CI-like npm wrapper noise enabled.
 - Keep the tracked `.githooks/pre-push` hook healthy. It should default to `npm run verify:release:core` so the repo catches most publish-facing regressions before the push leaves the machine.
 - For especially risky release or packaging work, prefer adding `npm run verify:release:clean` before push or publish so a temporary clean-room `npm ci` pass can catch warm-worktree blind spots.
+- After a release lands, refresh the globally installed `sift` from this repo with `npm install -g .` and confirm `sift --version` matches `package.json` before treating the global binary as trustworthy again.
 - When verifying new `sift` CLI behavior, prefer the repo-local entrypoint (`node --import tsx src/cli.ts ...` or the built local package) unless you have already confirmed the globally installed `sift` version matches `package.json`.
 - If global and local `sift` versions differ, treat repo-local results as source of truth for development verification.
 - If `sift` is insufficient or says the signal is not enough while developing `sift` itself, append a short timestamped note to `.local/agent-insufficient-log.md` with the command, preset or question, likely cause, and next step, then keep trying to resolve the gap instead of stopping at the first insufficient result.
