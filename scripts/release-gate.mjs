@@ -3,6 +3,15 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
+const CLEAN_ROOM_EXCLUDES = new Set([
+  ".git",
+  ".local",
+  ".planning",
+  "coverage",
+  "dist",
+  "node_modules"
+]);
+
 function parseTier(argv) {
   const tierFlag = argv.find((arg) => arg.startsWith("--tier="));
   if (tierFlag) {
@@ -37,7 +46,7 @@ function commandsForTier(tier) {
       ];
     default:
       throw new Error(
-        `Unknown release gate tier '${tier}'. Expected one of: core, e2e, full.`
+        `Unknown release gate tier '${tier}'. Expected one of: core, e2e, full, clean.`
       );
   }
 }
@@ -62,12 +71,12 @@ function makeCiParityEnv() {
   };
 }
 
-function runCommand(command, args, env) {
+function runCommand(command, args, env, cwd = process.cwd()) {
   const rendered = [command, ...args].join(" ");
   console.log(`\n> ${rendered}`);
 
   const result = spawnSync(command, args, {
-    cwd: process.cwd(),
+    cwd,
     env,
     stdio: "inherit"
   });
@@ -83,8 +92,58 @@ function runCommand(command, args, env) {
   return 1;
 }
 
+function copyRepoToCleanRoom(sourceDir, targetDir) {
+  fs.cpSync(sourceDir, targetDir, {
+    recursive: true,
+    filter(src) {
+      const relativePath = path.relative(sourceDir, src);
+      if (relativePath === "") {
+        return true;
+      }
+
+      const topLevel = relativePath.split(path.sep)[0];
+      return !CLEAN_ROOM_EXCLUDES.has(topLevel);
+    }
+  });
+}
+
+function runCleanRoomGate() {
+  const parentDir = fs.mkdtempSync(path.join(os.tmpdir(), "sift-clean-room-"));
+  const cleanDir = path.join(parentDir, "repo");
+
+  try {
+    copyRepoToCleanRoom(process.cwd(), cleanDir);
+    const { env, cleanup } = makeCiParityEnv();
+
+    try {
+      const npmCiEnv = { ...env };
+      delete npmCiEnv.npm_config_userconfig;
+
+      const npmCiStatus = runCommand("npm", ["ci"], npmCiEnv, cleanDir);
+      if (npmCiStatus !== 0) {
+        return npmCiStatus;
+      }
+
+      return runCommand(
+        "node",
+        ["scripts/release-gate.mjs", "--tier", "core"],
+        env,
+        cleanDir
+      );
+    } finally {
+      cleanup();
+    }
+  } finally {
+    fs.rmSync(parentDir, { force: true, recursive: true });
+  }
+}
+
 function main() {
   const tier = parseTier(process.argv.slice(2));
+
+  if (tier === "clean") {
+    return runCleanRoomGate();
+  }
 
   if (
     process.env.SIFT_RELEASE_GATE_ALREADY_RAN === "1" &&

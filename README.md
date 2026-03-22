@@ -177,6 +177,14 @@ npm run verify:release
 
 That gate runs under a CI-like environment on purpose so wrapper-noise regressions show up locally before they embarrass the repo in publish.
 
+If you want one extra paranoid pass before a release or risky push, use the clean-room variant too:
+
+```bash
+npm run verify:release:clean
+```
+
+That copies the repo into a temporary clean directory, runs `npm ci`, then executes the shared core gate there so warm local `node_modules` do not hide CI failures.
+
 If you want pushes to enforce the same core gate automatically inside this repo:
 
 ```bash

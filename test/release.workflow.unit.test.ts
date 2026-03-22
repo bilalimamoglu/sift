@@ -38,6 +38,9 @@ describe("release workflow", () => {
     expect(pkg.scripts?.["verify:release"]).toBe(
       "node scripts/release-gate.mjs --tier full"
     );
+    expect(pkg.scripts?.["verify:release:clean"]).toBe(
+      "node scripts/release-gate.mjs --tier clean"
+    );
     expect(pkg.scripts?.["verify:release:core"]).toBe(
       "node scripts/release-gate.mjs --tier core"
     );

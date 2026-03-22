@@ -33,6 +33,7 @@
     "test:watch": "vitest",
     "setup:hooks": "git config core.hooksPath .githooks",
     "verify:release": "node scripts/release-gate.mjs --tier full",
+    "verify:release:clean": "node scripts/release-gate.mjs --tier clean",
     "verify:release:core": "node scripts/release-gate.mjs --tier core",
     "verify:release:e2e": "node scripts/release-gate.mjs --tier e2e",
     "prepublishOnly": "node scripts/release-gate.mjs --tier full"
