@@ -169,6 +169,22 @@ sift doctor
 
 OpenAI setup defaults to `gpt-5-nano`, with `gpt-5.4-nano` and `gpt-5-mini` offered as backup choices during setup.
 
+Before pushing release-sensitive changes, run the same shared gate used by CI and the release workflow:
+
+```bash
+npm run verify:release
+```
+
+That gate runs under a CI-like environment on purpose so wrapper-noise regressions show up locally before they embarrass the repo in publish.
+
+If you want pushes to enforce the same core gate automatically inside this repo:
+
+```bash
+npm run setup:hooks
+```
+
+That installs the tracked `.githooks/pre-push` hook, which runs `npm run verify:release:core` before every push.
+
 If you want the older low-level controls, you can still preview, inspect, or remove the managed blocks directly:
 
 ```bash

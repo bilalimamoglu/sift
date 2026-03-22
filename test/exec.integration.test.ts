@@ -120,9 +120,11 @@ describe("runExec integration", () => {
   it("normalizes npm-style wrapper output before reduction and short-circuits silent typecheck success", async () => {
     const { runExec } = await import("../src/core/exec.js");
     const originalNpmConfigUserconfig = process.env.npm_config_userconfig;
+    const originalNpmConfigAlwaysAuth = process.env.npm_config_always_auth;
     const warnConfigPath = path.join(os.tmpdir(), `sift-npm-warn-${Date.now()}.npmrc`);
     fs.writeFileSync(warnConfigPath, "always-auth=true\n", "utf8");
     process.env.npm_config_userconfig = warnConfigPath;
+    process.env.npm_config_always_auth = "true";
 
     try {
       await expect(
@@ -141,6 +143,11 @@ describe("runExec integration", () => {
       } else {
         process.env.npm_config_userconfig = originalNpmConfigUserconfig;
       }
+      if (originalNpmConfigAlwaysAuth === undefined) {
+        delete process.env.npm_config_always_auth;
+      } else {
+        process.env.npm_config_always_auth = originalNpmConfigAlwaysAuth;
+      }
       fs.rmSync(warnConfigPath, { force: true });
     }
 
@@ -156,8 +163,10 @@ describe("runExec integration", () => {
     const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "sift-exec-int-typecheck-"));
     const warnConfigPath = path.join(cwd, ".npmrc-ci-warning");
     const originalNpmConfigUserconfig = process.env.npm_config_userconfig;
+    const originalNpmConfigAlwaysAuth = process.env.npm_config_always_auth;
     fs.writeFileSync(warnConfigPath, "always-auth=true\n", "utf8");
     process.env.npm_config_userconfig = warnConfigPath;
+    process.env.npm_config_always_auth = "true";
     fs.writeFileSync(
       path.join(cwd, "package.json"),
       JSON.stringify(
@@ -206,6 +215,11 @@ describe("runExec integration", () => {
         delete process.env.npm_config_userconfig;
       } else {
         process.env.npm_config_userconfig = originalNpmConfigUserconfig;
+      }
+      if (originalNpmConfigAlwaysAuth === undefined) {
+        delete process.env.npm_config_always_auth;
+      } else {
+        process.env.npm_config_always_auth = originalNpmConfigAlwaysAuth;
       }
     }
 

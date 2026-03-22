@@ -17,6 +17,7 @@
   "engines": {
     "node": ">=20"
   },
+  "packageManager": "npm@11.8.0",
   "scripts": {
     "build": "tsup",
     "bench:history": "node --import tsx scripts/bench/generate-version-history.ts --since v0.3.0",
@@ -30,7 +31,11 @@
     "test:e2e": "vitest run --config vitest.e2e.config.ts test/*.e2e.test.ts",
     "test:coverage": "vitest run --config vitest.config.ts --coverage --exclude=\"test/**/*.smoke.test.ts\" --exclude=\"test/**/*.e2e.test.ts\"",
     "test:watch": "vitest",
-    "prepublishOnly": "npm run typecheck && npm run test:coverage && npm run build"
+    "setup:hooks": "git config core.hooksPath .githooks",
+    "verify:release": "node scripts/release-gate.mjs --tier full",
+    "verify:release:core": "node scripts/release-gate.mjs --tier core",
+    "verify:release:e2e": "node scripts/release-gate.mjs --tier e2e",
+    "prepublishOnly": "node scripts/release-gate.mjs --tier full"
   },
   "keywords": [
     "cli",

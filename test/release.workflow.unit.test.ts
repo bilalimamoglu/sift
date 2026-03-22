@@ -13,6 +13,7 @@ describe("release workflow", () => {
       repository?: { type?: string; url?: string };
       homepage?: string;
       bugs?: { url?: string };
+      packageManager?: string;
       scripts?: Record<string, string>;
     };
 
@@ -34,7 +35,22 @@ describe("release workflow", () => {
     expect(pkg.scripts?.["test:coverage"]).toBe(
       "vitest run --config vitest.config.ts --coverage --exclude=\"test/**/*.smoke.test.ts\" --exclude=\"test/**/*.e2e.test.ts\""
     );
-    expect(pkg.scripts?.prepublishOnly).toContain("npm run test:coverage");
+    expect(pkg.scripts?.["verify:release"]).toBe(
+      "node scripts/release-gate.mjs --tier full"
+    );
+    expect(pkg.scripts?.["verify:release:core"]).toBe(
+      "node scripts/release-gate.mjs --tier core"
+    );
+    expect(pkg.scripts?.["verify:release:e2e"]).toBe(
+      "node scripts/release-gate.mjs --tier e2e"
+    );
+    expect(pkg.scripts?.["setup:hooks"]).toBe(
+      "git config core.hooksPath .githooks"
+    );
+    expect(pkg.packageManager).toBe("npm@11.8.0");
+    expect(pkg.scripts?.prepublishOnly).toBe(
+      "node scripts/release-gate.mjs --tier full"
+    );
   });
 
   it("enforces measured coverage in vitest and CI", () => {
@@ -54,9 +70,8 @@ describe("release workflow", () => {
     expect(vitestConfig).toContain("statements: 80");
     expect(vitestE2EConfig).toContain("test/global-setup.e2e.ts");
     expect(vitestE2EConfig).toContain("test/**/*.e2e.test.ts");
-    expect(ciWorkflow).toContain("npm run test:coverage");
-    expect(ciWorkflow).toContain("npm run test:smoke");
-    expect(ciWorkflow).toContain("npm run test:e2e");
+    expect(ciWorkflow).toContain("npm run verify:release:core");
+    expect(ciWorkflow).toContain("npm run verify:release:e2e");
     expect(ciWorkflow).toContain("matrix:");
     expect(ciWorkflow).toContain("node-version: [20, 24]");
     expect(ciWorkflow).toContain("node-version: ${{ matrix.node-version }}");
@@ -65,11 +80,19 @@ describe("release workflow", () => {
 
   it("ignores local secrets and machine-local artifacts", () => {
     const gitignore = fs.readFileSync(path.join(root, ".gitignore"), "utf8");
+    const nvmrc = fs.readFileSync(path.join(root, ".nvmrc"), "utf8");
+    const prePushHook = fs.readFileSync(
+      path.join(root, ".githooks", "pre-push"),
+      "utf8"
+    );
 
     expect(gitignore).toContain(".env");
     expect(gitignore).toContain(".env.*");
     expect(gitignore).toContain("!.env.example");
     expect(gitignore).toContain(".pytest_cache/");
+    expect(nvmrc.trim()).toBe("24");
+    expect(prePushHook).toContain("npm run verify:release:core");
+    expect(prePushHook).toContain("SIFT_SKIP_PRE_PUSH_VERIFY");
   });
 
   it("defines a manual trusted-publishing release workflow with tag and GitHub release creation", () => {
@@ -89,9 +112,8 @@ describe("release workflow", () => {
     expect(workflow).toContain("Validate requested release version");
     expect(workflow).toContain("workflow_dispatch input version");
     expect(workflow).toContain("must match package.json version");
-    expect(workflow).toContain("npm run test:coverage");
-    expect(workflow).toContain("npm run test:smoke");
-    expect(workflow).toContain("npm run test:e2e");
+    expect(workflow).toContain("npm run verify:release");
+    expect(workflow).toContain("SIFT_RELEASE_GATE_ALREADY_RAN: \"1\"");
     expect(workflow).toContain("npm publish --access public");
     expect(workflow).toContain("git tag -a");
     expect(workflow).toContain("gh release create");

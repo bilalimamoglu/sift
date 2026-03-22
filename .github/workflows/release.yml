@@ -72,19 +72,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test coverage
-        run: npm run test:coverage
-
-      - name: Smoke tests
-        run: npm run test:smoke
-
-      - name: Dist and packaging E2E
-        run: npm run test:e2e
+      - name: Shared release gate
+        run: npm run verify:release
 
       - name: Publish to npm
+        env:
+          SIFT_RELEASE_GATE_ALREADY_RAN: "1"
         run: npm publish --access public --provenance
 
       - name: Create and push git tag

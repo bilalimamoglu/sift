@@ -199,6 +199,7 @@ export function normalizeScriptWrapperOutput(args: {
 
       if (
         /^(?:npm|pnpm)\s+warn\s+unknown user config\b/i.test(trimmed) ||
+        /^(?:npm|pnpm)\s+warn\s+unknown env config\b/i.test(trimmed) ||
         /^npm\s+warn\s+config\b/i.test(trimmed) ||
         /^yarn\s+warning\b/i.test(trimmed) ||
         /^bun\s+warn\b/i.test(trimmed)
