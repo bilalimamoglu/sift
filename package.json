@@ -1,6 +1,6 @@
 {
   "name": "@bilalimamoglu/sift",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Local-first output guidance for coding agents working through noisy command output.",
   "type": "module",
   "bin": {

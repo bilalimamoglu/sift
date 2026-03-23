@@ -81,6 +81,15 @@ describe("packaging e2e", () => {
         encoding: "utf8"
       }
     );
+    const copilotInstall = spawnSync(
+      "npx",
+      ["--no-install", "sift", "install", "copilot", "--yes"],
+      {
+        cwd: dir,
+        env,
+        encoding: "utf8"
+      }
+    );
 
     expect(result.status).toBe(0);
     expect(doctor.status).toBe(0);
@@ -89,6 +98,7 @@ describe("packaging e2e", () => {
     expect(agentPreview.status).toBe(0);
     expect(skillInstall.status).toBe(0);
     expect(claudeInstall.status).toBe(0);
+    expect(copilotInstall.status).toBe(0);
     expect(tarballContents).not.toContain("assets/brand");
     expect(result.stdout).toContain("sift [question]");
     expect(result.stdout).toContain("  \\\\  //");
@@ -107,6 +117,9 @@ describe("packaging e2e", () => {
     expect(
       await fs.readFile(path.join(home, ".claude", "commands", "sift", "test-status.md"), "utf8")
     ).toContain("<!-- sift:generated claude-command test-status -->");
+    expect(
+      await fs.readFile(path.join(dir, ".github", "copilot-instructions.md"), "utf8")
+    ).toContain("<!-- sift:generated copilot-instructions -->");
   });
 
   it("keeps safety overrides working in the packed binary", async () => {

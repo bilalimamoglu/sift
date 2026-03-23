@@ -225,6 +225,15 @@ describe("cli app unit", () => {
       yes: true,
       version: "0.3.2"
     });
+
+    await runMatched(["install", "copilot", "--yes"], deps);
+
+    expect(deps.installRuntimeSupport).toHaveBeenLastCalledWith({
+      runtime: "copilot",
+      scope: undefined,
+      yes: true,
+      version: "0.3.2"
+    });
   });
 
   it("routes hook match and hook run to the hook command surface", async () => {

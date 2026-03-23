@@ -17,6 +17,10 @@ export function getDefaultCursorGlobalSkillPath(homeDir = os.homedir()): string 
   return path.join(homeDir, ".cursor", "skills", "sift", "SKILL.md");
 }
 
+export function getDefaultCopilotInstructionsPath(cwd = process.cwd()): string {
+  return path.join(cwd, ".github", "copilot-instructions.md");
+}
+
 export function getDefaultClaudeGlobalInstructionsPath(homeDir = os.homedir()): string {
   return path.join(homeDir, ".claude", "CLAUDE.md");
 }

@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { clearScreenDown, cursorTo, moveCursor } from "node:readline";
 import { stdin as defaultStdin } from "node:process";
+import stripAnsi from "strip-ansi";
 
 export const PROMPT_BACK = "__sift_back__";
 export const PROMPT_BACK_LABEL = "← Back";
@@ -135,6 +136,19 @@ function styleOption(option: string, selected: boolean, colorize: boolean): stri
   })}${trailing}`;
 }
 
+function getTerminalColumns(stream: NodeJS.WriteStream): number {
+  return typeof stream.columns === "number" && stream.columns > 0 ? stream.columns : 80;
+}
+
+function getVisualLineCount(line: string, columns: number): number {
+  const visibleLength = stripAnsi(line).length;
+  return Math.max(1, Math.ceil(visibleLength / columns));
+}
+
+function getVisualBlockHeight(lines: string[], columns: number): number {
+  return lines.reduce((total, line) => total + getVisualLineCount(line, columns), 0);
+}
+
 function setPosixEcho(enabled: boolean): void {
   const command = enabled ? "echo" : "-echo";
 
@@ -214,7 +228,7 @@ export async function promptSelect(args: {
     });
 
     output.write(`${lines.join("\n")}\n`);
-    previousLineCount = lines.length;
+    previousLineCount = getVisualBlockHeight(lines, getTerminalColumns(stream));
   };
 
   const cleanup = (selected?: string) => {

@@ -1063,11 +1063,12 @@ export function createCliApp(args: {
     });
 
   cli
-    .command("install [runtime]", "Interactive runtime installer for Codex, Claude, and tiny Cursor packaging")
+    .command("install [runtime]", "Interactive runtime installer for Codex, Claude, Cursor, and Copilot repo instructions")
     .usage("install [runtime] [options]")
     .example("install")
     .example("install codex")
     .example("install cursor")
+    .example("install copilot")
     .example("install codex --scope global --yes")
     .example("install all --scope local --yes")
     .option("--scope <scope>", "Install scope: local | global")

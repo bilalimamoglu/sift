@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { emitKeypressEvents } from "node:readline";
@@ -12,6 +13,7 @@ import {
   getDefaultClaudeGlobalCommandsDir,
   getDefaultClaudeGlobalInstructionsPath,
   getDefaultCodexGlobalInstructionsPath,
+  getDefaultCopilotInstructionsPath,
   getDefaultCursorGlobalSkillPath
 } from "../constants.js";
 import {
@@ -34,9 +36,10 @@ import {
   type AgentScope
 } from "./agent.js";
 import { CLAUDE_COMMAND_NAMES } from "../runtime-payloads/claude-commands.js";
+import { renderCopilotInstructions } from "../runtime-payloads/copilot-instructions.js";
 import { installSkill, type SkillRuntime } from "./skill.js";
 
-export type InstallRuntime = AgentName | SkillRuntime | "all";
+export type InstallRuntime = AgentName | SkillRuntime | "copilot" | "all";
 
 export interface InstallRuntimeIO extends AgentCommandIO {
   select?(
@@ -55,7 +58,8 @@ interface MenuChoice<T> {
 const INSTALL_TITLES: Record<Exclude<InstallRuntime, "all">, string> = {
   codex: "Codex",
   claude: "Claude",
-  cursor: "Cursor"
+  cursor: "Cursor",
+  copilot: "Copilot"
 };
 
 export function createInstallTerminalIO(): InstallRuntimeIO {
@@ -114,11 +118,11 @@ export function normalizeInstallRuntime(value: unknown): InstallRuntime | undefi
     return undefined;
   }
 
-  if (value === "codex" || value === "claude" || value === "cursor" || value === "all") {
+  if (value === "codex" || value === "claude" || value === "cursor" || value === "copilot" || value === "all") {
     return value;
   }
 
-  throw new Error("Invalid runtime. Use codex, claude, cursor, or all.");
+  throw new Error("Invalid runtime. Use codex, claude, cursor, copilot, or all.");
 }
 
 export function normalizeInstallScope(value: unknown): AgentScope | undefined {
@@ -180,6 +184,9 @@ function getLocalTargetLabel(runtime: Exclude<InstallRuntime, "all">, cwd = proc
   if (runtime === "claude") {
     return path.join(cwd, "CLAUDE.md");
   }
+  if (runtime === "copilot") {
+    return getDefaultCopilotInstructionsPath(cwd);
+  }
   return path.join(cwd, ".cursor", "skills", "sift", "SKILL.md");
 }
 
@@ -191,12 +198,46 @@ function describeScopeChoice(args: {
 }): string {
   const targets = getInstallTargets(args.runtime);
   const labels = targets.map((agent) =>
-    args.scope === "global"
+    args.runtime === "copilot"
+      ? getLocalTargetLabel("copilot", args.cwd)
+      : args.scope === "global"
       ? getGlobalTargetLabel(agent, args.homeDir)
       : getLocalTargetLabel(agent, args.cwd)
   );
 
   return labels.join(" + ");
+}
+
+function getCopilotInstructionsTargetPath(cwd?: string): string {
+  return getDefaultCopilotInstructionsPath(cwd ?? process.cwd());
+}
+
+function inspectCopilotInstructionsOwnership(content: string | undefined): "managed" | "custom" | "missing" {
+  if (content === undefined) {
+    return "missing";
+  }
+
+  return content.includes("<!-- sift:generated copilot-instructions -->") ? "managed" : "custom";
+}
+
+function readOptionalFile(targetPath: string): string | undefined {
+  if (!fs.existsSync(targetPath)) {
+    return undefined;
+  }
+
+  const stats = fs.statSync(targetPath);
+  if (!stats.isFile()) {
+    throw new Error(`${targetPath} exists but is not a file.`);
+  }
+
+  return fs.readFileSync(targetPath, "utf8");
+}
+
+function writeTextFileAtomic(targetPath: string, content: string): void {
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  const tempPath = `${targetPath}.tmp-${process.pid}-${Date.now()}`;
+  fs.writeFileSync(tempPath, content, "utf8");
+  fs.renameSync(tempPath, targetPath);
 }
 
 async function promptWithMenu<T>(args: {
@@ -270,6 +311,10 @@ async function promptForRuntime(io: InstallRuntimeIO): Promise<InstallRuntime | 
       {
         label: "Cursor  (.cursor/skills/sift/SKILL.md / ~/.cursor/skills/sift/SKILL.md) - native skill path for Cursor without inventing a second runtime",
         value: "cursor"
+      },
+      {
+        label: "Copilot (.github/copilot-instructions.md) - repository instructions for GitHub Copilot, repo-only by design",
+        value: "copilot"
       },
       {
         label: "All      - Codex + Claude together if you refuse to pick favorites today",
@@ -360,18 +405,32 @@ function writeSuccessSummary(args: {
   const ui = createPresentation(args.io.stdoutIsTTY);
   const targets = getInstallTargets(args.runtime);
   const scopeLabel = args.scope === "global" ? "global" : "local";
-  const targetLabel = describeScopeChoice({
-    runtime: args.runtime,
-    scope: args.scope,
-    cwd: args.cwd,
-    homeDir: args.homeDir
-  });
 
   if (args.io.stdoutIsTTY) {
     args.io.write(`\n${ui.success("Installed runtime support.")}\n`);
   } else {
     args.io.write("Installed runtime support.\n");
   }
+
+  if (targets.includes("copilot")) {
+    const targetLabel = getCopilotInstructionsTargetPath(args.cwd);
+    args.io.write(`${ui.note("Copilot instructions installed for this repository.")}\n`);
+    args.io.write(`${ui.note(`Repo-local instructions live at ${targetLabel}.`)}\n`);
+    args.io.write(`${ui.note("Copilot is repo-only here; there is no global install target.")}\n`);
+    args.io.write(`\n${ui.section("Try next")}\n`);
+    args.io.write(`  ${ui.command("sift exec --preset test-status -- pytest -q")}${ui.note("  # default first pass")}\n`);
+    args.io.write(`  ${ui.command("sift doctor")}${ui.note("  # verify the setup and see what happens on ambiguous cases")}\n`);
+    args.io.write(`${ui.note(getDefaultExecPathLine())}\n`);
+    args.io.write(`${ui.note(getHookBetaLine())}\n`);
+    return;
+  }
+
+  const targetLabel = describeScopeChoice({
+    runtime: args.runtime,
+    scope: args.scope,
+    cwd: args.cwd,
+    homeDir: args.homeDir
+  });
 
   args.io.write(
     `${ui.note(`Runtime instructions installed for ${targets.map((target) => INSTALL_TITLES[target]).join(" + ")} in ${scopeLabel} scope.`)}\n`
@@ -417,6 +476,17 @@ function writePreflightSummary(args: {
 }): void {
   const ui = createPresentation(args.io.stdoutIsTTY);
   const runtimeTargets = getInstallTargets(args.runtime);
+  if (runtimeTargets.includes("copilot")) {
+    const targetPath = getCopilotInstructionsTargetPath(args.cwd);
+
+    args.io.write(`\n${ui.section("Install preflight")}\n`);
+    args.io.write(`${ui.note("Will write repo-local instructions for GitHub Copilot:")}\n`);
+    args.io.write(`  ${ui.command(targetPath)}\n`);
+    args.io.write(`${ui.note("Will not write shell rc files, PATH entries, git hooks, or arbitrary repo files.")}\n`);
+    args.io.write(`${ui.note("Managed files update only when sift can prove ownership.")}\n`);
+    return;
+  }
+
   const writeTargets = runtimeTargets.flatMap((runtime) => {
     if (runtime === "codex") {
       return [
@@ -480,6 +550,7 @@ export async function installRuntimeSupport(options: {
 }): Promise<number> {
   const io = options.io ?? createInstallTerminalIO();
   type InstallStep = "runtime" | "mode" | "scope" | "provider";
+  const runtimeIsCopilot = options.runtime === "copilot";
 
   const getPreviousEditableStep = (step: InstallStep): InstallStep | undefined => {
     if (step === "runtime") {
@@ -517,9 +588,14 @@ export async function installRuntimeSupport(options: {
   };
 
   try {
-    if ((!io.stdinIsTTY || !io.stdoutIsTTY) && (!options.runtime || !options.scope || !options.yes)) {
+    if (runtimeIsCopilot && options.scope === "global") {
+      io.error("sift install copilot is repo-only. Use `sift install copilot --scope local` or omit --scope.\n");
+      return 1;
+    }
+
+    if ((!io.stdinIsTTY || !io.stdoutIsTTY) && (!options.runtime || (!runtimeIsCopilot && !options.scope) || !options.yes)) {
       io.error(
-        "sift install is interactive and requires a TTY. For non-interactive use `sift install codex --scope global --yes`.\n"
+        "sift install is interactive and requires a TTY. For non-interactive use `sift install codex --scope global --yes` or `sift install copilot --yes`.\n"
       );
       return 1;
     }
@@ -533,28 +609,42 @@ export async function installRuntimeSupport(options: {
     let scope: AgentScope | undefined = options.scope;
     let step: InstallStep | undefined;
 
+    if (runtime === "copilot") {
+      scope = "repo";
+      operationMode ??= "agent-escalation";
+    }
+
     if (!io.stdinIsTTY || !io.stdoutIsTTY) {
       runtime ??= options.runtime;
       operationMode ??= "agent-escalation";
+      if (runtime === "copilot") {
+        scope = "repo";
+      }
       step = undefined;
     } else if (!runtime) {
       step = "runtime";
-    } else if (!operationMode) {
+    } else if (runtime !== "copilot" && !operationMode) {
       step = "mode";
-    } else if (!scope) {
+    } else if (runtime !== "copilot" && !scope) {
       step = "scope";
-    } else if (operationMode === "provider-assisted") {
+    } else if (runtime !== "copilot" && operationMode === "provider-assisted") {
       step = "provider";
     }
 
     while (step) {
       if (step === "runtime") {
-      const runtimeChoice = await promptForRuntime(io);
+        const runtimeChoice = await promptForRuntime(io);
         if (runtimeChoice === PROMPT_BACK) {
           io.write(`\n${createPresentation(io.stdoutIsTTY).note("Install canceled before we touched anything.")}\n`);
           return 0;
         }
         runtime = runtimeChoice;
+        if (runtime === "copilot") {
+          scope = "repo";
+          operationMode ??= "agent-escalation";
+          step = undefined;
+          continue;
+        }
         step = !operationMode ? "mode" : !scope ? "scope" : operationMode === "provider-assisted" ? "provider" : undefined;
         continue;
       }
@@ -607,40 +697,83 @@ export async function installRuntimeSupport(options: {
         continue;
       }
 
-      if (scope === "repo") {
-        io.write(
-          `\n${createPresentation(io.stdoutIsTTY).note("Local only applies to the runtime instructions in this repo. Provider fallback config is still machine-wide so sift can reuse it anywhere.")}\n`
-        );
-      }
-      io.write(`\n${createPresentation(io.stdoutIsTTY).info("Next: provider setup. Press Esc at any step to go back.")}\n`);
-      const setupStatus = await configSetup({
-        io,
-        env: process.env,
-        embedded: true,
-        forcedMode: "provider-assisted",
-        targetPath: getDefaultGlobalConfigPath(options.homeDir)
-      });
-
-      if (setupStatus === CONFIG_SETUP_BACK) {
-        const previous = getPreviousEditableStep("provider");
-        if (!previous) {
-          io.write(`\n${createPresentation(io.stdoutIsTTY).note("Install canceled before we touched anything.")}\n`);
-          return 0;
+      if (step === "provider") {
+        if (scope === "repo") {
+          io.write(
+            `\n${createPresentation(io.stdoutIsTTY).note("Local only applies to the runtime instructions in this repo. Provider fallback config is still machine-wide so sift can reuse it anywhere.")}\n`
+          );
         }
-        step = previous;
+        io.write(`\n${createPresentation(io.stdoutIsTTY).info("Next: provider setup. Press Esc at any step to go back.")}\n`);
+        const setupStatus = await configSetup({
+          io,
+          env: process.env,
+          embedded: true,
+          forcedMode: "provider-assisted",
+          targetPath: getDefaultGlobalConfigPath(options.homeDir)
+        });
+
+        if (setupStatus === CONFIG_SETUP_BACK) {
+          const previous = getPreviousEditableStep("provider");
+          if (!previous) {
+            io.write(`\n${createPresentation(io.stdoutIsTTY).note("Install canceled before we touched anything.")}\n`);
+            return 0;
+          }
+          step = previous;
+          continue;
+        }
+
+        if (setupStatus !== 0) {
+          return setupStatus;
+        }
+
+        step = undefined;
         continue;
       }
-
-      if (setupStatus !== 0) {
-        return setupStatus;
-      }
-
-      step = undefined;
     }
 
     const nestedIo = createNestedInstallIO(io);
 
+    if (runtime === "copilot") {
+      const targetPath = getCopilotInstructionsTargetPath(options.cwd);
+      const existingContent = readOptionalFile(targetPath);
+      const ownership = inspectCopilotInstructionsOwnership(existingContent);
+
+      if (ownership === "custom") {
+        io.error(
+          `Refusing to overwrite a custom copilot-instructions.md at ${targetPath}. Move it, remove it manually, or choose a different target path.\n`
+        );
+        return 1;
+      }
+
+      if (io.stdoutIsTTY) {
+        writePreflightSummary({
+          io,
+          runtime,
+          scope: "repo",
+          operationMode: operationMode ?? "agent-escalation",
+          cwd: options.cwd,
+          homeDir: options.homeDir
+        });
+      }
+
+      writeTextFileAtomic(targetPath, `${renderCopilotInstructions()}\n`);
+      writeSuccessSummary({
+        io,
+        version: options.version,
+        runtime,
+        scope: "repo",
+        operationMode: operationMode ?? "agent-escalation",
+        cwd: options.cwd,
+        homeDir: options.homeDir
+      });
+      return 0;
+    }
+
     for (const runtimeTarget of getInstallTargets(runtime!)) {
+      if (runtimeTarget === "copilot") {
+        continue;
+      }
+
       const status =
         runtimeTarget === "cursor"
           ? await installSkill({

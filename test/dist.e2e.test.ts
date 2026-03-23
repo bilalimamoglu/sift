@@ -218,4 +218,22 @@ describe("dist e2e", () => {
     await expect(fs.access(path.join(cwd, "AGENTS.md"))).rejects.toThrow();
     await expect(fs.access(path.join(cwd, "CLAUDE.md"))).rejects.toThrow();
   });
+
+  it("installs the copilot repository instructions from the packaged binary", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-dist-copilot-home-"));
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-dist-copilot-cwd-"));
+
+    const copilotInstall = await runDistCliAsync({
+      args: ["install", "copilot", "--yes"],
+      cwd,
+      env: {
+        HOME: home
+      }
+    });
+
+    expect(copilotInstall.status).toBe(0);
+    expect(
+      await fs.readFile(path.join(cwd, ".github", "copilot-instructions.md"), "utf8")
+    ).toContain("<!-- sift:generated copilot-instructions -->");
+  });
 });

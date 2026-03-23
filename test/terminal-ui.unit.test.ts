@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import stripAnsi from "strip-ansi";
 import {
   PROMPT_BACK,
   promptSecret,
@@ -149,6 +150,59 @@ describe("terminal ui helpers", () => {
     expect(output.buffer).toContain("Provider: OpenAI Compatible");
     expect(input.pauseCalls).toBe(1);
     expect(input.isRaw).toBe(false);
+  });
+
+  it("clears the full wrapped selection block when moving between options", async () => {
+    vi.resetModules();
+    const moveCursor = vi.fn();
+    const clearScreenDown = vi.fn();
+    const cursorTo = vi.fn();
+    vi.doMock("node:readline", () => ({
+      clearScreenDown,
+      cursorTo,
+      moveCursor
+    }));
+
+    const terminal = await import("../src/ui/terminal.js");
+    const input = new FakeKeypressInput();
+    const output = new FakeOutput();
+    Object.assign(output, { isTTY: true, columns: 24 });
+
+    const prompt = "Choose how sift should work";
+    const options = [
+      "With an agent - recommended if Codex or Claude is already with you; sift does the fast local first pass, the agent only steps in when repo context is truly needed",
+      "With provider fallback - recommended if you want sift to finish more ambiguous cases on its own before handing them back to you or your agent; needs an API key, cheap model only when needed",
+      "Solo, local-only - recommended if you want zero model calls; great for supported presets, ambiguous cases stay with you"
+    ];
+
+    const pending = terminal.promptSelect({
+      input,
+      output,
+      prompt,
+      options,
+      selectedLabel: "Mode",
+      allowBack: true
+    });
+
+    input.emit("keypress", "", { name: "down" });
+    input.emit("keypress", "", { name: "return" });
+
+    await expect(pending).resolves.toBe(options[1]);
+
+    const renderedLines = terminal.renderSelectionBlock({
+      prompt,
+      options,
+      selectedIndex: 0,
+      allowBack: true
+    });
+    const expectedHeight = renderedLines.reduce((total, line) => {
+      return total + Math.max(1, Math.ceil(stripAnsi(line).length / 24));
+    }, 0);
+
+    expect(moveCursor).toHaveBeenCalledWith(expect.anything(), 0, -expectedHeight);
+    expect(moveCursor).toHaveBeenCalledTimes(2);
+    expect(clearScreenDown).toHaveBeenCalledTimes(2);
+    expect(cursorTo).toHaveBeenCalledTimes(2);
   });
 
   it("wraps upward selection and restores prior raw state", async () => {

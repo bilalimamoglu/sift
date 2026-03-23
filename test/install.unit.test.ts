@@ -69,9 +69,10 @@ describe("install runtime support", () => {
     expect(normalizeInstallRuntime("codex")).toBe("codex");
     expect(normalizeInstallRuntime("claude")).toBe("claude");
     expect(normalizeInstallRuntime("cursor")).toBe("cursor");
+    expect(normalizeInstallRuntime("copilot")).toBe("copilot");
     expect(normalizeInstallRuntime("all")).toBe("all");
     expect(() => normalizeInstallRuntime("windsurf")).toThrow(
-      "Invalid runtime. Use codex, claude, cursor, or all."
+      "Invalid runtime. Use codex, claude, cursor, copilot, or all."
     );
 
     expect(normalizeInstallScope(undefined)).toBeUndefined();
@@ -170,6 +171,26 @@ describe("install runtime support", () => {
     await expect(fs.access(path.join(cwd, "CLAUDE.md"))).rejects.toThrow();
     expect(io.stdout).toContain("Cursor");
     expect(io.stdout).toContain(".cursor/skills/sift/SKILL.md");
+  });
+
+  it("installs Copilot repository instructions without introducing a global target", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-install-copilot-"));
+    const io = createFakeIO();
+
+    const status = await installRuntimeSupport({
+      runtime: "copilot",
+      yes: true,
+      io,
+      cwd,
+      version: "0.5.0"
+    });
+
+    expect(status).toBe(0);
+    expect(
+      await fs.readFile(path.join(cwd, ".github", "copilot-instructions.md"), "utf8")
+    ).toContain("<!-- sift:generated copilot-instructions -->");
+    expect(io.stdout).toContain("Copilot instructions installed for this repository.");
+    expect(io.stdout).toContain(".github/copilot-instructions.md");
   });
 
   it("continues straight into provider setup when provider-assisted is selected", async () => {
