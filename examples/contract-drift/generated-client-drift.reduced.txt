@@ -1,0 +1,3 @@
+- Generated artifact drift detected.
+- Visible drift touches /api/v1/users, gpt-4.1-mini.
+- If the changes are intentional, run pnpm generate:client and rerun the drift check.

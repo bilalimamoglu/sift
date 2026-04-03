@@ -101,9 +101,60 @@ describe("README quick start e2e", () => {
 
     try {
       const home = await fs.mkdtemp(path.join(os.tmpdir(), "sift-docs-home-"));
+      const binDir = await fs.mkdtemp(path.join(os.tmpdir(), "sift-docs-bin-"));
+      const fakeAuditJson = JSON.stringify({
+        auditReportVersion: 2,
+        vulnerabilities: {},
+        metadata: {
+          vulnerabilities: {
+            info: 0,
+            low: 0,
+            moderate: 0,
+            high: 0,
+            critical: 0,
+            total: 0
+          }
+        }
+      });
+      const fakeShellPath = path.join(binDir, "fake-shell");
+      const fakeNpmPath = path.join(binDir, "npm");
+      await fs.writeFile(
+        fakeShellPath,
+        `#!/bin/sh
+if [ "$1" = "-lc" ]; then
+  shift
+  exec /bin/sh -c "$1"
+fi
+
+exec /bin/sh "$@"
+`
+      );
+      await fs.chmod(fakeShellPath, 0o755);
+      await fs.writeFile(
+        fakeNpmPath,
+        `#!/usr/bin/env node
+const args = process.argv.slice(2);
+
+if (args[0] === "run" && args[1] === "typecheck") {
+  console.log("> sift@0.0.0 typecheck");
+  console.log("> tsc --noEmit");
+  process.exit(0);
+}
+
+if (args[0] === "audit" && args[1] === "--json") {
+  console.log(${JSON.stringify(fakeAuditJson)});
+  process.exit(0);
+}
+
+console.error(\`fake npm: unsupported args \${args.join(" ")}\`);
+process.exit(2);
+`
+      );
+      await fs.chmod(fakeNpmPath, 0o755);
       const env = {
-        PATH: process.env.PATH,
+        PATH: [binDir, process.env.PATH ?? ""].join(path.delimiter),
         HOME: home,
+        SHELL: fakeShellPath,
         SIFT_PROVIDER: "openai",
         SIFT_BASE_URL: server.baseUrl,
         OPENAI_API_KEY: "test-key",

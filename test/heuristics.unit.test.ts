@@ -1525,6 +1525,12 @@ describe("heuristic policies", () => {
     expect(output).toContain("/api/v1/users");
   });
 
+  it("surfaces contract-drift anchors when failure labels are visible", () => {
+    const output = applyHeuristicPolicy("contract-drift", buildContractVsSnapshotOutput());
+
+    expect(output).toContain("Inspect tests/contracts/task_matrix_snapshot_freeze.test.ts first.");
+  });
+
   it("keeps env and connection failures out of standalone contract-drift", () => {
     expect(applyHeuristicPolicy("contract-drift", buildContractDriftFalsePositiveOutput())).toBeNull();
   });

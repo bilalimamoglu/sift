@@ -15,6 +15,11 @@ const buildFailurePairs = [
   "vite-build-failure-full"
 ];
 
+const contractDriftPairs = [
+  "generated-client-drift",
+  "snapshot-drift-only-real"
+];
+
 describe("examples companion sync", () => {
   it("build-failure reduced outputs match current heuristic", () => {
     for (const name of buildFailurePairs) {
@@ -23,6 +28,17 @@ describe("examples companion sync", () => {
       const raw = fs.readFileSync(rawPath, "utf8");
       const committed = fs.readFileSync(reducedPath, "utf8").trim();
       const actual = applyHeuristicPolicy("build-failure", raw);
+      expect(actual, `${name} reduced output must match committed file`).toBe(committed);
+    }
+  });
+
+  it("contract-drift reduced outputs match current heuristic", () => {
+    for (const name of contractDriftPairs) {
+      const rawPath = path.join(repoRoot(), "examples", "contract-drift", `${name}.raw.txt`);
+      const reducedPath = path.join(repoRoot(), "examples", "contract-drift", `${name}.reduced.txt`);
+      const raw = fs.readFileSync(rawPath, "utf8");
+      const committed = fs.readFileSync(reducedPath, "utf8").trim();
+      const actual = applyHeuristicPolicy("contract-drift", raw);
       expect(actual, `${name} reduced output must match committed file`).toBe(committed);
     }
   });

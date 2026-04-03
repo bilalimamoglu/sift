@@ -1,0 +1,17 @@
+{
+  "id": "insufficient-prose-doc-suppresses-test-status",
+  "family": "trust-regression",
+  "title": "Insufficient prose-doc routing suppresses test-status nudges",
+  "description": "Repo prose should produce a prose-aware insufficiency hint instead of a misleading test-status recommendation.",
+  "coversPlans": ["08-02"],
+  "surface": "insufficient-hint",
+  "fixtureRef": "test/fixtures/trust/insufficient.ts#proseDocSuppressesTestStatusFixture",
+  "assertions": {
+    "contains": [
+      "captured output looks like prose or markdown"
+    ],
+    "notContains": [
+      "try --preset test-status"
+    ]
+  }
+}

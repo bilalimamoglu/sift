@@ -1931,6 +1931,11 @@ interface ContractDriftEntities {
   snapshotKeys: string[];
 }
 
+interface ContractDriftAnchor {
+  label: string;
+  target: string;
+}
+
 const CONTRACT_DRIFT_STRONG_PATTERN =
   /(snapshot(?:\s+`[^`]+`)?\s+(?:mismatch(?:ed)?|expectations?\s+differ|is out of date)|golden output drift|expected .+ to stay frozen|generated (?:client|artifact|schema).+(?:out of sync|out of date)|openapi.+(?:frozen|out of sync|drift)|manifest.+(?:frozen|out of sync|drift)|contract.+(?:frozen|out of sync|drift))/i;
 const CONTRACT_DRIFT_LABEL_PATTERN = /(freeze|contract|manifest|openapi|golden|snapshot)/i;
@@ -2428,6 +2433,44 @@ function buildContractDriftHint(input: string): string {
   return "If the changes are intentional, regenerate or refresh the expected artifact and rerun the drift check.";
 }
 
+function extractContractDriftAnchors(input: string): ContractDriftAnchor[] {
+  const labels = collectFailureLabels(input)
+    .map((entry) => entry.label)
+    .filter(isContractDriftLabel);
+  const unique = new Set<string>();
+  const anchors: ContractDriftAnchor[] = [];
+
+  for (const label of labels) {
+    const anchor = buildLabelAnchor(label);
+    const target = anchor.file ? compactDisplayFile(anchor.file) : label;
+    if (unique.has(target)) {
+      continue;
+    }
+    unique.add(target);
+    anchors.push({ label, target });
+    if (anchors.length >= 2) {
+      return anchors;
+    }
+  }
+
+  for (const line of input.split("\n").map((entry) => entry.trim())) {
+    const fileMatch = line.match(
+      /\b(tests\/[A-Za-z0-9_./-]+\.(?:py|ts|tsx|js|jsx)|src\/[A-Za-z0-9_./-]+\.(?:ts|tsx|js|jsx|json|ya?ml))\b/
+    );
+    const target = fileMatch?.[1] ? compactDisplayFile(fileMatch[1]) : null;
+    if (!target || unique.has(target) || !isContractDriftLabel(line)) {
+      continue;
+    }
+    unique.add(target);
+    anchors.push({ label: line, target });
+    if (anchors.length >= 2) {
+      break;
+    }
+  }
+
+  return anchors;
+}
+
 function contractDriftHeuristic(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) {
@@ -2440,6 +2483,7 @@ function contractDriftHeuristic(input: string): string | null {
 
   const evidence = collectContractDriftEvidence(trimmed);
   const entities = extractContractDriftEntities(trimmed);
+  const anchors = extractContractDriftAnchors(trimmed);
   const entityMentions = [
     ...entities.apiPaths,
     ...entities.modelIds,
@@ -2464,6 +2508,9 @@ function contractDriftHeuristic(input: string): string | null {
   } else if (evidence.length > 0) {
     lines.push(`- Visible evidence: ${evidence[0]}.`);
   }
+  if (anchors.length > 0) {
+    lines.push(`- Inspect ${anchors.map((anchor) => anchor.target).join(", ")} first.`);
+  }
   lines.push(`- ${buildContractDriftHint(trimmed)}`);
 
   return lines.join("\n");
@@ -2475,6 +2522,10 @@ function looksLikeTaskKey(value: string): boolean {
 
 function looksLikeModelId(value: string): boolean {
   return !value.startsWith("/api/") && /^[a-z0-9][a-z0-9._/-]*-[a-z0-9._-]+$/i.test(value);
+}
+
+function looksLikeHttpMethod(value: string): boolean {
+  return /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/i.test(value);
 }
 
 function extractContractDriftEntities(input: string): ContractDriftEntities {
@@ -2520,15 +2571,19 @@ function extractContractDriftEntities(input: string): ContractDriftEntities {
       continue;
     }
 
+    if (looksLikeHttpMethod(candidate)) {
+      continue;
+    }
+
     if (!snapshotKeys.includes(candidate) && snapshotKeys.length < 6) {
       snapshotKeys.push(candidate);
     }
   }
 
-  if (apiPaths.length === 0) {
-    apiPaths.push(
-      ...collectUniqueMatches(input, /['"](\/api\/[A-Za-z0-9_./{}:-]+)['"]/g, 6)
-    );
+  for (const candidatePath of collectUniqueMatches(input, /['"](\/api\/[A-Za-z0-9_./{}:-]+)['"]/g, 6)) {
+    if (!apiPaths.includes(candidatePath) && apiPaths.length < 6) {
+      apiPaths.push(candidatePath);
+    }
   }
 
   return {

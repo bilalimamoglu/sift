@@ -1,0 +1,22 @@
+collecting ... collected 3 items
+tests/contracts/test_feature_manifest_freeze.py::test_feature_manifest_is_frozen FAILED [ 33%]
+tests/contracts/test_openapi_contract_freeze.py::test_openapi_paths_and_methods_are_frozen FAILED [ 66%]
+tests/contracts/test_task_matrix_snapshot_freeze.py::test_task_matrix_snapshot_is_frozen FAILED [100%]
+
+python scripts/update_contract_snapshots.py
+E     Left contains 4 more items:
+E     {'/api/v1/admin/landing-gallery': ['GET'],
+E      '/api/v1/admin/landing-gallery/drafts/{draft_id}/discard': ['POST'],
+E      '/api/v1/admin/landing-gallery/publish': ['PUT'],
+E      '/api/v1/admin/landing-gallery/uploads/stream': ['POST']}
+  +     '/api/v1/admin/landing-gallery': [
+  +         'GET',
+  +     ],
+  -             'openai-gpt-image-1.5',
+  -             'openai-gpt-image-1.5',
+
+=========================== short test summary info ============================
+FAILED tests/contracts/test_feature_manifest_freeze.py::test_feature_manifest_is_frozen
+FAILED tests/contracts/test_openapi_contract_freeze.py::test_openapi_paths_and_methods_are_frozen
+FAILED tests/contracts/test_task_matrix_snapshot_freeze.py::test_task_matrix_snapshot_is_frozen
+============================== 3 failed in 1.02s ==============================

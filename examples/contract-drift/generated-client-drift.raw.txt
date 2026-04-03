@@ -1,0 +1,4 @@
+Generated client artifact is out of sync with the current OpenAPI schema.
+Please run pnpm generate:client
+- '/api/v1/users'
+- 'gpt-4.1-mini'

@@ -1,0 +1,4 @@
+- OpenAPI drift detected.
+- Visible drift touches /api/v1/admin/landing-gallery, /api/v1/admin/landing-gallery/drafts/{draft_id}/discard, /api/v1/admin/landing-gallery/publish, /api/v1/admin/landing-gallery/uploads/stream.
+- Inspect tests/contracts/test_feature_manifest_freeze.py, tests/contracts/test_openapi_contract_freeze.py first.
+- If the changes are intentional, run python scripts/update_contract_snapshots.py and rerun the drift check.

@@ -1,0 +1,31 @@
+{
+  "id": "diagnose-search-only-anchor",
+  "family": "trust-regression",
+  "title": "Diagnose marks representative anchors as search-only",
+  "description": "Mixed full-suite read targets should expose search-only guidance when the anchor is representative rather than exact.",
+  "coversPlans": ["08-03"],
+  "surface": "diagnose-public-json",
+  "fixtureRef": "test/fixtures/trust/test-status.ts#diagnoseSearchOnlyAnchorFixture",
+  "assertions": {
+    "jsonEquals": [
+      {
+        "path": "read_targets.0.anchor_kind",
+        "value": "test_label"
+      },
+      {
+        "path": "read_targets.0.context_hint.kind",
+        "value": "search_only"
+      },
+      {
+        "path": "read_targets.0.context_hint.search_hint",
+        "value": "PGTEST_POSTGRES_DSN"
+      }
+    ],
+    "jsonIncludes": [
+      {
+        "path": "read_targets.0.why",
+        "value": "PGTEST_POSTGRES_DSN setup guard"
+      }
+    ]
+  }
+}

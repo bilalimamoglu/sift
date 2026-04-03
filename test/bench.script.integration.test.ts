@@ -140,7 +140,7 @@ function assertMixedFixtureHasBothBuckets(report: BenchmarkReport, name: string)
     expect.arrayContaining(["shared_environment_blocker", "contract_snapshot_drift"])
   );
   expect(fixture?.completion.entitiesFound).toEqual(
-    expect.arrayContaining(["PGTEST_POSTGRES_DSN", "openai-gpt-image-1.5", "/api/v1/admin/landing-gallery"])
+    expect.arrayContaining(["PGTEST_POSTGRES_DSN", "/api/v1/admin/landing-gallery"])
   );
 }
 

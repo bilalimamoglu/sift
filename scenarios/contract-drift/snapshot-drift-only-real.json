@@ -1,0 +1,18 @@
+{
+  "id": "contract-drift.snapshot-drift-only-real",
+  "family": "contract-drift",
+  "fixtureName": "snapshot-drift-only-real",
+  "title": "Snapshot Drift Only",
+  "description": "Repo-captured snapshot and OpenAPI drift fixture for the standalone contract-drift preset.",
+  "sourceType": "repo-captured",
+  "rawPath": "examples/contract-drift/snapshot-drift-only-real.raw.txt",
+  "renders": [
+    {
+      "id": "snapshot-drift-only-real-standard",
+      "renderMode": "standard",
+      "docsSlug": "12-snapshot-drift-only-real",
+      "title": "Snapshot Drift Only",
+      "companionOutputPath": "examples/contract-drift/snapshot-drift-only-real.reduced.txt"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "contract-drift.generated-client-drift",
+  "family": "contract-drift",
+  "fixtureName": "generated-client-drift",
+  "title": "Generated Client Drift",
+  "description": "Synthetic generated-artifact drift fixture for the standalone contract-drift preset.",
+  "sourceType": "synthetic-derived",
+  "rawPath": "examples/contract-drift/generated-client-drift.raw.txt",
+  "renders": [
+    {
+      "id": "generated-client-drift-standard",
+      "renderMode": "standard",
+      "docsSlug": "11-generated-client-drift",
+      "title": "Generated Client Drift",
+      "companionOutputPath": "examples/contract-drift/generated-client-drift.reduced.txt"
+    }
+  ]
+}

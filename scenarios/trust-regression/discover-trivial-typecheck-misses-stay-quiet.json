@@ -1,0 +1,17 @@
+{
+  "id": "discover-trivial-typecheck-misses-stay-quiet",
+  "family": "trust-regression",
+  "title": "Discover stays quiet on trivial repeated misses",
+  "description": "Repeated typecheck candidate misses with trivial evidence should not create a discover hint.",
+  "coversPlans": ["08-01"],
+  "surface": "discover-report",
+  "fixtureRef": "test/fixtures/trust/history.ts#discoverTrivialTypecheckMissesFixture",
+  "assertions": {
+    "contains": [
+      "No strong discover hints"
+    ],
+    "notContains": [
+      "Built-in preset fit: typecheck-summary"
+    ]
+  }
+}

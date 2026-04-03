@@ -1,0 +1,16 @@
+{
+  "id": "gain-build-failure-contamination",
+  "family": "trust-regression",
+  "title": "Gain filters low-signal build-failure contamination",
+  "description": "Tiny build-failure samples should stay exploratory and not read like strategic gain evidence.",
+  "coversPlans": ["08-01"],
+  "surface": "gain-report",
+  "fixtureRef": "test/fixtures/trust/history.ts#gainBuildFailureContaminationFixture",
+  "assertions": {
+    "contains": [
+      "Low-signal runs: 3",
+      "Confidence note:",
+      "build-failure: 2 run(s), 0 meaningful, 2 low-signal, evidence is still exploratory, 100% low-signal contamination"
+    ]
+  }
+}

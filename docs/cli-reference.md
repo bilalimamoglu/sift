@@ -410,6 +410,26 @@ Read-target trust notes:
 - `read_targets.context_hint.kind=search_only` means search first instead of trusting an exact line range
 - lower-confidence or non-traceback read targets are representative hints, not exact root-cause proof
 
+## Contract-drift preset
+
+Use `contract-drift` only for explicit artifact mismatch surfaces such as:
+- snapshot drift
+- golden output drift
+- frozen manifest or contract drift
+- OpenAPI drift
+- generated artifact mismatch
+
+Expected output shape:
+- the drift type in plain language
+- the smallest visible entities that drifted
+- when visible, the first anchor file or test surface to inspect
+- the next action, usually regenerate or refresh only if the visible output already shows intentional drift-style evidence
+
+Non-goals:
+- environment/setup troubleshooting
+- generic build or test triage
+- broad repo analysis
+
 ## Current preset list
 
 The built-in presets are:

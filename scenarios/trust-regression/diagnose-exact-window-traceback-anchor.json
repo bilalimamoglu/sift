@@ -1,0 +1,43 @@
+{
+  "id": "diagnose-exact-window-traceback-anchor",
+  "family": "trust-regression",
+  "title": "Diagnose marks traceback anchors as exact windows",
+  "description": "Observed traceback anchors should surface as the strongest read hint with exact window context.",
+  "coversPlans": ["08-03"],
+  "surface": "diagnose-public-json",
+  "fixtureRef": "test/fixtures/trust/test-status.ts#diagnoseExactWindowTracebackFixture",
+  "assertions": {
+    "jsonEquals": [
+      {
+        "path": "read_targets.0.anchor_kind",
+        "value": "traceback"
+      },
+      {
+        "path": "read_targets.0.anchor_confidence",
+        "value": 1
+      },
+      {
+        "path": "read_targets.0.context_hint.kind",
+        "value": "exact_window"
+      },
+      {
+        "path": "read_targets.0.context_hint.confidence",
+        "value": 1
+      },
+      {
+        "path": "read_targets.0.context_hint.start_line",
+        "value": 369
+      },
+      {
+        "path": "read_targets.0.context_hint.end_line",
+        "value": 379
+      }
+    ],
+    "jsonIncludes": [
+      {
+        "path": "read_targets.0.why",
+        "value": "PGTEST_POSTGRES_DSN setup guard"
+      }
+    ]
+  }
+}
