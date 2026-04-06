@@ -282,9 +282,9 @@ The installer now asks which operating mode matches your actual workflow:
 - `local-only`: best if you want `sift` by itself with no provider credentials
 
 Supported runtime paths:
-- `codex`: managed `AGENTS.md` plus tiny Codex skill
-- `claude`: managed `CLAUDE.md` plus tiny Claude command pack
-- `cursor`: tiny native `.cursor/skills/sift/SKILL.md` only
+- `codex`: managed `AGENTS.md` plus tiny Codex skill and shared `SIFT.md`
+- `claude`: managed `CLAUDE.md` plus tiny Claude command pack and shared `SIFT.md`
+- `cursor`: tiny native `.cursor/skills/sift/SKILL.md` plus shared `SIFT.md`
 
 If you pick `provider-assisted`, the installer continues directly into provider/model/API-key setup instead of telling you to run `sift config setup` separately.
 
@@ -308,8 +308,8 @@ sift install all --scope local --yes
 Install a managed instruction block for a supported agent directly. Use this when you want dry runs, raw block output, or a low-level override.
 
 The low-level install also keeps the tiny native packaging honest:
-- Codex installs update `AGENTS.md` and the generated `SKILL.md`
-- Claude installs update `CLAUDE.md` and the generated `.claude/commands/sift/` command pack
+- Codex installs update `AGENTS.md`, the generated `SKILL.md`, and the shared `SIFT.md`
+- Claude installs update `CLAUDE.md`, the generated `.claude/commands/sift/` command pack, and the shared `SIFT.md`
 - the CLI stays the real runtime; these files are guidance surfaces only
 
 ```bash
@@ -357,7 +357,7 @@ sift skill show cursor
 sift skill show codex --raw
 ```
 
-Use this when you want to inspect the tiny native workflow guide that reinforces the normal `sift exec` path.
+Use this when you want to inspect the tiny native pointer that reinforces the normal `sift exec` path and sends deeper workflow reading to `SIFT.md`.
 
 ### `sift skill install`
 

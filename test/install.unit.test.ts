@@ -103,9 +103,11 @@ describe("install runtime support", () => {
     });
 
     const written = await fs.readFile(path.join(homeDir, ".codex", "AGENTS.md"), "utf8");
+    const guide = await fs.readFile(path.join(homeDir, ".config", "sift", "SIFT.md"), "utf8");
 
     expect(status).toBe(0);
     expect(written).toContain("<!-- sift:begin codex -->");
+    expect(guide).toContain("<!-- sift:generated shared-guide -->");
     expect(io.stdout).toContain("███████╗██╗███████╗████████╗");
     expect(io.stdout).toContain("You already installed sift with npm.");
     expect(io.stdout).toContain("Choose your runtime");
@@ -143,6 +145,9 @@ describe("install runtime support", () => {
     );
     expect(await fs.readFile(path.join(cwd, "CLAUDE.md"), "utf8")).toContain(
       "<!-- sift:begin claude -->"
+    );
+    expect(await fs.readFile(path.join(cwd, "SIFT.md"), "utf8")).toContain(
+      "<!-- sift:generated shared-guide -->"
     );
     expect(io.stdout).toContain("Codex + Claude");
     expect(io.stdout).toContain("Operating mode: Agent escalation");

@@ -11,14 +11,38 @@ import {
 } from "../content/adoption.js";
 import type { OperationMode } from "../types.js";
 
-export function getSharedPayloadIntro(mode: OperationMode): string[] {
+export function getCompactPayloadIntro(mode: OperationMode): string[] {
   return [
     "Use `sift` as the default local-first output guidance layer for long, noisy, non-interactive command output.",
-    "The goal is to turn failure walls into grouped issues, likely root causes, and the next useful step before reading raw logs.",
     "",
     `Default operating mode: ${getOperationModeLabel(mode)}.`,
     describeOperationMode(mode),
-    describeInsufficientBehavior(mode),
+    describeInsufficientBehavior(mode)
+  ];
+}
+
+export function getCompactWorkflowLines(guideReference: string): string[] {
+  return [
+    "",
+    "Use `sift exec` first for long, noisy, non-interactive output.",
+    "If exact raw output is required, skip `sift` and read the raw output directly.",
+    "For test failures, start with `sift exec --preset test-status -- <test command>`.",
+    `Read \`${guideReference}\` for the full workflow, rerun/escalate path, and diagnose JSON notes.`
+  ];
+}
+
+export function renderSharedGuideBody(): string {
+  return [...getSharedGuideIntro(), ...getSharedWorkflowLines()].join("\n");
+}
+
+function getSharedGuideIntro(): string[] {
+  return [
+    "# Sift Guide",
+    "",
+    "Use `sift` as the default local-first output guidance layer for long, noisy, non-interactive command output.",
+    "The goal is to turn failure walls into grouped issues, likely root causes, and the next useful step before reading raw logs.",
+    "",
+    "This guide is mode-neutral. Your installed runtime surface and `sift doctor` show the active operation-mode details for the current setup.",
     "",
     getDefaultExecPathLine(),
     getHookBetaLine(),
@@ -27,7 +51,7 @@ export function getSharedPayloadIntro(mode: OperationMode): string[] {
   ];
 }
 
-export function getSharedWorkflowLines(): string[] {
+function getSharedWorkflowLines(): string[] {
   return [
     "",
     "Start with:",

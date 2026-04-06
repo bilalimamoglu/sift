@@ -29,6 +29,7 @@ import { CONFIG_SETUP_BACK, configSetup } from "./config-setup.js";
 import type { OperationMode } from "../types.js";
 import { createPresentation } from "../ui/presentation.js";
 import { PROMPT_BACK, promptSelect } from "../ui/terminal.js";
+import { resolveSharedGuideTargetPath } from "../shared-guide.js";
 import {
   installAgent,
   type AgentCommandIO,
@@ -439,6 +440,15 @@ function writeSuccessSummary(args: {
   args.io.write(`${ui.note(`Operating mode: ${getOperationModeLabel(args.operationMode)}`)}\n`);
   args.io.write(`${ui.note(describeOperationMode(args.operationMode))}\n`);
   args.io.write(`${ui.note(targetLabel)}\n`);
+  args.io.write(
+    `${ui.note(
+      `Shared SIFT guide: ${resolveSharedGuideTargetPath({
+        scope: args.scope,
+        cwd: args.cwd,
+        homeDir: args.homeDir
+      })}`
+    )}\n`
+  );
   if (targets.includes("codex")) {
     args.io.write(`${ui.note("Codex install also writes a tiny generated SKILL.md so Codex has a native `sift` entry point.")}\n`);
   }
@@ -488,11 +498,17 @@ function writePreflightSummary(args: {
   }
 
   const writeTargets = runtimeTargets.flatMap((runtime) => {
+    const sharedGuidePath = resolveSharedGuideTargetPath({
+      scope: args.scope,
+      cwd: args.cwd,
+      homeDir: args.homeDir
+    });
     if (runtime === "codex") {
       return [
         args.scope === "global"
           ? getDefaultCodexGlobalInstructionsPath(args.homeDir)
           : getLocalTargetLabel("codex", args.cwd),
+        sharedGuidePath,
         args.scope === "global"
           ? path.join(args.homeDir ?? os.homedir(), ".codex", "skills", "sift", "SKILL.md")
           : path.join(args.cwd ?? process.cwd(), ".codex", "skills", "sift", "SKILL.md")
@@ -501,6 +517,7 @@ function writePreflightSummary(args: {
 
     if (runtime === "cursor") {
       return [
+        sharedGuidePath,
         args.scope === "global"
           ? getDefaultCursorGlobalSkillPath(args.homeDir)
           : getLocalTargetLabel("cursor", args.cwd)
@@ -508,6 +525,7 @@ function writePreflightSummary(args: {
     }
 
     return [
+      sharedGuidePath,
       args.scope === "global"
         ? getDefaultClaudeGlobalInstructionsPath(args.homeDir)
         : getLocalTargetLabel("claude", args.cwd),

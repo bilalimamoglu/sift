@@ -117,39 +117,10 @@ describe("agent command helpers", () => {
     expect(markers.end).toBe("<!-- sift:end codex -->");
     expect(block).toContain(markers.start);
     expect(block).toContain("Default operating mode: Agent escalation.");
-    expect(block).toContain("sift exec --preset test-status -- <test command>");
-    expect(block).toContain("default to `sift` first and treat `standard` as the usual stop point");
-    expect(block).toContain("Use `sift escalate` when you want a deeper render of the same cached output");
-    expect(block).toContain("`sift escalate` and `sift rerun` require a cached `sift exec --preset test-status -- <test command>` run first.");
-    expect(block).toContain("refresh the truth with `sift rerun`");
-    expect(block).toContain("sift rerun --remaining --detail focused");
-    expect(block).toContain(
-      "`sift rerun --remaining` narrows automatically for `pytest` and reruns the full original command for `vitest` and `jest` while keeping the diagnosis focused on what still fails."
-    );
-    expect(block).toContain("Use diagnose JSON only when automation or machine branching truly needs it.");
-    expect(block).toContain(
-      "If `standard` already shows bucket-level root cause, anchor, and fix lines, trust it and report from it directly."
-    );
-    expect(block).toContain(
-      "do not re-verify the same bucket with raw pytest; at most do one targeted source read before you edit."
-    );
-    expect(block).toContain(
-      "If `standard` still contains an unknown bucket or ends with `Decision: zoom`, do one deeper sift pass before raw traceback."
-    );
-    expect(block).toContain(
-      "Diagnose JSON is summary-first by default. Add `--include-test-ids` only when you truly need the raw failing test IDs."
-    );
-    expect(block).toContain(
-      "If diagnose JSON returns `read_targets.anchor_kind=traceback` and `read_targets.context_hint.kind=exact_window`, read only that small line range first."
-    );
-    expect(block).toContain(
-      "If diagnose JSON returns `read_targets.context_hint.kind=search_only`, search for `read_targets.context_hint.search_hint` before reading the whole file."
-    );
-    expect(block).toContain(
-      "Treat lower-confidence or non-traceback read targets as representative hints, not exact root-cause proof."
-    );
-    expect(block).toContain("--show-raw");
-    expect(block).not.toContain("When debugging test failures, use this order:");
+    expect(block).toContain("Use `sift exec` first for long, noisy, non-interactive output.");
+    expect(block).toContain("If exact raw output is required, skip `sift` and read the raw output directly.");
+    expect(block).toContain("For test failures, start with `sift exec --preset test-status -- <test command>`.");
+    expect(block).toContain("Read `SIFT.md` for the full workflow, rerun/escalate path, and diagnose JSON notes.");
     expect(block).toContain(markers.end);
 
     expect(inspectManagedBlock("", "codex")).toMatchObject({
@@ -312,33 +283,20 @@ describe("agent command helpers", () => {
     expect(previewOutput).toContain("Use --raw to print the exact managed block.");
     expect(previewOutput).toContain("target file: CLAUDE.md");
     expect(previewOutput).toContain("narrow long command output before your agent burns time and tokens on the raw log wall");
-    expect(previewOutput).toContain("default to sift first, keep raw as the last resort");
     expect(previewOutput).toContain("Default path: use `sift exec`");
     expect(previewOutput).toContain("Optional beta shortcut: use `sift hook`");
-    expect(previewOutput).toContain("`sift exec` is the explicit full-control path");
-    expect(previewOutput).toContain("sift hook match -- pytest -q");
+    expect(previewOutput).toContain("Shared guide:");
     expect(previewOutput).toContain("Claude also gets a tiny native command pack");
     expect(previewOutput).toContain("command pack target:");
     expect(previewOutput).toContain("Installed commands: /sift:help, /sift:test-status, /sift:doctor");
-    expect(previewOutput).toContain("standard should usually be enough for first-pass guidance");
-    expect(previewOutput).toContain("After a fix, refresh the truth with sift rerun");
-    expect(previewOutput).toContain("Only then zoom into what is still broken");
-    expect(previewOutput).toContain("Use diagnose JSON only for automation or machine branching");
-    expect(previewOutput).toContain(
-      "If standard already shows bucket-level root cause, anchor, and fix lines"
-    );
-    expect(previewOutput).toContain("avoid re-verifying the same bucket with raw pytest");
+    expect(previewOutput).toContain("Read SIFT.md for the full workflow.");
 
     const rawShowIo = createIo({ stdoutIsTTY: false });
     showAgent({ agent: "claude", raw: true, operationMode: "agent-escalation" }, rawShowIo);
     expect(rawShowIo.stdout).toContain("<!-- sift:begin claude -->");
     expect(rawShowIo.stdout).toContain("Default operating mode: Agent escalation.");
-    expect(rawShowIo.stdout).toContain("Default path: use `sift exec`");
-    expect(rawShowIo.stdout).toContain("Optional beta shortcut: use `sift hook`");
-    expect(rawShowIo.stdout).toContain("refresh the truth with `sift rerun`");
-    expect(rawShowIo.stdout).toContain("`sift escalate` and `sift rerun` require a cached `sift exec --preset test-status -- <test command>` run first.");
-    expect(rawShowIo.stdout).toContain("--include-test-ids");
-    expect(rawShowIo.stdout).toContain("--show-raw");
+    expect(rawShowIo.stdout).toContain("Use `sift exec` first for long, noisy, non-interactive output.");
+    expect(rawShowIo.stdout).toContain("Read `SIFT.md` for the full workflow, rerun/escalate path, and diagnose JSON notes.");
 
     const pathShowIo = createIo();
     showAgent(

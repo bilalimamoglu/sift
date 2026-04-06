@@ -20,11 +20,8 @@ describe("agent installer smoke", () => {
     expect(codex.stdout).toContain("Codex instructions preview");
     expect(codex.stdout).toContain("Use --raw to print the exact managed block.");
     expect(codex.stdout).toContain("operation mode: Agent escalation");
-    expect(codex.stdout).toContain("default to sift first, keep raw as the last resort");
-    expect(codex.stdout).toContain("standard should usually be enough for first-pass guidance");
-    expect(codex.stdout).toContain("Only then zoom into what is still broken");
-    expect(codex.stdout).toContain("Use diagnose JSON only for automation or machine branching");
-    expect(codex.stdout).toContain("If standard already shows bucket-level root cause, anchor, and fix lines");
+    expect(codex.stdout).toContain("Shared guide:");
+    expect(codex.stdout).toContain("Read SIFT.md for the full workflow.");
     expect(codex.stdout).not.toContain("<!-- sift:begin codex -->");
     expect(claude.status).toBe(0);
     expect(claude.stdout).toContain("Claude instructions preview");
@@ -32,17 +29,9 @@ describe("agent installer smoke", () => {
     expect(rawCodex.status).toBe(0);
     expect(rawCodex.stdout).toContain("<!-- sift:begin codex -->");
     expect(rawCodex.stdout).toContain("Default operating mode: Agent escalation.");
-    expect(rawCodex.stdout).toContain("refresh the truth with `sift rerun`");
-    expect(rawCodex.stdout).toContain(
-      "`sift rerun --remaining` narrows automatically for `pytest` and reruns the full original command for `vitest` and `jest` while keeping the diagnosis focused on what still fails."
-    );
-    expect(rawCodex.stdout).toContain("--include-test-ids");
-    expect(rawCodex.stdout).toContain("read_targets.anchor_kind=traceback");
-    expect(rawCodex.stdout).toContain("read_targets.context_hint.kind=search_only");
-    expect(rawCodex.stdout).toContain("read_targets.context_hint.search_hint");
-    expect(rawCodex.stdout).toContain("trust it and report from it directly");
-    expect(rawCodex.stdout).toContain("unknown bucket or ends with `Decision: zoom`");
-    expect(rawCodex.stdout).toContain("--show-raw");
+    expect(rawCodex.stdout).toContain("Use `sift exec` first for long, noisy, non-interactive output.");
+    expect(rawCodex.stdout).toContain("If exact raw output is required, skip `sift` and read the raw output directly.");
+    expect(rawCodex.stdout).toContain("Read `SIFT.md` for the full workflow, rerun/escalate path, and diagnose JSON notes.");
   });
 
   it("installs, updates, removes, and reports repo-scope managed blocks safely", async () => {
@@ -70,10 +59,12 @@ describe("agent installer smoke", () => {
     expect(append.status).toBe(0);
     const appended = await fs.readFile(claudePath, "utf8");
     const claudeHelpPath = path.join(cwd, ".claude", "commands", "sift", "help.md");
+    const guidePath = path.join(cwd, "SIFT.md");
     expect(appended).toContain("# Existing instructions");
     expect(appended).toContain("Keep this.");
     expect(appended).toContain("<!-- sift:begin claude -->");
     expect(await fs.readFile(claudeHelpPath, "utf8")).toContain("/sift:help");
+    expect(await fs.readFile(guidePath, "utf8")).toContain("<!-- sift:generated shared-guide -->");
 
     const update = runSourceCli({
       args: ["agent", "install", "claude", "--yes"],
@@ -99,6 +90,7 @@ describe("agent installer smoke", () => {
     expect(remove.status).toBe(0);
     expect(await fs.readFile(claudePath, "utf8")).toBe("# Existing instructions\n\nKeep this.\n");
     await expect(fs.stat(claudeHelpPath)).rejects.toThrow();
+    await expect(fs.readFile(guidePath, "utf8")).resolves.toContain("<!-- sift:generated shared-guide -->");
   });
 
   it("supports global installs under an isolated HOME and keeps dry-run non-mutating", async () => {

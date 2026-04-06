@@ -96,6 +96,9 @@ describe("dist e2e", () => {
     expect(codexSkill.status).toBe(0);
     expect(claudeInstall.status).toBe(0);
     expect(
+      await fs.readFile(path.join(home, ".config", "sift", "SIFT.md"), "utf8")
+    ).toContain("<!-- sift:generated shared-guide -->");
+    expect(
       await fs.readFile(path.join(home, ".codex", "skills", "sift", "SKILL.md"), "utf8")
     ).toContain("<!-- sift:generated codex-skill -->");
     expect(
@@ -212,6 +215,9 @@ describe("dist e2e", () => {
     });
 
     expect(cursorInstall.status).toBe(0);
+    expect(await fs.readFile(path.join(cwd, "SIFT.md"), "utf8")).toContain(
+      "<!-- sift:generated shared-guide -->"
+    );
     expect(
       await fs.readFile(path.join(cwd, ".cursor", "skills", "sift", "SKILL.md"), "utf8")
     ).toContain("<!-- sift:generated cursor-skill -->");

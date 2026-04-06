@@ -9,6 +9,15 @@ import { getDefaultExecPathLine, getHookBetaLine } from "../content/adoption.js"
 import { CODEX_SKILL_MARKER, renderCodexSkill } from "../runtime-payloads/codex-skill.js";
 import { CURSOR_SKILL_MARKER, renderCursorSkill } from "../runtime-payloads/cursor-skill.js";
 import { resolveConfig, resolveEffectiveOperationMode } from "../config/resolve.js";
+import {
+  describeSharedGuideStatus,
+  getSharedGuideReference,
+  inspectSharedGuideOwnership,
+  readOptionalSharedGuide,
+  removeSharedGuideIfUnused,
+  resolveSharedGuideTargetPath,
+  writeSharedGuide
+} from "../shared-guide.js";
 import type { OperationMode } from "../types.js";
 import { createPresentation } from "../ui/presentation.js";
 
@@ -161,8 +170,14 @@ function getSkillTitle(runtime: SkillRuntime): string {
   return runtime === "codex" ? "Codex" : "Cursor";
 }
 
-function renderSkillForRuntime(runtime: SkillRuntime, mode: OperationMode): string {
-  return runtime === "codex" ? renderCodexSkill(mode) : renderCursorSkill(mode);
+function renderSkillForRuntime(
+  runtime: SkillRuntime,
+  mode: OperationMode,
+  guideReference: string
+): string {
+  return runtime === "codex"
+    ? renderCodexSkill(mode, guideReference)
+    : renderCursorSkill(mode, guideReference);
 }
 
 function getSkillMarker(runtime: SkillRuntime): string {
@@ -177,8 +192,8 @@ function getSkillOwnerNote(runtime: SkillRuntime): string {
 
 function getSkillPreviewNote(runtime: SkillRuntime): string {
   return runtime === "codex"
-    ? "This is a tiny Codex-native workflow guide, not a second runtime or command system."
-    : "This is a tiny Cursor-native workflow guide, not a second runtime or command system.";
+    ? "This is a tiny Codex-native pointer, not a second runtime or command system."
+    : "This is a tiny Cursor-native pointer, not a second runtime or command system.";
 }
 
 function getSkillInstallNote(runtime: SkillRuntime): string {
@@ -216,8 +231,15 @@ function inspectCompatibleCodexOwnership(args: {
 export function showSkill(args: SkillShowArgs): void {
   const io = args.io ?? createStdoutOnlyIO();
   const targetPath = resolveSkillTargetPath(args);
+  const scope = args.scope ?? "repo";
   const mode = inferOperationMode(args);
-  const content = renderSkillForRuntime(args.runtime, mode);
+  const guidePath = resolveSharedGuideTargetPath({
+    scope,
+    cwd: args.cwd,
+    homeDir: args.homeDir
+  });
+  const guideReference = getSharedGuideReference(scope);
+  const content = renderSkillForRuntime(args.runtime, mode, guideReference);
 
   if (args.raw) {
     io.write(`${content}\n`);
@@ -227,6 +249,10 @@ export function showSkill(args: SkillShowArgs): void {
   const ui = createPresentation(Boolean(io.stdoutIsTTY));
   const ownership = inspectSkillOwnership(readOptionalSkillFile(targetPath), args.runtime);
   const compatibleCodexOwnership = inspectCompatibleCodexOwnership(args);
+  const guideStatus = describeSharedGuideStatus(
+    readOptionalSharedGuide(guidePath),
+    guidePath
+  );
   const status =
     ownership === "managed" || ownership === "legacy-managed"
       ? "sift-managed skill already installed here"
@@ -235,7 +261,7 @@ export function showSkill(args: SkillShowArgs): void {
         : "not installed yet";
 
   io.write(`${ui.section(`${getSkillTitle(args.runtime)} skill preview`)}\n`);
-  io.write(`${ui.labelValue("scope", args.scope ?? "repo")}\n`);
+  io.write(`${ui.labelValue("scope", scope)}\n`);
   io.write(`${ui.labelValue("target", targetPath)}\n`);
   io.write(`${ui.labelValue("status", status)}\n`);
   io.write(`${ui.info(getSkillPreviewNote(args.runtime))}\n`);
@@ -248,21 +274,31 @@ export function showSkill(args: SkillShowArgs): void {
   }
   io.write(`${ui.note(getDefaultExecPathLine())}\n`);
   io.write(`${ui.note(getHookBetaLine())}\n`);
+  io.write(`${ui.note(`Shared guide: ${guideStatus}`)}\n`);
+  io.write(`${ui.note(`Read ${guideReference} for the full workflow.`)}\n`);
   io.write(`${ui.note("The skill complements the CLI and managed block. It does not replace them.")}\n`);
   io.write(`${ui.note("sift only updates or removes SKILL.md when the file is clearly owned by sift.")}\n`);
   io.write(`  ${ui.command("sift exec --preset test-status -- pytest -q")}\n`);
-  io.write(`  ${ui.command("sift hook match -- pytest -q")}${ui.note("  # optional beta shortcut")}\n`);
+  io.write(`  ${ui.command("sift doctor")}\n`);
   io.write(`${ui.note("Use --raw to print the exact SKILL.md content.")}\n`);
 }
 
 export async function installSkill(args: SkillInstallArgs): Promise<number> {
   const io = args.io ?? createTerminalIO();
   const targetPath = resolveSkillTargetPath(args);
+  const scope = args.scope ?? "repo";
   const mode = inferOperationMode(args);
-  const content = `${renderSkillForRuntime(args.runtime, mode)}\n`;
+  const guidePath = resolveSharedGuideTargetPath({
+    scope,
+    cwd: args.cwd,
+    homeDir: args.homeDir
+  });
+  const guideReference = getSharedGuideReference(scope);
+  const content = `${renderSkillForRuntime(args.runtime, mode, guideReference)}\n`;
   const ui = createPresentation(Boolean(io.stdoutIsTTY));
   const existingContent = readOptionalSkillFile(targetPath);
   const ownership = inspectSkillOwnership(existingContent, args.runtime);
+  const guideOwnership = inspectSharedGuideOwnership(readOptionalSharedGuide(guidePath));
   const compatibleCodexOwnership = inspectCompatibleCodexOwnership(args);
   const action =
     ownership === "missing"
@@ -280,7 +316,7 @@ export async function installSkill(args: SkillInstallArgs): Promise<number> {
     io.write(
       `${ui.section(`Dry run: ${action === "update" ? "update" : "create"} ${getSkillTitle(args.runtime)} skill`)}\n`
     );
-    io.write(`${ui.labelValue("scope", args.scope ?? "repo")}\n`);
+    io.write(`${ui.labelValue("scope", scope)}\n`);
     io.write(`${ui.labelValue("target", targetPath)}\n`);
     io.write(`${ui.labelValue("file exists", existingContent !== undefined ? "yes" : "no")}\n`);
     io.write(
@@ -296,6 +332,16 @@ export async function installSkill(args: SkillInstallArgs): Promise<number> {
       )}\n`
     );
     io.write(`${ui.note(getSkillInstallNote(args.runtime))}\n`);
+    io.write(
+      `${ui.labelValue(
+        "shared guide",
+        guideOwnership === "missing"
+          ? `create ${guidePath}`
+          : guideOwnership === "custom"
+            ? `custom guide present; install would stop before overwriting ${guidePath}`
+            : `update ${guidePath}`
+      )}\n`
+    );
     if (args.runtime === "cursor" && (compatibleCodexOwnership === "managed" || compatibleCodexOwnership === "legacy-managed")) {
       io.write(
         `${ui.warning(
@@ -327,15 +373,28 @@ export async function installSkill(args: SkillInstallArgs): Promise<number> {
     return 1;
   }
 
+  if (guideOwnership === "custom") {
+    io.error(`Refusing to overwrite a custom SIFT.md at ${guidePath}. Move it, remove it manually, or choose a different scope.\n`);
+    return 1;
+  }
+
+  writeSharedGuide(guidePath);
   writeTextFileAtomic(targetPath, content);
   io.write(`${ui.success(`${getSkillTitle(args.runtime)} skill ${action === "update" ? "updated" : "installed"}.`)}\n`);
   io.write(`${ui.labelValue("target", targetPath)}\n`);
+  io.write(`${ui.labelValue("shared guide", guidePath)}\n`);
   return 0;
 }
 
 export async function removeSkill(args: SkillRemoveArgs): Promise<number> {
   const io = args.io ?? createTerminalIO();
   const targetPath = resolveSkillTargetPath(args);
+  const scope = args.scope ?? "repo";
+  const guidePath = resolveSharedGuideTargetPath({
+    scope,
+    cwd: args.cwd,
+    homeDir: args.homeDir
+  });
   const ui = createPresentation(Boolean(io.stdoutIsTTY));
   const existingContent = readOptionalSkillFile(targetPath);
   const ownership = inspectSkillOwnership(existingContent, args.runtime);
@@ -343,6 +402,7 @@ export async function removeSkill(args: SkillRemoveArgs): Promise<number> {
   if (args.dryRun) {
     io.write(`${ui.section(`Dry run: remove ${getSkillTitle(args.runtime)} skill`)}\n`);
     io.write(`${ui.labelValue("target", targetPath)}\n`);
+    io.write(`${ui.labelValue("shared guide", guidePath)}\n`);
     io.write(`${ui.labelValue("file exists", existingContent !== undefined ? "yes" : "no")}\n`);
     io.write(
       `${ui.labelValue(
@@ -375,8 +435,16 @@ export async function removeSkill(args: SkillRemoveArgs): Promise<number> {
   }
 
   fs.unlinkSync(targetPath);
-  cleanupEmptyDirectories(args.runtime, path.dirname(targetPath), args.scope ?? "repo", args.cwd, args.homeDir);
+  cleanupEmptyDirectories(args.runtime, path.dirname(targetPath), scope, args.cwd, args.homeDir);
+  const sharedGuideRemoval = removeSharedGuideIfUnused({
+    scope,
+    cwd: args.cwd,
+    homeDir: args.homeDir
+  });
   io.write(`${ui.success(`${getSkillTitle(args.runtime)} skill removed.`)}\n`);
+  if (sharedGuideRemoval.removed) {
+    io.write(`${ui.note(`Removed the shared SIFT guide at ${sharedGuideRemoval.targetPath}`)}\n`);
+  }
   return 0;
 }
 
@@ -410,6 +478,19 @@ export function statusSkills(args: {
 } = {}): void {
   const io = args.io ?? createStdoutOnlyIO();
   const ui = createPresentation(Boolean(io.stdoutIsTTY));
+  for (const scope of ["repo", "global"] as const) {
+    const guidePath = resolveSharedGuideTargetPath({
+      scope,
+      cwd: args.cwd,
+      homeDir: args.homeDir
+    });
+    io.write(
+      `${ui.labelValue(
+        `${scope}Guide`,
+        describeSharedGuideStatus(readOptionalSharedGuide(guidePath), guidePath)
+      )}\n`
+    );
+  }
   for (const runtime of ["codex", "cursor"] as const) {
     const repoPath = resolveSkillTargetPath({ runtime, scope: "repo", cwd: args.cwd });
     const globalPath = resolveSkillTargetPath({

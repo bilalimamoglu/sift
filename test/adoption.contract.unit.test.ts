@@ -78,8 +78,7 @@ describe("adoption contract", () => {
 
     expect(agentPreview).toContain(getDefaultExecPathLine());
     expect(agentPreview).toContain(getHookBetaLine());
-    expect(agentPreview).toContain(getExecVsHookDecisionLine());
-    expect(agentPreview).toContain("sift hook match -- pytest -q");
+    expect(agentPreview).toContain("Read SIFT.md for the full workflow.");
 
     expect(cliHelp.status).toBe(0);
     expect(cliHelp.stdout).toContain(getDefaultExecPathLine());

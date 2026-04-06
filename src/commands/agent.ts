@@ -10,17 +10,23 @@ import {
   getDefaultCodexGlobalInstructionsPath
 } from "../constants.js";
 import {
-  describeInsufficientBehavior,
   describeOperationMode,
   getOperationModeLabel
 } from "../config/operation-mode.js";
 import {
   getDefaultExecPathLine,
-  getExecVsHookDecisionLine,
-  getHookBetaLine,
-  getHookBetaPlainEnglishLine
+  getHookBetaLine
 } from "../content/adoption.js";
 import { resolveConfig, resolveEffectiveOperationMode } from "../config/resolve.js";
+import {
+  describeSharedGuideStatus,
+  getSharedGuideReference,
+  inspectSharedGuideOwnership,
+  readOptionalSharedGuide,
+  removeSharedGuideIfUnused,
+  resolveSharedGuideTargetPath,
+  writeSharedGuide
+} from "../shared-guide.js";
 import type { OperationMode } from "../types.js";
 import {
   CLAUDE_COMMAND_NAMES,
@@ -261,10 +267,11 @@ function inferOperationMode(args: {
 export function renderManagedBlock(
   agent: AgentName,
   eol = "\n",
-  mode: OperationMode = "agent-escalation"
+  mode: OperationMode = "agent-escalation",
+  guideReference = "SIFT.md"
 ): string {
   const markers = getManagedBlockMarkers(agent);
-  return [markers.start, renderManagedInstructionBody(mode), markers.end].join(eol);
+  return [markers.start, renderManagedInstructionBody(mode, guideReference), markers.end].join(eol);
 }
 
 export function inspectManagedBlock(content: string, agent: AgentName): ManagedBlockInfo {
@@ -299,9 +306,15 @@ export function planManagedInstall(args: {
   targetPath: string;
   existingContent?: string;
   operationMode?: OperationMode;
+  guideReference?: string;
 }): AgentInstallPlan {
   const eol = args.existingContent?.includes("\r\n") ? "\r\n" : "\n";
-  const block = renderManagedBlock(args.agent, eol, args.operationMode ?? "agent-escalation");
+  const block = renderManagedBlock(
+    args.agent,
+    eol,
+    args.operationMode ?? "agent-escalation",
+    args.guideReference ?? "SIFT.md"
+  );
 
   if (args.existingContent === undefined) {
     return {
@@ -454,9 +467,19 @@ export function showAgent(
     homeDir: params.homeDir,
     operationMode: params.operationMode
   });
+  const guidePath = resolveSharedGuideTargetPath({
+    scope: params.scope,
+    cwd: params.cwd,
+    homeDir: params.homeDir
+  });
+  const guideReference = getSharedGuideReference(params.scope);
+  const guideStatus = describeSharedGuideStatus(
+    readOptionalSharedGuide(guidePath),
+    guidePath
+  );
 
   if (params.raw) {
-    io.write(`${renderManagedBlock(agent, "\n", operationMode)}\n`);
+    io.write(`${renderManagedBlock(agent, "\n", operationMode, guideReference)}\n`);
     return;
   }
 
@@ -512,48 +535,14 @@ export function showAgent(
     `${ui.info("The point is to narrow long command output before your agent burns time and tokens on the raw log wall.")}\n`
   );
   io.write(
-    `${ui.info("The managed block teaches the agent to default to sift first, keep raw as the last resort, and treat standard as the usual stop point.")}\n`
+    `${ui.info("The managed block stays tiny and points to the shared Sift guide for the deeper workflow.")}\n`
   );
   io.write(`${ui.note(describeOperationMode(operationMode))}\n`);
-  io.write(`${ui.note(describeInsufficientBehavior(operationMode))}\n`);
   io.write(`${ui.note(getDefaultExecPathLine())}\n`);
   io.write(`${ui.note(getHookBetaLine())}\n`);
-  io.write(`${ui.note(getExecVsHookDecisionLine())}\n`);
-  io.write(`  ${ui.command('sift exec "question" -- <command> [args...]')}\n`);
   io.write(`  ${ui.command("sift exec --preset test-status -- <test command>")}\n`);
-  io.write(`  ${ui.command("sift exec --preset audit-critical -- npm audit")}\n`);
-  io.write(`  ${ui.command("sift exec --preset infra-risk -- terraform plan")}\n`);
-  io.write(`  ${ui.command("sift hook match -- pytest -q")}${ui.note("  # optional beta shortcut for a known preset")}\n`);
-  io.write(
-    `${ui.info("For test debugging, standard should usually be enough for first-pass guidance.")}\n`
-  );
-  io.write(
-    `${ui.note("If standard already names the main failure buckets and hints, stop there and read source.")}\n`
-  );
-  io.write(
-    `${ui.note(`Use ${ui.command("sift escalate")} when you want a deeper render of the same cached output without rerunning the command.`)}\n`
-  );
-  io.write(
-    `${ui.note(`After a fix, refresh the truth with ${ui.command("sift rerun")} so the full suite runs again at standard.`)}\n`
-  );
-  io.write(
-    `${ui.note(`Only then zoom into what is still broken with ${ui.command("sift rerun --remaining --detail focused")}, then ${ui.command("sift rerun --remaining --detail verbose")}, then ${ui.command("sift rerun --remaining --detail verbose --show-raw")} if needed.`)}\n`
-  );
-  io.write(
-    `${ui.note("Use diagnose JSON only for automation or machine branching. It is summary-first by default, and full test IDs stay opt-in.")}\n`
-  );
-  io.write(
-    `${ui.note("Treat `read_targets.anchor_kind=traceback` plus `context_hint.kind=exact_window` as the strongest read hint. Lower-confidence or search-only targets are representative hints, not exact proof.")}\n`
-  );
-  io.write(
-    `${ui.note("If standard already shows bucket-level root cause, anchor, and fix lines, report from it directly and avoid re-verifying the same bucket with raw pytest.")}\n`
-  );
-  io.write(
-    `${ui.note("At most do one targeted source read before you edit when standard already points to the right file or line range.")}\n`
-  );
-  io.write(
-    `${ui.note("Only fall back to the raw test command if exact traceback lines are still needed for the remaining failing subset.")}\n`
-  );
+  io.write(`  ${ui.command("sift doctor")}\n`);
+  io.write(`${ui.note(`Shared guide: ${guideStatus}`)}\n`);
   if (agent === "codex") {
     const skillTargetPath = resolveSkillTargetPath({
       runtime: "codex",
@@ -590,6 +579,7 @@ export function showAgent(
       );
     }
   }
+  io.write(`${ui.note(`Read ${guideReference} for the full workflow.`)}\n`);
   io.write(`${ui.note("Use --raw to print the exact managed block.")}\n`);
 }
 
@@ -613,6 +603,13 @@ export async function installAgent(args: AgentInstallArgs): Promise<number> {
 
   try {
     const existingContent = readOptionalFile(targetPath);
+    const guidePath = resolveSharedGuideTargetPath({
+      scope,
+      cwd: args.cwd,
+      homeDir: args.homeDir
+    });
+    const guideReference = getSharedGuideReference(scope);
+    const guideOwnership = inspectSharedGuideOwnership(readOptionalSharedGuide(guidePath));
     const fileExists = existingContent !== undefined;
     const inspection =
       existingContent !== undefined
@@ -622,7 +619,8 @@ export async function installAgent(args: AgentInstallArgs): Promise<number> {
       agent,
       targetPath,
       existingContent,
-      operationMode
+      operationMode,
+      guideReference
     });
     const codexSkillTargetPath =
       agent === "codex"
@@ -643,7 +641,8 @@ export async function installAgent(args: AgentInstallArgs): Promise<number> {
             scope,
             cwd: args.cwd,
             homeDir: args.homeDir,
-            operationMode
+            operationMode,
+            guideReference
           })
         : undefined;
 
@@ -677,6 +676,16 @@ export async function installAgent(args: AgentInstallArgs): Promise<number> {
       );
       io.write(
         `${ui.warning("Only the managed sift block would be written or updated.")}\n`
+      );
+      io.write(
+        `${ui.labelValue(
+          "shared guide",
+          guideOwnership === "missing"
+            ? `create ${guidePath}`
+            : guideOwnership === "custom"
+              ? `custom guide present; install would stop before overwriting ${guidePath}`
+              : `update ${guidePath}`
+        )}\n`
       );
       if (codexSkillTargetPath) {
         io.write(
@@ -768,15 +777,27 @@ export async function installAgent(args: AgentInstallArgs): Promise<number> {
       return 1;
     }
 
+    if (guideOwnership === "custom") {
+      io.error(
+        `Refusing to overwrite a custom SIFT.md at ${guidePath}. Clean it up manually or choose a different scope.\n`
+      );
+      return 1;
+    }
+
     writeTextFileAtomic(targetPath, plan.content);
+    writeSharedGuide(guidePath);
     if (codexSkillTargetPath) {
-      writeTextFileAtomic(codexSkillTargetPath, `${renderCodexSkill(operationMode)}\n`);
+      writeTextFileAtomic(
+        codexSkillTargetPath,
+        `${renderCodexSkill(operationMode, guideReference)}\n`
+      );
     }
     if (claudeCommandPack) {
       writeClaudeCommandPack(claudeCommandPack);
     }
     io.write(`${ui.success(`${AGENT_TITLES[agent]} managed block updated.`)}\n`);
     io.write(`${ui.note(`${targetPath}`)}\n`);
+    io.write(`${ui.note(`Shared guide updated in ${guidePath}`)}\n`);
     if (codexSkillTargetPath) {
       io.write(`${ui.note(`Codex skill updated in ${codexSkillTargetPath}`)}\n`);
     }
@@ -804,6 +825,11 @@ export async function removeAgent(args: AgentRemoveArgs): Promise<number> {
 
   try {
     const existingContent = readOptionalFile(targetPath);
+    const guidePath = resolveSharedGuideTargetPath({
+      scope,
+      cwd: args.cwd,
+      homeDir: args.homeDir
+    });
     const plan = planManagedRemove({
       agent,
       targetPath,
@@ -853,10 +879,13 @@ export async function removeAgent(args: AgentRemoveArgs): Promise<number> {
       );
       io.write(`${ui.labelValue("scope", scope)}\n`);
       io.write(`${ui.labelValue("target", targetPath)}\n`);
+      io.write(`${ui.labelValue("shared guide", guidePath)}\n`);
       io.write(
         `${ui.warning("Only the managed sift block would be removed.")}\n`
       );
-      io.write(`${ui.note("Other content in the file would be preserved.")}\n`);
+      io.write(
+        `${ui.note("Other content in the file would be preserved. The shared guide is removed only when no generated surfaces still depend on it.")}\n`
+      );
       return 0;
     }
 
@@ -907,6 +936,14 @@ export async function removeAgent(args: AgentRemoveArgs): Promise<number> {
         io.write(`${ui.warning(`Left ${commandRemoval.customFiles.length} custom Claude command file(s) untouched.`)}\n`);
       }
     }
+    const sharedGuideRemoval = removeSharedGuideIfUnused({
+      scope,
+      cwd: args.cwd,
+      homeDir: args.homeDir
+    });
+    if (sharedGuideRemoval.removed) {
+      io.write(`${ui.note(`Removed the shared SIFT guide at ${sharedGuideRemoval.targetPath}`)}\n`);
+    }
     return 0;
   } finally {
     io.close?.();
@@ -934,6 +971,19 @@ export function statusAgents(args: {
 
   for (const scope of ["repo", "global"] as const) {
     io.write(`${ui.section(scope === "repo" ? "Repo scope" : "Global scope")}\n`);
+    const guidePath = resolveSharedGuideTargetPath({
+      scope,
+      cwd: args.cwd,
+      homeDir: args.homeDir
+    });
+    const guideStatus = describeSharedGuideStatus(readOptionalSharedGuide(guidePath), guidePath);
+    const sharedGuideStyled =
+      guideStatus.startsWith("installed")
+        ? ui.success(`Shared SIFT guide: ${guideStatus}`)
+        : guideStatus.startsWith("custom")
+          ? ui.warning(`Shared SIFT guide: ${guideStatus}`)
+          : ui.warning(`Shared SIFT guide: ${guideStatus}`);
+    io.write(`  ${sharedGuideStyled}\n`);
     for (const row of rows.filter((entry) => entry.scope === scope)) {
       const status = `${AGENT_TITLES[row.agent]} managed block: ${row.installed ? "installed" : "not installed"} (${row.fileExists ? "file exists" : "file missing"})`;
       io.write(`  ${row.installed ? ui.success(status) : ui.warning(status)}\n`);
@@ -1055,9 +1105,13 @@ function planClaudeCommandPack(args: {
   cwd?: string;
   homeDir?: string;
   operationMode: OperationMode;
+  guideReference?: string;
 }): ClaudeCommandPackPlan {
   const targetDir = resolveClaudeCommandPackTargetDir(args);
-  const rendered = renderClaudeCommandPack(args.operationMode);
+  const rendered = renderClaudeCommandPack(
+    args.operationMode,
+    args.guideReference ?? "SIFT.md"
+  );
   const files: ClaudeCommandFilePlan[] = Object.entries(rendered).map(([name, content]) => {
     const targetPath = path.join(targetDir, name);
     const ownership = inspectClaudeCommandOwnership(readOptionalFile(targetPath), name as `${ClaudeCommandName}.md`);

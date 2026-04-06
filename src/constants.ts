@@ -33,6 +33,10 @@ export function getDefaultGlobalConfigPath(homeDir = os.homedir()): string {
   return path.join(homeDir, ".config", "sift", "config.yaml");
 }
 
+export function getDefaultGlobalGuidePath(homeDir = os.homedir()): string {
+  return path.join(homeDir, ".config", "sift", "SIFT.md");
+}
+
 export function getDefaultGlobalStateDir(homeDir = os.homedir()): string {
   return path.join(homeDir, ".config", "sift", "state");
 }

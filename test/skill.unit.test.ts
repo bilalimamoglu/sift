@@ -116,11 +116,13 @@ describe("skill commands", () => {
     });
 
     const targetPath = path.join(cwd, ".codex", "skills", "sift", "SKILL.md");
+    const guidePath = path.join(cwd, "SIFT.md");
     const written = await fs.readFile(targetPath, "utf8");
 
     expect(installStatus).toBe(0);
     expect(written).toContain("name: sift");
-    expect(written).toContain("Long noisy output: use `sift exec` first.");
+    expect(written).toContain("Use `sift exec` first for long, noisy, non-interactive output.");
+    expect(await fs.readFile(guidePath, "utf8")).toContain("<!-- sift:generated shared-guide -->");
 
     const statusIo = createIo();
     statusSkills({
@@ -142,6 +144,7 @@ describe("skill commands", () => {
 
     expect(removeStatus).toBe(0);
     await expect(fs.access(targetPath)).rejects.toThrow();
+    await expect(fs.access(guidePath)).rejects.toThrow();
   });
 
   it("refuses to overwrite or remove a custom SKILL.md and still reports the conflict honestly", async () => {
@@ -187,7 +190,20 @@ describe("skill commands", () => {
     const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "sift-skill-legacy-"));
     const targetPath = path.join(cwd, ".codex", "skills", "sift", "SKILL.md");
     await fs.mkdir(path.dirname(targetPath), { recursive: true });
-    const legacyContent = `${renderCodexSkill("agent-escalation").replace("<!-- sift:generated codex-skill -->\n", "")}\n`;
+    const legacyContent = [
+      "---",
+      "name: sift",
+      "description: legacy",
+      "---",
+      "",
+      "# Sift",
+      "",
+      "## Decision Table",
+      "",
+      "- legacy guidance",
+      "",
+      "The CLI is the product runtime. This skill is a discoverability and workflow guide for Codex."
+    ].join("\n");
     await fs.writeFile(targetPath, legacyContent, "utf8");
 
     const installIo = createIo();
@@ -241,7 +257,7 @@ describe("skill commands", () => {
 
     expect(installStatus).toBe(0);
     expect(written).toContain("name: sift");
-    expect(written).toContain("workflow guide for Cursor");
+    expect(written).toContain("tiny Cursor-native pointer");
 
     const statusIo = createIo();
     statusSkills({
